@@ -1243,6 +1243,9 @@ void idRenderSystemLocal::TakeScreenshot( int width, int height, const char *fil
 	takingScreenshot = false;
 }
 
+void idRenderSystemVk::TakeScreenshot(int width, int height, const char *fileName, int blends, renderView_t *ref) {
+}
+
 /* 
 ================== 
 R_ScreenshotFilename
@@ -1938,6 +1941,9 @@ void idRenderSystemLocal::Clear() {
 	frontEndJobList = NULL;
 }
 
+void idRenderSystemVk::Clear() {
+}
+
 /*
 =============
 R_MakeFullScreenTris
@@ -2196,6 +2202,9 @@ void idRenderSystemLocal::Init() {
 	common->Printf( "--------------------------------------\n" );
 }
 
+void idRenderSystemVk::Init() {
+}
+
 /*
 ===============
 idRenderSystemLocal::Shutdown
@@ -2232,7 +2241,10 @@ void idRenderSystemLocal::Shutdown() {
 
 	Clear();
 
-	ShutdownOpenGL();
+	ShutdownRenderBackend();
+}
+
+void idRenderSystemVk::Shutdown() {
 }
 
 /*
@@ -2248,6 +2260,9 @@ void idRenderSystemLocal::ResetGuiModels() {
 	tr_guiModel = guiModel;	// for DeviceContext fast path
 }
 
+void idRenderSystemVk::ResetGuiModels() {
+}
+
 /*
 ========================
 idRenderSystemLocal::BeginLevelLoad
@@ -2261,6 +2276,9 @@ void idRenderSystemLocal::BeginLevelLoad() {
 	R_InitMaterials();
 }
 
+void idRenderSystemVk::BeginLevelLoad() {
+}
+
 /*
 ========================
 idRenderSystemLocal::LoadLevelImages
@@ -2268,6 +2286,9 @@ idRenderSystemLocal::LoadLevelImages
 */
 void idRenderSystemLocal::LoadLevelImages() {
 	globalImages->LoadLevelImages( false );
+}
+
+void idRenderSystemVk::LoadLevelImages() {
 }
 
 /*
@@ -2281,6 +2302,9 @@ void idRenderSystemLocal::Preload( const idPreloadManifest &manifest, const char
 	renderModelManager->Preload( manifest );
 }
 
+void idRenderSystemVk::Preload( const idPreloadManifest &manifest, const char *mapName ) {
+}
+
 /*
 ========================
 idRenderSystemLocal::EndLevelLoad
@@ -2291,6 +2315,9 @@ void idRenderSystemLocal::EndLevelLoad() {
 	globalImages->EndLevelLoad();
 }
 
+void idRenderSystemVk::EndLevelLoad() {
+}
+
 /*
 ========================
 idRenderSystemLocal::BeginAutomaticBackgroundSwaps
@@ -2298,6 +2325,9 @@ idRenderSystemLocal::BeginAutomaticBackgroundSwaps
 */
 void idRenderSystemLocal::BeginAutomaticBackgroundSwaps( autoRenderIconType_t icon ) {
 }
+
+void idRenderSystemVk::BeginAutomaticBackgroundSwaps( autoRenderIconType_t icon ) {
+	}
 
 /*
 ========================
@@ -2307,12 +2337,19 @@ idRenderSystemLocal::EndAutomaticBackgroundSwaps
 void idRenderSystemLocal::EndAutomaticBackgroundSwaps() {
 }
 
+void idRenderSystemVk::EndAutomaticBackgroundSwaps() {
+}
+
 /*
 ========================
 idRenderSystemLocal::AreAutomaticBackgroundSwapsRunning
 ========================
 */
 bool idRenderSystemLocal::AreAutomaticBackgroundSwapsRunning( autoRenderIconType_t * icon ) const {
+	return false;
+}
+
+bool idRenderSystemVk::AreAutomaticBackgroundSwapsRunning( autoRenderIconType_t * icon ) const {
 	return false;
 }
 
@@ -2336,6 +2373,10 @@ idFont * idRenderSystemLocal::RegisterFont( const char * fontName ) {
 	return newFont;
 }
 
+idFont * idRenderSystemVk::RegisterFont( const char * fontName ) {
+	return nullptr;
+}
+
 /*
 ========================
 idRenderSystemLocal::ResetFonts
@@ -2344,12 +2385,16 @@ idRenderSystemLocal::ResetFonts
 void idRenderSystemLocal::ResetFonts() {
 	fonts.DeleteContents( true );
 }
+
+void idRenderSystemVk::ResetFonts() {
+}
+
 /*
 ========================
 idRenderSystemLocal::InitOpenGL
 ========================
 */
-void idRenderSystemLocal::InitOpenGL() {
+void idRenderSystemLocal::InitRenderBackend() {
 	// if OpenGL isn't started, start it now
 	if ( !R_IsInitialized() ) {
 		R_InitOpenGL();
@@ -2364,16 +2409,22 @@ void idRenderSystemLocal::InitOpenGL() {
 	}
 }
 
+void idRenderSystemVk::InitRenderBackend() {
+}
+
 /*
 ========================
 idRenderSystemLocal::ShutdownOpenGL
 ========================
 */
-void idRenderSystemLocal::ShutdownOpenGL() {
+void idRenderSystemLocal::ShutdownRenderBackend() {
 	// free the context and close the window
 	R_ShutdownFrameData();
 	GLimp_Shutdown();
 	r_initialized = false;
+}
+
+void idRenderSystemVk::ShutdownRenderBackend() {
 }
 
 /*
@@ -2381,8 +2432,12 @@ void idRenderSystemLocal::ShutdownOpenGL() {
 idRenderSystemLocal::IsOpenGLRunning
 ========================
 */
-bool idRenderSystemLocal::IsOpenGLRunning() const {
+bool idRenderSystemLocal::IsRenderBackendRunning() const {
 	return R_IsInitialized();
+}
+
+bool idRenderSystemVk::IsRenderBackendRunning() const {
+	return false;
 }
 
 /*
@@ -2392,6 +2447,10 @@ idRenderSystemLocal::IsFullScreen
 */
 bool idRenderSystemLocal::IsFullScreen() const {
 	return glConfig.isFullscreen != 0;
+}
+
+bool idRenderSystemVk::IsFullScreen() const {
+	return false;
 }
 
 /*
@@ -2404,6 +2463,10 @@ int idRenderSystemLocal::GetWidth() const {
 		return glConfig.nativeScreenWidth >> 1;
 	}
 	return glConfig.nativeScreenWidth;
+}
+
+int idRenderSystemVk::GetWidth() const {
+	return 0;
 }
 
 /*
@@ -2426,6 +2489,10 @@ int idRenderSystemLocal::GetHeight() const {
 	return glConfig.nativeScreenHeight;
 }
 
+int idRenderSystemVk::GetHeight() const {
+	return 0;
+}
+
 /*
 ========================
 idRenderSystemLocal::GetStereo3DMode
@@ -2434,6 +2501,10 @@ idRenderSystemLocal::GetStereo3DMode
 stereo3DMode_t idRenderSystemLocal::GetStereo3DMode() const {
 	return glConfig.stereo3Dmode;
 }
+
+stereo3DMode_t idRenderSystemVk::GetStereo3DMode() const {
+	return STEREO3D_OFF;
+	}
 
 /*
 ========================
@@ -2444,6 +2515,10 @@ bool idRenderSystemLocal::IsStereoScopicRenderingSupported() const {
 	return true;
 }
 
+bool idRenderSystemVk::IsStereoScopicRenderingSupported() const {
+	return false;
+	}
+
 /*
 ========================
 idRenderSystemLocal::HasQuadBufferSupport
@@ -2452,6 +2527,10 @@ idRenderSystemLocal::HasQuadBufferSupport
 bool idRenderSystemLocal::HasQuadBufferSupport() const {
 	return glConfig.stereoPixelFormatAvailable;
 }
+
+bool idRenderSystemVk::HasQuadBufferSupport() const {
+	return false;
+	}
 
 /*
 ========================
@@ -2462,6 +2541,10 @@ stereo3DMode_t idRenderSystemLocal::GetStereoScopicRenderingMode() const {
 	return ( !IsStereoScopicRenderingSupported() ) ? STEREO3D_OFF : (stereo3DMode_t)stereoRender_enable.GetInteger();
 }
 
+stereo3DMode_t idRenderSystemVk::GetStereoScopicRenderingMode() const {
+	return STEREO3D_OFF;
+	}
+
 /*
 ========================
 idRenderSystemLocal::IsStereoScopicRenderingSupported
@@ -2470,6 +2553,9 @@ idRenderSystemLocal::IsStereoScopicRenderingSupported
 void idRenderSystemLocal::EnableStereoScopicRendering( const stereo3DMode_t mode ) const {
 	stereoRender_enable.SetInteger( mode );
 }
+
+void idRenderSystemVk::EnableStereoScopicRendering( const stereo3DMode_t mode ) const {
+	}
 
 /*
 ========================
@@ -2488,6 +2574,10 @@ float idRenderSystemLocal::GetPixelAspect() const {
 	}
 }
 
+float idRenderSystemVk::GetPixelAspect() const {
+	return 0.0f;
+}
+
 /*
 ========================
 idRenderSystemLocal::GetPhysicalScreenWidthInCentimeters
@@ -2501,4 +2591,8 @@ float idRenderSystemLocal::GetPhysicalScreenWidthInCentimeters() const {
 		return r_forceScreenWidthCentimeters.GetFloat();
 	}
 	return glConfig.physicalScreenWidthInCentimeters;
+}
+
+float idRenderSystemVk::GetPhysicalScreenWidthInCentimeters() const {
+	return 0.0f;
 }

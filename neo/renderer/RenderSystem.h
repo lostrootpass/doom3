@@ -186,11 +186,11 @@ public:
 
 	virtual void			ResetGuiModels() = 0;
 
-	virtual void			InitOpenGL() = 0;
+	virtual void			InitRenderBackend() = 0;
 
-	virtual void			ShutdownOpenGL() = 0;
+	virtual void			ShutdownRenderBackend() = 0;
 
-	virtual bool			IsOpenGLRunning() const = 0;
+	virtual bool			IsRenderBackendRunning() const = 0;
 
 	virtual bool			IsFullScreen() const = 0;
 	virtual int				GetWidth() const = 0;

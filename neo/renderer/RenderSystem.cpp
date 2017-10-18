@@ -31,7 +31,8 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "tr_local.h"
 
-idRenderSystemLocal	tr;
+//idRenderSystemLocal	tr;
+idRenderSystemVk	tr;
 idRenderSystem * renderSystem = &tr;
 
 /*
@@ -129,6 +130,8 @@ void idRenderSystemLocal::RenderCommandBuffers( const emptyCommand_t * const cmd
 
 	// pass in null for now - we may need to do some map specific hackery in the future
 	resolutionScale.InitForMap( NULL );
+}
+void idRenderSystemVk::RenderCommandBuffers(const emptyCommand_t * const cmdHead) {
 }
 
 /*
@@ -282,6 +285,10 @@ idRenderSystemLocal::idRenderSystemLocal() :
 	Clear();
 }
 
+idRenderSystemVk::idRenderSystemVk() : idRenderSystemLocal()
+{
+}
+
 /*
 =============
 idRenderSystemLocal::~idRenderSystemLocal
@@ -290,6 +297,9 @@ idRenderSystemLocal::~idRenderSystemLocal
 idRenderSystemLocal::~idRenderSystemLocal() {
 }
 
+idRenderSystemVk::~idRenderSystemVk() {
+	}
+
 /*
 =============
 idRenderSystemLocal::SetColor
@@ -297,6 +307,9 @@ idRenderSystemLocal::SetColor
 */
 void idRenderSystemLocal::SetColor( const idVec4 & rgba ) {
 	currentColorNativeBytesOrder = LittleLong( PackColor( rgba ) );
+}
+
+void idRenderSystemVk::SetColor(const idVec4 & rgba) {
 }
 
 /*
@@ -308,6 +321,10 @@ uint32 idRenderSystemLocal::GetColor() {
 	return LittleLong( currentColorNativeBytesOrder );
 }
 
+uint32 idRenderSystemVk::GetColor() {
+	return 0;
+}
+
 /*
 =============
 idRenderSystemLocal::SetGLState
@@ -316,6 +333,9 @@ idRenderSystemLocal::SetGLState
 void idRenderSystemLocal::SetGLState( const uint64 glState ) {
 	currentGLState = glState;
 }
+
+void idRenderSystemVk::SetGLState( const uint64 glState ) {
+	}
 
 /*
 =============
@@ -327,6 +347,9 @@ void idRenderSystemLocal::DrawFilled( const idVec4 & color, float x, float y, fl
 	DrawStretchPic( x, y, w, h, 0.0f, 0.0f, 1.0f, 1.0f, whiteMaterial );
 }
 
+void idRenderSystemVk::DrawFilled( const idVec4 & color, float x, float y, float w, float h ) {
+	}
+
 /*
 =============
 idRenderSystemLocal::DrawStretchPic
@@ -335,6 +358,9 @@ idRenderSystemLocal::DrawStretchPic
 void idRenderSystemLocal::DrawStretchPic( float x, float y, float w, float h, float s1, float t1, float s2, float t2, const idMaterial *material ) {
 	DrawStretchPic( idVec4( x, y, s1, t1 ), idVec4( x+w, y, s2, t1 ), idVec4( x+w, y+h, s2, t2 ), idVec4( x, y+h, s1, t2 ), material );
 }
+
+void idRenderSystemVk::DrawStretchPic( float x, float y, float w, float h, float s1, float t1, float s2, float t2, const idMaterial *material ) {
+	}
 
 /*
 =============
@@ -388,6 +414,9 @@ void idRenderSystemLocal::DrawStretchPic( const idVec4 & topLeft, const idVec4 &
 	WriteDrawVerts16( verts, localVerts, 4 );
 }
 
+void idRenderSystemVk::DrawStretchPic( const idVec4 & topLeft, const idVec4 & topRight, const idVec4 & bottomRight, const idVec4 & bottomLeft, const idMaterial * material ) {
+	}
+
 /*
 =============
 idRenderSystemLocal::DrawStretchTri
@@ -434,6 +463,9 @@ void idRenderSystemLocal::DrawStretchTri( const idVec2 & p1, const idVec2 & p2, 
 	WriteDrawVerts16( verts, localVerts, 3 );
 }
 
+void idRenderSystemVk::DrawStretchTri( const idVec2 & p1, const idVec2 & p2, const idVec2 & p3, const idVec2 & t1, const idVec2 & t2, const idVec2 & t3, const idMaterial *material ) {
+	}
+
 /*
 =============
 idRenderSystemLocal::AllocTris
@@ -441,6 +473,10 @@ idRenderSystemLocal::AllocTris
 */
 idDrawVert * idRenderSystemLocal::AllocTris( int numVerts, const triIndex_t * indexes, int numIndexes, const idMaterial * material, const stereoDepthType_t stereoType ) {
 	return guiModel->AllocTris( numVerts, indexes, numIndexes, material, currentGLState, stereoType );
+}
+
+idDrawVert * idRenderSystemVk::AllocTris( int numVerts, const triIndex_t * indexes, int numIndexes, const idMaterial * material, const stereoDepthType_t stereoType ) {
+	return nullptr;
 }
 
 /*
@@ -477,6 +513,9 @@ void idRenderSystemLocal::DrawSmallChar( int x, int y, int ch ) {
 					   fcol + size, frow + size, 
 					   charSetMaterial );
 }
+
+void idRenderSystemVk::DrawSmallChar( int x, int y, int ch ) {
+	}
 
 /*
 ==================
@@ -518,6 +557,9 @@ void idRenderSystemLocal::DrawSmallStringExt( int x, int y, const char *string, 
 	SetColor( colorWhite );
 }
 
+void idRenderSystemVk::DrawSmallStringExt( int x, int y, const char *string, const idVec4 &setColor, bool forceColor ) {
+	}
+
 /*
 =====================
 idRenderSystemLocal::DrawBigChar
@@ -550,6 +592,9 @@ void idRenderSystemLocal::DrawBigChar( int x, int y, int ch ) {
 					   fcol + size, frow + size, 
 					   charSetMaterial );
 }
+
+void idRenderSystemVk::DrawBigChar( int x, int y, int ch ) {
+	}
 
 /*
 ==================
@@ -591,6 +636,9 @@ void idRenderSystemLocal::DrawBigStringExt( int x, int y, const char *string, co
 	SetColor( colorWhite );
 }
 
+void idRenderSystemVk::DrawBigStringExt( int x, int y, const char *string, const idVec4 &setColor, bool forceColor ) {
+	}
+
 //======================================================================================
 
 /*
@@ -618,6 +666,14 @@ const emptyCommand_t * idRenderSystemLocal::SwapCommandBuffers(
 	SwapCommandBuffers_FinishRendering( frontEndMicroSec, backEndMicroSec, shadowMicroSec, gpuMicroSec );
 
 	return SwapCommandBuffers_FinishCommandBuffers();
+}
+
+const emptyCommand_t * idRenderSystemVk::SwapCommandBuffers(
+	uint64 * frontEndMicroSec,
+	uint64 * backEndMicroSec,
+	uint64 * shadowMicroSec,
+	uint64 * gpuMicroSec) {
+	return nullptr;
 }
 
 /*
@@ -682,6 +738,13 @@ void idRenderSystemLocal::SwapCommandBuffers_FinishRendering(
     // check for errors
 	GL_CheckErrors();
 }
+
+void idRenderSystemVk::SwapCommandBuffers_FinishRendering( 
+												uint64 * frontEndMicroSec,
+												uint64 * backEndMicroSec,
+												uint64 * shadowMicroSec,
+												uint64 * gpuMicroSec )  {
+	}
 
 /*
 =====================
@@ -768,6 +831,10 @@ const emptyCommand_t * idRenderSystemLocal::SwapCommandBuffers_FinishCommandBuff
 	return commandBufferHead;
 }
 
+const emptyCommand_t * idRenderSystemVk::SwapCommandBuffers_FinishCommandBuffers() {
+	return nullptr;
+}
+
 /*
 =====================
 idRenderSystemLocal::WriteDemoPics
@@ -778,6 +845,9 @@ void idRenderSystemLocal::WriteDemoPics() {
 	common->WriteDemo()->WriteInt( DC_GUI_MODEL );
 }
 
+void idRenderSystemVk::WriteDemoPics() {
+	}
+
 /*
 =====================
 idRenderSystemLocal::DrawDemoPics
@@ -785,6 +855,9 @@ idRenderSystemLocal::DrawDemoPics
 */
 void idRenderSystemLocal::DrawDemoPics() {
 }
+
+void idRenderSystemVk::DrawDemoPics() {
+	}
 
 /*
 =====================
@@ -796,6 +869,9 @@ Returns the current cropped pixel coordinates
 void idRenderSystemLocal::GetCroppedViewport( idScreenRect * viewport ) {
 	*viewport = renderCrops[currentRenderCrop];
 }
+
+void idRenderSystemVk::GetCroppedViewport( idScreenRect * viewport ) {
+	}
 
 /*
 ========================
@@ -815,6 +891,9 @@ void idRenderSystemLocal::PerformResolutionScaling( int& newWidth, int& newHeigh
 	newWidth = idMath::Ftoi( GetWidth() * xScale );
 	newHeight = idMath::Ftoi( GetHeight() * yScale );
 }
+
+void idRenderSystemVk::PerformResolutionScaling( int& newWidth, int& newHeight ) {
+	}
 
 /*
 ================
@@ -858,6 +937,9 @@ void idRenderSystemLocal::CropRenderSize( int width, int height ) {
 	current.y2 = previous.y2;
 }
 
+void idRenderSystemVk::CropRenderSize( int width, int height ) {
+	}
+
 /*
 ================
 idRenderSystemLocal::UnCrop
@@ -887,6 +969,9 @@ void idRenderSystemLocal::UnCrop() {
 		}
 	}
 }
+
+void idRenderSystemVk::UnCrop() {
+	}
 
 /*
 ================
@@ -928,6 +1013,9 @@ void idRenderSystemLocal::CaptureRenderToImage( const char *imageName, bool clea
 	guiModel->Clear();
 }
 
+void idRenderSystemVk::CaptureRenderToImage( const char *imageName, bool clearColorAfterCopy ) {
+	}
+
 /*
 ==============
 idRenderSystemLocal::CaptureRenderToFile
@@ -968,6 +1056,9 @@ void idRenderSystemLocal::CaptureRenderToFile( const char *fileName, bool fixAlp
 }
 
 
+void idRenderSystemVk::CaptureRenderToFile( const char *fileName, bool fixAlpha ) {
+	}
+
 /*
 ==============
 idRenderSystemLocal::AllocRenderWorld
@@ -978,6 +1069,10 @@ idRenderWorld *idRenderSystemLocal::AllocRenderWorld() {
 	rw = new (TAG_RENDER) idRenderWorldLocal;
 	worlds.Append( rw );
 	return rw;
+}
+
+idRenderWorld *idRenderSystemVk::AllocRenderWorld() {
+	return nullptr;
 }
 
 /*
@@ -992,6 +1087,9 @@ void idRenderSystemLocal::FreeRenderWorld( idRenderWorld *rw ) {
 	worlds.Remove( static_cast<idRenderWorldLocal *>(rw) );
 	delete rw;
 }
+
+void idRenderSystemVk::FreeRenderWorld( idRenderWorld *rw ) {
+	}
 
 /*
 ==============
@@ -1009,6 +1107,9 @@ void idRenderSystemLocal::PrintMemInfo( MemInfo_t *mi ) {
 
 }
 
+void idRenderSystemVk::PrintMemInfo( MemInfo_t *mi ) {
+	}
+
 /*
 ===============
 idRenderSystemLocal::UploadImage
@@ -1021,4 +1122,8 @@ bool idRenderSystemLocal::UploadImage( const char *imageName, const byte *data, 
 	}
 	image->UploadScratch( data, width, height );
 	return true;
+}
+
+bool idRenderSystemVk::UploadImage( const char *imageName, const byte *data, int width, int height  ) {
+	return false;
 }

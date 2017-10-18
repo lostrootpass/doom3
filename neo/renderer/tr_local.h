@@ -683,9 +683,9 @@ public:
 	virtual void			Init();
 	virtual void			Shutdown();
 	virtual void			ResetGuiModels();
-	virtual void			InitOpenGL();
-	virtual void			ShutdownOpenGL();
-	virtual bool			IsOpenGLRunning() const;
+	virtual void			InitRenderBackend();
+	virtual void			ShutdownRenderBackend();
+	virtual bool			IsRenderBackendRunning() const;
 	virtual bool			IsFullScreen() const;
 	virtual stereo3DMode_t	GetStereo3DMode() const;
 	virtual bool			HasQuadBufferSupport() const;
@@ -745,10 +745,10 @@ public:
 							idRenderSystemLocal();
 							~idRenderSystemLocal();
 
-	void					Clear();
-	void					GetCroppedViewport( idScreenRect * viewport );
-	void					PerformResolutionScaling( int& newWidth, int& newHeight );
-	int						GetFrameCount() const { return frameCount; };
+	virtual void					Clear();
+	virtual void GetCroppedViewport( idScreenRect * viewport );
+	virtual void PerformResolutionScaling( int& newWidth, int& newHeight );
+	int	GetFrameCount() const { return frameCount; };
 
 public:
 	// renderer globals
@@ -817,8 +817,128 @@ public:
 	unsigned				timerQueryId;		// for GL_TIME_ELAPSED_EXT queries
 };
 
+class idRenderSystemVk : public idRenderSystemLocal
+{
+
+public:
+	idRenderSystemVk();
+
+	~idRenderSystemVk();
+
+	virtual void Init() override;
+
+	virtual void Shutdown() override;
+
+	virtual void ResetGuiModels() override;
+
+	virtual void InitRenderBackend() override;
+
+	virtual void ShutdownRenderBackend() override;
+
+	virtual bool IsRenderBackendRunning() const override;
+
+	virtual bool IsFullScreen() const override;
+
+	virtual stereo3DMode_t GetStereo3DMode() const override;
+
+	virtual bool HasQuadBufferSupport() const override;
+
+	virtual bool IsStereoScopicRenderingSupported() const override;
+
+	virtual stereo3DMode_t GetStereoScopicRenderingMode() const override;
+
+	virtual void EnableStereoScopicRendering(const stereo3DMode_t mode) const override;
+
+	virtual int GetWidth() const override;
+
+	virtual int GetHeight() const override;
+
+	virtual float GetPixelAspect() const override;
+
+	virtual float GetPhysicalScreenWidthInCentimeters() const override;
+
+	virtual idRenderWorld * AllocRenderWorld() override;
+
+	virtual void FreeRenderWorld(idRenderWorld *rw) override;
+
+	virtual void BeginLevelLoad() override;
+
+	virtual void EndLevelLoad() override;
+
+	virtual void LoadLevelImages() override;
+
+	virtual void Preload(const idPreloadManifest &manifest, const char *mapName) override;
+
+	virtual void BeginAutomaticBackgroundSwaps(autoRenderIconType_t icon = AUTORENDER_DEFAULTICON) override;
+
+	virtual void EndAutomaticBackgroundSwaps() override;
+
+	virtual bool AreAutomaticBackgroundSwapsRunning(autoRenderIconType_t * usingAlternateIcon = NULL) const override;
+
+	virtual idFont * RegisterFont(const char * fontName) override;
+
+	virtual void ResetFonts() override;
+
+	virtual void PrintMemInfo(MemInfo_t *mi) override;
+
+	virtual void SetColor(const idVec4 & color) override;
+
+	virtual uint32 GetColor() override;
+
+	virtual void SetGLState(const uint64 glState) override;
+
+	virtual void DrawFilled(const idVec4 & color, float x, float y, float w, float h) override;
+
+	virtual void DrawStretchPic(float x, float y, float w, float h, float s1, float t1, float s2, float t2, const idMaterial *material) override;
+
+	virtual void DrawStretchPic(const idVec4 & topLeft, const idVec4 & topRight, const idVec4 & bottomRight, const idVec4 & bottomLeft, const idMaterial * material) override;
+
+	virtual void DrawStretchTri(const idVec2 & p1, const idVec2 & p2, const idVec2 & p3, const idVec2 & t1, const idVec2 & t2, const idVec2 & t3, const idMaterial *material) override;
+
+	virtual idDrawVert * AllocTris(int numVerts, const triIndex_t * indexes, int numIndexes, const idMaterial * material, const stereoDepthType_t stereoType = STEREO_DEPTH_TYPE_NONE) override;
+
+	virtual void DrawSmallChar(int x, int y, int ch) override;
+
+	virtual void DrawSmallStringExt(int x, int y, const char *string, const idVec4 &setColor, bool forceColor) override;
+
+	virtual void DrawBigChar(int x, int y, int ch) override;
+
+	virtual void DrawBigStringExt(int x, int y, const char *string, const idVec4 &setColor, bool forceColor) override;
+
+	virtual void WriteDemoPics() override;
+
+	virtual void DrawDemoPics() override;
+
+	virtual const emptyCommand_t * SwapCommandBuffers(uint64 *frontEndMicroSec, uint64 *backEndMicroSec, uint64 *shadowMicroSec, uint64 *gpuMicroSec) override;
+
+	virtual void SwapCommandBuffers_FinishRendering(uint64 *frontEndMicroSec, uint64 *backEndMicroSec, uint64 *shadowMicroSec, uint64 *gpuMicroSec) override;
+
+	virtual const emptyCommand_t * SwapCommandBuffers_FinishCommandBuffers() override;
+
+	virtual void RenderCommandBuffers(const emptyCommand_t * commandBuffers) override;
+
+	virtual void TakeScreenshot(int width, int height, const char *fileName, int downSample, renderView_t *ref) override;
+
+	virtual void CropRenderSize(int width, int height) override;
+
+	virtual void CaptureRenderToImage(const char *imageName, bool clearColorAfterCopy = false) override;
+
+	virtual void CaptureRenderToFile(const char *fileName, bool fixAlpha) override;
+
+	virtual void UnCrop() override;
+
+	virtual bool UploadImage(const char *imageName, const byte *data, int width, int height) override;
+
+	virtual void Clear() override;
+
+	virtual void GetCroppedViewport(idScreenRect * viewport) override;
+
+	virtual void PerformResolutionScaling(int& newWidth, int& newHeight) override;
+};
+
 extern backEndState_t		backEnd;
-extern idRenderSystemLocal	tr;
+extern idRenderSystemVk	tr;
+//extern idRenderSystemLocal	tr;
 extern glconfig_t			glConfig;		// outside of TR since it shouldn't be cleared during ref re-init
 
 //
