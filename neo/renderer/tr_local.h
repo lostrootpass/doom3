@@ -1091,6 +1091,7 @@ INITIALIZATION
 
 void R_Init();
 void R_InitOpenGL();
+void R_InitVulkan();
 
 void R_SetColorMappings();
 
@@ -1174,6 +1175,15 @@ void		GLimp_DeactivateContext();
 
 void		GLimp_EnableLogging( bool enable );
 
+
+/* Vulkan-specific functions */
+
+typedef glimpParms_t VkImpParams_t;
+
+bool		VkImp_Init( VkImpParams_t params );
+void VkImp_Shutdown();
+
+void Vk_FlipPresent();
 
 /*
 ============================================================

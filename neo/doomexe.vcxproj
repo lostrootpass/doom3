@@ -56,6 +56,7 @@
     <Import Project="_Debug.props" />
     <Import Project="_WithInlines.props" />
     <Import Project="_PCLibs.props" />
+    <Import Project="_Vulkan.props" />
   </ImportGroup>
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
@@ -106,6 +107,7 @@
     <ClCompile>
       <TreatWarningAsError Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</TreatWarningAsError>
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(DXSDK_DIR)\Include\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">_INLINEDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <ClCompile>
       <TreatWarningAsError Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</TreatWarningAsError>
@@ -130,6 +132,10 @@
     <Manifest>
       <EnableDPIAwareness Condition="'$(Configuration)|$(Platform)'=='Retail|Win32'">true</EnableDPIAwareness>
     </Manifest>
+    <Link>
+      <AdditionalLibraryDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(DXSDK_DIR)\Lib\x86\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">xinput.lib;dbghelp.lib;dinput8.lib;dsound.lib;dxguid.lib;DxErr.lib;glu32.lib;iphlpapi.lib;odbc32.lib;odbccp32.lib;opengl32.lib;winmm.lib;wsock32.lib;x3daudio.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="aas\AASFile.h" />
@@ -263,6 +269,8 @@
     <ClInclude Include="sys\sys_stats.h" />
     <ClInclude Include="sys\sys_stats_misc.h" />
     <ClInclude Include="sys\sys_voicechat.h" />
+    <ClInclude Include="sys\win32\win_vkutil.h" />
+    <ClInclude Include="sys\win32\win_gfxcommon.h" />
     <ClInclude Include="sys\win32\win_input.h" />
     <ClInclude Include="sys\win32\win_achievements.h" />
     <ClInclude Include="sys\win32\win_local.h" />
@@ -479,6 +487,7 @@
     <ClCompile Include="sys\sys_voicechat.cpp" />
     <ClCompile Include="sys\win32\win_achievements.cpp" />
     <ClCompile Include="sys\win32\win_cpu.cpp" />
+    <ClCompile Include="sys\win32\win_gfxcommon.cpp" />
     <ClCompile Include="sys\win32\win_glimp.cpp" />
     <ClCompile Include="sys\win32\win_input.cpp" />
     <ClCompile Include="sys\win32\win_localuser.cpp" />
@@ -492,6 +501,8 @@
     <ClCompile Include="sys\win32\win_snd.cpp" />
     <ClCompile Include="sys\win32\win_syscon.cpp" />
     <ClCompile Include="sys\win32\win_taskkeyhook.cpp" />
+    <ClCompile Include="sys\win32\win_vkimp.cpp" />
+    <ClCompile Include="sys\win32\win_vkutil.cpp" />
     <ClCompile Include="sys\win32\win_wndproc.cpp" />
     <ClCompile Include="ui\BindWindow.cpp" />
     <ClCompile Include="ui\ChoiceWindow.cpp" />

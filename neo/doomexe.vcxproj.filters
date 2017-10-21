@@ -537,6 +537,12 @@
     <ClInclude Include="renderer\GLMatrix.h">
       <Filter>Renderer</Filter>
     </ClInclude>
+    <ClInclude Include="sys\win32\win_gfxcommon.h">
+      <Filter>Sys\Win32</Filter>
+    </ClInclude>
+    <ClInclude Include="sys\win32\win_vkutil.h">
+      <Filter>Sys\Win32</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="cm\CollisionModel_contacts.cpp">
@@ -1134,6 +1140,15 @@
       <Filter>Renderer</Filter>
     </ClCompile>
     <ClCompile Include="sys\win32\win_session_local.cpp">
+      <Filter>Sys\Win32</Filter>
+    </ClCompile>
+    <ClCompile Include="sys\win32\win_vkimp.cpp">
+      <Filter>Sys\Win32</Filter>
+    </ClCompile>
+    <ClCompile Include="sys\win32\win_gfxcommon.cpp">
+      <Filter>Sys\Win32</Filter>
+    </ClCompile>
+    <ClCompile Include="sys\win32\win_vkutil.cpp">
       <Filter>Sys\Win32</Filter>
     </ClCompile>
   </ItemGroup>

@@ -748,6 +748,101 @@ safeMode:
 	}
 }
 
+void R_SetNewModeVk( const bool fullInit ) {
+	// try up to three different configurations
+
+	for ( int i = 0 ; i < 3 ; i++ ) {
+		if ( i == 0 && stereoRender_enable.GetInteger() != STEREO3D_QUAD_BUFFER ) {
+			continue;		// don't even try for a stereo mode
+		}
+
+		glimpParms_t	parms;
+
+		if ( r_fullscreen.GetInteger() <= 0 ) {
+			// use explicit position / size for window
+			parms.x = r_windowX.GetInteger();
+			parms.y = r_windowY.GetInteger();
+			parms.width = r_windowWidth.GetInteger();
+			parms.height = r_windowHeight.GetInteger();
+			// may still be -1 to force a borderless window
+			parms.fullScreen = r_fullscreen.GetInteger();
+			parms.displayHz = 0;		// ignored
+		} else {
+			// get the mode list for this monitor
+			idList<vidMode_t> modeList;
+			if ( !R_GetModeListForDisplay( r_fullscreen.GetInteger()-1, modeList ) ) {
+				idLib::Printf( "r_fullscreen reset from %i to 1 because mode list failed.", r_fullscreen.GetInteger() );
+				r_fullscreen.SetInteger( 1 );
+				R_GetModeListForDisplay( r_fullscreen.GetInteger()-1, modeList );
+			}
+			if ( modeList.Num() < 1 ) {
+				idLib::Printf( "Going to safe mode because mode list failed." );
+				goto safeMode;
+			}
+
+			parms.x = 0;		// ignored
+			parms.y = 0;		// ignored
+			parms.fullScreen = r_fullscreen.GetInteger();
+
+			// set the parameters we are trying
+			if ( r_vidMode.GetInteger() < 0 ) {
+				// try forcing a specific mode, even if it isn't on the list
+				parms.width = r_customWidth.GetInteger();
+				parms.height = r_customHeight.GetInteger();
+				parms.displayHz = r_displayRefresh.GetInteger();
+			} else {
+				if ( r_vidMode.GetInteger() > modeList.Num() ) {
+					idLib::Printf( "r_vidMode reset from %i to 0.\n", r_vidMode.GetInteger() );
+					r_vidMode.SetInteger( 0 );
+				}
+
+				parms.width = modeList[ r_vidMode.GetInteger() ].width;
+				parms.height = modeList[ r_vidMode.GetInteger() ].height;
+				parms.displayHz = modeList[ r_vidMode.GetInteger() ].displayHz;
+			}
+		}
+
+		parms.multiSamples = r_multiSamples.GetInteger();
+		if ( i == 0 ) {
+			parms.stereo = ( stereoRender_enable.GetInteger() == STEREO3D_QUAD_BUFFER );
+		} else {
+			parms.stereo = false;
+		}
+
+		if ( fullInit ) {
+			// create the context as well as setting up the window
+			if ( VkImp_Init( parms ) ) {
+				// it worked
+				break;
+			}
+		} else {
+			// just rebuild the window
+			if ( GLimp_SetScreenParms( parms ) ) {
+				// it worked
+				break;
+			}
+		}
+
+		if ( i == 2 ) {
+			common->FatalError( "Unable to initialize OpenGL" );
+		}
+
+		if ( i == 0 ) {
+			// same settings, no stereo
+			continue;
+		}
+
+safeMode:
+		// if we failed, set everything back to "safe mode"
+		// and try again
+		r_vidMode.SetInteger( 0 );
+		r_fullscreen.SetInteger( 1 );
+		r_displayRefresh.SetInteger( 0 );
+		r_multiSamples.SetInteger( 0 );
+	}
+}
+
+
 idStr extensions_string;
 
 /*
@@ -859,6 +954,17 @@ void R_InitOpenGL() {
 			}
 		}
 	}
+}
+
+void R_InitVulkan() {
+
+	common->Printf("----- R_InitVulkan -----");
+	
+	if (R_IsInitialized()) {
+		common->FatalError("R_InitVulkan called while active");
+	}
+
+	R_SetNewModeVk(true);
 }
 
 /*
@@ -2374,7 +2480,7 @@ idFont * idRenderSystemLocal::RegisterFont( const char * fontName ) {
 }
 
 idFont * idRenderSystemVk::RegisterFont( const char * fontName ) {
-	return nullptr;
+	return idRenderSystemLocal::RegisterFont(fontName);
 }
 
 /*
@@ -2410,6 +2516,9 @@ void idRenderSystemLocal::InitRenderBackend() {
 }
 
 void idRenderSystemVk::InitRenderBackend() {
+	if (!R_IsInitialized()) {
+		R_InitVulkan();
+	}
 }
 
 /*
@@ -2425,6 +2534,9 @@ void idRenderSystemLocal::ShutdownRenderBackend() {
 }
 
 void idRenderSystemVk::ShutdownRenderBackend() {
+	R_ShutdownFrameData();
+	VkImp_Shutdown();
+	r_initialized = false;
 }
 
 /*

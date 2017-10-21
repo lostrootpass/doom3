@@ -132,6 +132,7 @@ void idRenderSystemLocal::RenderCommandBuffers( const emptyCommand_t * const cmd
 	resolutionScale.InitForMap( NULL );
 }
 void idRenderSystemVk::RenderCommandBuffers(const emptyCommand_t * const cmdHead) {
+	Vk_FlipPresent();
 }
 
 /*

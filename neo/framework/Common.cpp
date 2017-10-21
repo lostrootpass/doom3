@@ -1183,6 +1183,7 @@ void idCommonLocal::Init( int argc, const char * const * argv, const char *cmdli
 
 		fileSystem->EndLevelLoad();
 
+#ifndef DOOM3_VULKAN
 		// Initialize support for Doom classic.
 		doomClassicMaterial = declManager->FindMaterial( "_doomClassic" );
 		idImage *image = globalImages->GetImage( "_doomClassic" );
@@ -1208,6 +1209,7 @@ void idCommonLocal::Init( int argc, const char * const * argv, const char *cmdli
 				}
 			}
 		}
+#endif
 
 		Printf( "--- Common Initialization Complete ---\n" );
 
