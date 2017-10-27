@@ -965,6 +965,20 @@ void R_InitVulkan() {
 	}
 
 	R_SetNewModeVk(true);
+
+	Sys_InitInput();
+
+	//TODO
+	//renderProgManager.Init();
+
+	r_initialized = true;
+	
+	//TODO
+	//vertexCache.Init();
+
+	R_InitFrameData();
+
+	R_SetColorMappings();
 }
 
 /*
@@ -2351,6 +2365,35 @@ void idRenderSystemLocal::Shutdown() {
 }
 
 void idRenderSystemVk::Shutdown() {
+	common->Printf( "idRenderSystem::Shutdown()\n" );
+
+	fonts.DeleteContents();
+
+	if ( R_IsInitialized() ) {
+		globalImages->PurgeAllImages();
+	}
+
+	renderModelManager->Shutdown();
+
+	idCinematic::ShutdownCinematic( );
+
+	globalImages->Shutdown();
+
+	// free frame memory
+	R_ShutdownFrameData();
+
+	// free the vertex cache, which should have nothing allocated now
+	vertexCache.Shutdown();
+
+	RB_ShutdownDebugTools();
+
+	delete guiModel;
+
+	parallelJobManager->FreeJobList( frontEndJobList );
+
+	Clear();
+
+	ShutdownRenderBackend();
 }
 
 /*

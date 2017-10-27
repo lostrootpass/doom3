@@ -1525,9 +1525,7 @@ int WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
 	SetThreadAffinityMask( GetCurrentThread(), 1 );
 #endif
 
-#ifndef DOOM3_VULKAN
 	::SetCursor( hcurSave );
-#endif
 
 	::SetFocus( win32.hWnd );
 
@@ -1544,13 +1542,7 @@ int WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
 		Sys_FPU_EnableExceptions( TEST_FPU_EXCEPTIONS );
 
 		// run the game
-#ifdef DOOM3_VULKAN
-		Sys_GenerateEvents();
-		renderSystem->RenderCommandBuffers(nullptr);
-		Sleep(16);
-#else
 		common->Frame();
-#endif
 	}
 
 	// never gets here

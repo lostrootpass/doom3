@@ -11,18 +11,20 @@
 #include "win_gfxcommon.h"
 #include "win_vkutil.h"
 
-VkInstance vkInstance;
-VkSurfaceKHR vkSurface;
-VkPhysicalDevice vkPhysicalDevice;
+VkInstance vkInstance = VK_NULL_HANDLE;
+VkSurfaceKHR vkSurface = VK_NULL_HANDLE;
+VkPhysicalDevice vkPhysicalDevice = VK_NULL_HANDLE;
 VkPhysicalDeviceProperties vkPhysicalDeviceProperties;
-VkDevice vkDevice;	
-VkCommandPool vkCommandPool;
-VkSwapchainKHR vkSwapchain;
-VkRenderPass vkRenderPass;
+VkDevice vkDevice = VK_NULL_HANDLE;	
+VkCommandPool vkCommandPool = VK_NULL_HANDLE;
+VkSwapchainKHR vkSwapchain = VK_NULL_HANDLE;
+VkRenderPass vkRenderPass = VK_NULL_HANDLE;
 
-VkImage depthImage;
-VkImageView depthView;
-VkDeviceMemory depthMemory;
+VkImage depthImage = VK_NULL_HANDLE;
+VkImageView depthView = VK_NULL_HANDLE;
+VkDeviceMemory depthMemory = VK_NULL_HANDLE;
+
+VkDebugReportCallbackEXT vkDebugCallback;
 
 struct QueueInfo
 {
@@ -528,6 +530,20 @@ static void Vk_RecordAllCommandBuffers()
 	}
 }
 
+static void Vk_RegisterDebugger()
+{
+	VkDebugReportCallbackCreateInfoEXT info = {};
+	info.sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT;
+	info.pfnCallback = VulkanUtil::debugCallback;
+	info.pUserData = nullptr;
+	info.flags = VK_DEBUG_REPORT_WARNING_BIT_EXT | VK_DEBUG_REPORT_ERROR_BIT_EXT;
+
+	PFN_vkCreateDebugReportCallbackEXT vkCreateDebugReportCallbackEXT = 
+		(PFN_vkCreateDebugReportCallbackEXT)vkGetInstanceProcAddr(vkInstance, "vkCreateDebugReportCallbackEXT");
+	if (vkCreateDebugReportCallbackEXT)
+		vkCreateDebugReportCallbackEXT(vkInstance, &info, nullptr, &vkDebugCallback);
+}
+
 static bool Vk_InitDriver(VkImpParams_t params)
 {
 	Vk_CreateInstance();
@@ -626,6 +642,8 @@ static bool Vk_InitDriver(VkImpParams_t params)
 	Vk_CreateRenderPass();
 	Vk_CreateSwapChain();
 	Vk_RecordAllCommandBuffers();
+
+	Vk_RegisterDebugger();
 
 	//common->Printf( "...making context current: " );
 	//if ( !qwglMakeCurrent( win32.hDC, win32.hGLRC ) ) {
@@ -813,6 +831,8 @@ bool VkImp_Init(VkImpParams_t params)
 
 void VkImp_Shutdown()
 {
+	vkDeviceWaitIdle(vkDevice);
+
 	//destroy in reverse order:
 	vkFreeCommandBuffers(vkDevice, vkCommandPool, commandBuffers.size(), commandBuffers.data());
 	commandBuffers.clear();
@@ -835,6 +855,12 @@ void VkImp_Shutdown()
 	vkDestroyCommandPool(vkDevice, vkCommandPool, nullptr);
 	vkDestroyDevice(vkDevice, nullptr);
 	vkDestroySurfaceKHR(vkInstance, vkSurface, nullptr);
+	
+	PFN_vkDestroyDebugReportCallbackEXT vkDestroyDebugReportCallbackEXT =
+		(PFN_vkDestroyDebugReportCallbackEXT)vkGetInstanceProcAddr(vkInstance, "vkDestroyDebugReportCallbackEXT");
+	if (vkDestroyDebugReportCallbackEXT)
+		vkDestroyDebugReportCallbackEXT(vkInstance, vkDebugCallback, nullptr);
+	
 	vkDestroyInstance(vkInstance, nullptr);
 }
 
@@ -870,4 +896,138 @@ void Vk_FlipPresent()
 	presentInfo.pImageIndices = &idx;
 
 	VkCheck(vkQueuePresentKHR(vkPresentQueue.vkQueue, &presentInfo));
+}
+
+VkBuffer Vk_CreateAndBindBuffer(const VkBufferCreateInfo& info, VkMemoryPropertyFlags flags)
+{
+	VkBuffer buffer;
+	VkDeviceMemory memory;
+
+	VkMemoryRequirements memReq;
+
+	VkCheck(vkCreateBuffer(vkDevice, &info, nullptr, &buffer));
+	vkGetBufferMemoryRequirements(vkDevice, buffer, &memReq);
+
+	VkMemoryAllocateInfo alloc = {};
+	alloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	alloc.allocationSize = memReq.size;
+	alloc.memoryTypeIndex = Vk_GetMemoryTypeIndex(memReq.memoryTypeBits, flags);
+
+	VkCheck(vkAllocateMemory(vkDevice, &alloc, nullptr, &memory));
+	VkCheck(vkBindBufferMemory(vkDevice, buffer, memory, 0));
+
+	return buffer;
+}
+
+VkImage Vk_AllocAndCreateImage(const VkImageCreateInfo& info)
+{
+	VkImage image;
+	VkDeviceMemory memory;
+
+	VkCheck(vkCreateImage(vkDevice, &info, nullptr, &image));
+
+	VkMemoryRequirements memReq;
+	vkGetImageMemoryRequirements(vkDevice, image, &memReq);
+
+	VkMemoryAllocateInfo alloc = { VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
+	alloc.allocationSize = memReq.size;
+	alloc.memoryTypeIndex = Vk_GetMemoryTypeIndex(memReq.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+	VkCheck(vkAllocateMemory(vkDevice, &alloc, nullptr, &memory));
+	VkCheck(vkBindImageMemory(vkDevice, image, memory, 0));
+
+	return image;
+}
+
+VkImageView Vk_CreateImageView(const VkImageViewCreateInfo& info)
+{
+	VkImageView view;
+
+	VkCheck(vkCreateImageView(vkDevice, &info, nullptr, &view));
+
+	return view;
+}
+
+VkCommandBuffer Vk_StartOneShotCommandBuffer()
+{
+	VkCommandBuffer buffer;
+	
+	VkCommandBufferAllocateInfo info = {};
+	info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	info.commandPool = vkCommandPool;
+	info.commandBufferCount = 1;
+	info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+
+	vkAllocateCommandBuffers(vkDevice, &info, &buffer);
+
+	VkCommandBufferBeginInfo begin = {};
+	begin.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+	VkCheck(vkBeginCommandBuffer(buffer, &begin));
+
+	return buffer;
+}
+
+void Vk_SubmitOneShotCommandBuffer(VkCommandBuffer cmd)
+{
+	VkCheck(vkEndCommandBuffer(cmd));
+
+	VkSubmitInfo submit = {};
+	submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submit.commandBufferCount = 1;
+	submit.pCommandBuffers = &cmd;
+
+	VkCheck(vkQueueSubmit(vkGraphicsQueue.vkQueue, 1, &submit, VK_NULL_HANDLE));
+	VkCheck(vkQueueWaitIdle(vkGraphicsQueue.vkQueue));
+
+	vkFreeCommandBuffers(vkDevice, vkCommandPool, 1, &cmd);
+}
+
+void Vk_SetImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, 
+	VkImageLayout newLayout, VkImageSubresourceRange& range)
+{
+
+	VkCommandBuffer buffer = Vk_StartOneShotCommandBuffer();
+
+	VkImageMemoryBarrier barrier = {};
+	barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	barrier.oldLayout = oldLayout;
+	barrier.newLayout = newLayout;
+	barrier.image = image;
+	barrier.subresourceRange = range;
+
+	switch (oldLayout)
+	{
+	case VK_IMAGE_LAYOUT_PREINITIALIZED:
+		barrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
+		break;
+	case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+		barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+		break;
+	}
+
+	switch (newLayout)
+	{
+	case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+		barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+		break;
+	case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+		barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+		break;
+	}
+
+	vkCmdPipelineBarrier(buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);	
+
+	Vk_SubmitOneShotCommandBuffer(buffer);
+}
+
+void Vk_DestroyImageAndView(VkImage image, VkImageView imageView)
+{
+	vkDestroyImageView(vkDevice, imageView, nullptr);
+	vkDestroyImage(vkDevice, image, nullptr);
+}
+
+void Vk_DestroyBuffer(VkBuffer buffer)
+{
+	vkDestroyBuffer(vkDevice, buffer, nullptr);
 }

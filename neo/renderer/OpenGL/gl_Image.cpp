@@ -36,6 +36,14 @@ Contains the Image implementation for OpenGL.
 
 #include "../tr_local.h"
 
+//TODO: these definitions conflict if DOOM3_OPENGL and DOOM3_VULKAN are both defined.
+#ifdef DOOM3_OPENGL
+
+void idImage::FinaliseImageUpload()
+{
+	//Do nothing on OpenGL.
+}
+
 /*
 ========================
 idImage::SubImageUpload
@@ -480,3 +488,96 @@ void idImage::Resize( int width, int height ) {
 	opts.height = height;
 	AllocImage();
 }
+
+/*
+========================
+idImage::SetSamplerState
+========================
+*/
+void idImage::SetSamplerState( textureFilter_t tf, textureRepeat_t tr ) {
+	if ( tf == filter && tr == repeat ) {
+		return;
+	}
+	filter = tf;
+	repeat = tr;
+	qglBindTexture( ( opts.textureType == TT_CUBIC ) ? GL_TEXTURE_CUBE_MAP_EXT : GL_TEXTURE_2D, texnum );
+	SetTexParameters();
+}
+
+/*
+==============
+Bind
+
+Automatically enables 2D mapping or cube mapping if needed
+==============
+*/
+void idImage::Bind() {
+
+	RENDERLOG_PRINTF( "idImage::Bind( %s )\n", GetName() );
+
+	// load the image if necessary (FIXME: not SMP safe!)
+	if ( !IsLoaded() ) {
+		// load the image on demand here, which isn't our normal game operating mode
+		ActuallyLoadImage( true );
+	}
+
+	const int texUnit = backEnd.glState.currenttmu;
+
+	tmu_t * tmu = &backEnd.glState.tmu[texUnit];
+	// bind the texture
+	if ( opts.textureType == TT_2D ) {
+		if ( tmu->current2DMap != texnum ) {
+			tmu->current2DMap = texnum;
+			qglBindMultiTextureEXT( GL_TEXTURE0_ARB + texUnit, GL_TEXTURE_2D, texnum );
+		}
+	} else if ( opts.textureType == TT_CUBIC ) {
+		if ( tmu->currentCubeMap != texnum ) {
+			tmu->currentCubeMap = texnum;
+			qglBindMultiTextureEXT( GL_TEXTURE0_ARB + texUnit, GL_TEXTURE_CUBE_MAP_EXT, texnum );
+		}
+	}
+
+}
+
+/*
+====================
+CopyFramebuffer
+====================
+*/
+void idImage::CopyFramebuffer( int x, int y, int imageWidth, int imageHeight ) {
+
+
+	qglBindTexture( ( opts.textureType == TT_CUBIC ) ? GL_TEXTURE_CUBE_MAP_EXT : GL_TEXTURE_2D, texnum );
+
+	qglReadBuffer( GL_BACK );
+
+	opts.width = imageWidth;
+	opts.height = imageHeight;
+	qglCopyTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA8, x, y, imageWidth, imageHeight, 0 );
+
+	// these shouldn't be necessary if the image was initialized properly
+	qglTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
+	qglTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
+
+	qglTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
+	qglTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
+
+	backEnd.pc.c_copyFrameBuffer++;
+}
+
+/*
+====================
+CopyDepthbuffer
+====================
+*/
+void idImage::CopyDepthbuffer( int x, int y, int imageWidth, int imageHeight ) {
+	qglBindTexture( ( opts.textureType == TT_CUBIC ) ? GL_TEXTURE_CUBE_MAP_EXT : GL_TEXTURE_2D, texnum );
+
+	opts.width = imageWidth;
+	opts.height = imageHeight;
+	qglCopyTexImage2D( GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, x, y, imageWidth, imageHeight, 0 );
+
+	backEnd.pc.c_copyFrameBuffer++;
+}
+
+#endif

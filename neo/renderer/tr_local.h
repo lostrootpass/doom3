@@ -38,6 +38,10 @@ If you have questions concerning this license or the applicable additional terms
 #include "RenderTexture.h"
 #include "Font.h"
 
+#ifdef DOOM3_VULKAN
+#include <vulkan/vulkan.h>
+#endif
+
 // everything that is needed by the backend needs
 // to be double buffered to allow it to run in
 // parallel on a dual cpu machine
@@ -1184,6 +1188,19 @@ bool		VkImp_Init( VkImpParams_t params );
 void VkImp_Shutdown();
 
 void Vk_FlipPresent();
+
+//TODO: move these
+#ifdef DOOM3_VULKAN
+VkBuffer Vk_CreateAndBindBuffer(const VkBufferCreateInfo& info, VkMemoryPropertyFlags flags);
+VkImage Vk_AllocAndCreateImage(const VkImageCreateInfo& info);
+VkImageView Vk_CreateImageView(const VkImageViewCreateInfo& info);
+VkCommandBuffer Vk_StartOneShotCommandBuffer();
+void Vk_SubmitOneShotCommandBuffer(VkCommandBuffer cmd);
+void Vk_SetImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout,
+	VkImageLayout newLayout, VkImageSubresourceRange& range);
+void Vk_DestroyImageAndView(VkImage image, VkImageView imageView);
+void Vk_DestroyBuffer(VkBuffer buffer);
+#endif
 
 /*
 ============================================================

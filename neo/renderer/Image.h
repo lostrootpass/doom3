@@ -65,6 +65,10 @@ typedef enum {
 #include "ImageOpts.h"
 #include "BinaryImage.h"
 
+#ifdef DOOM3_VULKAN
+#include <vulkan/vulkan.h>
+#endif
+
 #define	MAX_IMAGE_NAME	256
 
 class idImage {
@@ -119,6 +123,7 @@ public:
 	// Platform specific implementations
 	//---------------------------------------------
 
+	void FinaliseImageUpload();
 	void		AllocImage( const idImageOpts &imgOpts, textureFilter_t filter, textureRepeat_t repeat );
 
 	// Deletes the texture object, but leaves the structure so it can be reloaded
@@ -188,6 +193,12 @@ private:
 	GLuint				dataFormat;
 	GLuint				dataType;
 
+#ifdef DOOM3_VULKAN
+	VkBuffer stagingBuffer;
+	VkImage image;
+	VkImageView imageView;
+	VkFormat format;
+#endif
 
 };
 

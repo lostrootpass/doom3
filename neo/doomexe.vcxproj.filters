@@ -61,6 +61,9 @@
     <Filter Include="Renderer\Jobs\PreLightShadowVolume">
       <UniqueIdentifier>{de864e31-e19e-41ac-8186-9b27d6c29c03}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Renderer\Vulkan">
+      <UniqueIdentifier>{d00d86fb-64e8-445b-9089-a4807da2da48}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="cm\CollisionModel.h">
@@ -1150,6 +1153,9 @@
     </ClCompile>
     <ClCompile Include="sys\win32\win_vkutil.cpp">
       <Filter>Sys\Win32</Filter>
+    </ClCompile>
+    <ClCompile Include="renderer\Vulkan\vk_image.cpp">
+      <Filter>Renderer\Vulkan</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
