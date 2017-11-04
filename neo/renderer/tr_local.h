@@ -1200,6 +1200,10 @@ void Vk_SetImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout,
 	VkImageLayout newLayout, VkImageSubresourceRange& range);
 void Vk_DestroyImageAndView(VkImage image, VkImageView imageView);
 void Vk_DestroyBuffer(VkBuffer buffer);
+VkCommandBuffer Vk_ActiveCommandBuffer();
+VkCommandBuffer Vk_StartRenderPass();
+void Vk_EndRenderPass();
+uint32_t Vk_GetMemoryTypeIndex(uint32_t bits, VkMemoryPropertyFlags flags);
 #endif
 
 /*

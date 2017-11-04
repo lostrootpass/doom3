@@ -749,6 +749,7 @@ safeMode:
 }
 
 void R_SetNewModeVk( const bool fullInit ) {
+#ifdef DOOM3_VULKAN
 	// try up to three different configurations
 
 	for ( int i = 0 ; i < 3 ; i++ ) {
@@ -840,6 +841,7 @@ safeMode:
 		r_displayRefresh.SetInteger( 0 );
 		r_multiSamples.SetInteger( 0 );
 	}
+#endif
 }
 
 
@@ -973,8 +975,7 @@ void R_InitVulkan() {
 
 	r_initialized = true;
 	
-	//TODO
-	//vertexCache.Init();
+	vertexCache.Init();
 
 	R_InitFrameData();
 
@@ -2323,6 +2324,7 @@ void idRenderSystemLocal::Init() {
 }
 
 void idRenderSystemVk::Init() {
+	idRenderSystemLocal::Init();
 }
 
 /*
@@ -2410,6 +2412,7 @@ void idRenderSystemLocal::ResetGuiModels() {
 }
 
 void idRenderSystemVk::ResetGuiModels() {
+	idRenderSystemLocal::ResetGuiModels();
 }
 
 /*
@@ -2577,9 +2580,11 @@ void idRenderSystemLocal::ShutdownRenderBackend() {
 }
 
 void idRenderSystemVk::ShutdownRenderBackend() {
+#ifdef DOOM3_VULKAN
 	R_ShutdownFrameData();
 	VkImp_Shutdown();
 	r_initialized = false;
+#endif
 }
 
 /*
@@ -2621,7 +2626,7 @@ int idRenderSystemLocal::GetWidth() const {
 }
 
 int idRenderSystemVk::GetWidth() const {
-	return 0;
+	return idRenderSystemLocal::GetWidth();
 }
 
 /*
@@ -2645,7 +2650,7 @@ int idRenderSystemLocal::GetHeight() const {
 }
 
 int idRenderSystemVk::GetHeight() const {
-	return 0;
+	return idRenderSystemLocal::GetHeight();
 }
 
 /*
@@ -2730,7 +2735,7 @@ float idRenderSystemLocal::GetPixelAspect() const {
 }
 
 float idRenderSystemVk::GetPixelAspect() const {
-	return 0.0f;
+	return idRenderSystemLocal::GetPixelAspect();
 }
 
 /*

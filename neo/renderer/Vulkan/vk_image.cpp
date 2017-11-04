@@ -8,10 +8,11 @@ Contains the Image implementation for OpenGL.
 */
 
 #include "../tr_local.h"
-#include <vulkan/vulkan.h>
-#include <vector>
 
 #ifdef DOOM3_VULKAN
+
+#include <vulkan/vulkan.h>
+#include <vector>
 
 void idImage::FinaliseImageUpload()
 {

@@ -132,7 +132,6 @@ void idRenderSystemLocal::RenderCommandBuffers( const emptyCommand_t * const cmd
 	resolutionScale.InitForMap( NULL );
 }
 void idRenderSystemVk::RenderCommandBuffers(const emptyCommand_t * const cmdHead) {
-	Vk_FlipPresent();
 }
 
 /*
@@ -477,7 +476,7 @@ idDrawVert * idRenderSystemLocal::AllocTris( int numVerts, const triIndex_t * in
 }
 
 idDrawVert * idRenderSystemVk::AllocTris( int numVerts, const triIndex_t * indexes, int numIndexes, const idMaterial * material, const stereoDepthType_t stereoType ) {
-	return nullptr;
+	return guiModel->AllocTris( numVerts, indexes, numIndexes, material, currentGLState, stereoType );
 }
 
 /*
@@ -674,7 +673,7 @@ const emptyCommand_t * idRenderSystemVk::SwapCommandBuffers(
 	uint64 * backEndMicroSec,
 	uint64 * shadowMicroSec,
 	uint64 * gpuMicroSec) {
-	return nullptr;
+	return idRenderSystemLocal::SwapCommandBuffers(frontEndMicroSec, backEndMicroSec, shadowMicroSec, gpuMicroSec);
 }
 
 /*
@@ -745,7 +744,11 @@ void idRenderSystemVk::SwapCommandBuffers_FinishRendering(
 												uint64 * backEndMicroSec,
 												uint64 * shadowMicroSec,
 												uint64 * gpuMicroSec )  {
-	}
+#ifdef DOOM3_VULKAN
+	Vk_EndRenderPass();
+	Vk_FlipPresent();
+#endif
+}
 
 /*
 =====================
@@ -833,7 +836,10 @@ const emptyCommand_t * idRenderSystemLocal::SwapCommandBuffers_FinishCommandBuff
 }
 
 const emptyCommand_t * idRenderSystemVk::SwapCommandBuffers_FinishCommandBuffers() {
-	return nullptr;
+#ifdef DOOM3_VULKAN
+	Vk_StartRenderPass();
+#endif
+	return idRenderSystemLocal::SwapCommandBuffers_FinishCommandBuffers();
 }
 
 /*
@@ -894,6 +900,7 @@ void idRenderSystemLocal::PerformResolutionScaling( int& newWidth, int& newHeigh
 }
 
 void idRenderSystemVk::PerformResolutionScaling( int& newWidth, int& newHeight ) {
+	idRenderSystemLocal::PerformResolutionScaling(newWidth, newHeight);
 	}
 
 /*
@@ -939,6 +946,7 @@ void idRenderSystemLocal::CropRenderSize( int width, int height ) {
 }
 
 void idRenderSystemVk::CropRenderSize( int width, int height ) {
+	idRenderSystemLocal::CropRenderSize(width, height);
 	}
 
 /*
@@ -972,6 +980,7 @@ void idRenderSystemLocal::UnCrop() {
 }
 
 void idRenderSystemVk::UnCrop() {
+	idRenderSystemLocal::UnCrop();
 	}
 
 /*

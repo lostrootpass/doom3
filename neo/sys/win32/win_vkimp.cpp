@@ -5,6 +5,7 @@
 #include "rc/doom_resource.h"
 #include "../../renderer/tr_local.h"
 
+#ifdef DOOM3_VULKAN
 #include <vulkan/vulkan.h>
 #include <set>
 
@@ -19,6 +20,7 @@ VkDevice vkDevice = VK_NULL_HANDLE;
 VkCommandPool vkCommandPool = VK_NULL_HANDLE;
 VkSwapchainKHR vkSwapchain = VK_NULL_HANDLE;
 VkRenderPass vkRenderPass = VK_NULL_HANDLE;
+VkPipelineLayout vkPipelineLayout = VK_NULL_HANDLE;
 
 VkImage depthImage = VK_NULL_HANDLE;
 VkImageView depthView = VK_NULL_HANDLE;
@@ -49,6 +51,8 @@ VkSurfaceCapabilitiesKHR surfaceCaps;
 
 VkSemaphore imageAvailableSemaphore;
 VkSemaphore renderingFinishedSemaphore;
+
+uint32_t activeCommandBufferIdx = -1;
 
 static void CreateVulkanContextOnHWND(HWND hwnd, bool isDebug)
 {
@@ -244,7 +248,7 @@ static void Vk_PopulateSwapChainInfo()
 	}
 }
 
-static uint32_t Vk_GetMemoryTypeIndex(uint32_t bits, VkMemoryPropertyFlags flags) 
+uint32_t Vk_GetMemoryTypeIndex(uint32_t bits, VkMemoryPropertyFlags flags) 
 {
 	VkPhysicalDeviceMemoryProperties props;
 	vkGetPhysicalDeviceMemoryProperties(vkPhysicalDevice, &props);
@@ -504,6 +508,34 @@ static void Vk_RecordCommandBuffer(VkFramebuffer framebuffer, VkCommandBuffer cm
 	vkCmdSetScissor(cmd, 0, 1, &scissor);
 
 	vkCmdBeginRenderPass(cmd, &info, VK_SUBPASS_CONTENTS_INLINE);
+}
+
+VkCommandBuffer Vk_StartRenderPass()
+{
+	VkCheck(vkAcquireNextImageKHR(vkDevice, vkSwapchain, 
+		std::numeric_limits<uint64_t>::max(), imageAvailableSemaphore,
+		VK_NULL_HANDLE, &activeCommandBufferIdx));
+
+	Vk_RecordCommandBuffer(framebuffers[activeCommandBufferIdx].framebuffer,
+		commandBuffers[activeCommandBufferIdx]);
+
+	return commandBuffers[activeCommandBufferIdx];
+}
+
+VkCommandBuffer Vk_ActiveCommandBuffer()
+{
+	if (activeCommandBufferIdx == -1)
+		return VK_NULL_HANDLE;
+
+	return commandBuffers[activeCommandBufferIdx];
+}
+
+void Vk_EndRenderPass()
+{
+	VkCommandBuffer cmd = Vk_ActiveCommandBuffer();
+
+	if (cmd == VK_NULL_HANDLE)
+		return;
 
 	vkCmdEndRenderPass(cmd);
 
@@ -524,10 +556,22 @@ static void Vk_RecordAllCommandBuffers()
 
 	VkCheck(vkAllocateCommandBuffers(vkDevice, &info, commandBuffers.data()));
 
-	for(size_t i = 0; i < framebuffers.size(); ++i)
-	{
-		Vk_RecordCommandBuffer(framebuffers[i].framebuffer, commandBuffers[i]);
-	}
+//	for(size_t i = 0; i < framebuffers.size(); ++i)
+//	{
+//		Vk_RecordCommandBuffer(framebuffers[i].framebuffer, commandBuffers[i]);
+//	}
+}
+
+static void Vk_CreatePipelineLayout()
+{
+	std::vector<VkDescriptorSetLayout> descriptorLayouts;
+
+	VkPipelineLayoutCreateInfo layoutCreateInfo = {};
+	layoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+	layoutCreateInfo.pSetLayouts = descriptorLayouts.data();
+	layoutCreateInfo.setLayoutCount = (uint32_t)descriptorLayouts.size();
+
+	VkCheck(vkCreatePipelineLayout(vkDevice, &layoutCreateInfo, nullptr, &vkPipelineLayout));
 }
 
 static void Vk_RegisterDebugger()
@@ -639,6 +683,7 @@ static bool Vk_InitDriver(VkImpParams_t params)
 	Vk_PickPhysicalDevice();
 	Vk_InitDevice();
 	Vk_InitCommandPool();
+	Vk_CreatePipelineLayout();
 	Vk_CreateRenderPass();
 	Vk_CreateSwapChain();
 	Vk_RecordAllCommandBuffers();
@@ -852,6 +897,7 @@ void VkImp_Shutdown()
 	vkDestroyImage(vkDevice, depthImage, nullptr);
 	vkFreeMemory(vkDevice, depthMemory, nullptr);
 	vkDestroyRenderPass(vkDevice, vkRenderPass, nullptr);
+	vkDestroyPipelineLayout(vkDevice, vkPipelineLayout, nullptr);
 	vkDestroyCommandPool(vkDevice, vkCommandPool, nullptr);
 	vkDestroyDevice(vkDevice, nullptr);
 	vkDestroySurfaceKHR(vkInstance, vkSurface, nullptr);
@@ -866,13 +912,13 @@ void VkImp_Shutdown()
 
 void Vk_FlipPresent()
 {
-	uint32_t idx;
-	VkCheck(vkAcquireNextImageKHR(vkDevice, vkSwapchain, std::numeric_limits<uint64_t>::max(), imageAvailableSemaphore, VK_NULL_HANDLE, &idx));
+	if (activeCommandBufferIdx == -1)
+		return;
 
 	VkSemaphore semaphores[] = { imageAvailableSemaphore };
 	VkSemaphore signals[] = { renderingFinishedSemaphore };
 	VkPipelineStageFlags stages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
-	VkCommandBuffer buffers[] = { commandBuffers[(size_t)idx] };
+	VkCommandBuffer buffers[] = { commandBuffers[(size_t)activeCommandBufferIdx] };
 	VkSwapchainKHR swapChains[] = { vkSwapchain };
 
 	VkSubmitInfo submitInfo = {};
@@ -893,7 +939,7 @@ void Vk_FlipPresent()
 	presentInfo.pWaitSemaphores = signals;
 	presentInfo.swapchainCount = 1;
 	presentInfo.pSwapchains = swapChains;
-	presentInfo.pImageIndices = &idx;
+	presentInfo.pImageIndices = &activeCommandBufferIdx;
 
 	VkCheck(vkQueuePresentKHR(vkPresentQueue.vkQueue, &presentInfo));
 }
@@ -1031,3 +1077,5 @@ void Vk_DestroyBuffer(VkBuffer buffer)
 {
 	vkDestroyBuffer(vkDevice, buffer, nullptr);
 }
+
+#endif

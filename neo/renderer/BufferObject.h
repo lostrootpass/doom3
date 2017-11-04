@@ -36,6 +36,10 @@ If you have questions concerning this license or the applicable additional terms
 ================================================================================================
 */
 
+#ifdef DOOM3_VULKAN
+#include <vulkan/vulkan.h>
+#endif
+
 class idIndexBuffer;
 
 enum bufferMapType_t {
@@ -78,10 +82,20 @@ public:
 	void *				GetAPIObject() const { return apiObject; }
 	int					GetOffset() const { return ( offsetInOtherBuffer & ~OWNS_BUFFER_FLAG ); }
 
+	void				Sync();
+
 private:
 	int					size;					// size in bytes
 	int					offsetInOtherBuffer;	// offset in bytes
 	void *				apiObject;
+
+#ifdef DOOM3_VULKAN
+	VkDeviceMemory stagingMemory;
+	VkDeviceMemory memory;
+
+	VkBuffer stagingBuffer;
+	VkBuffer buffer;
+#endif
 
 	// sizeof() confuses typeinfo...
 	static const int	MAPPED_FLAG			= 1 << ( 4 /* sizeof( int ) */ * 8 - 1 );
@@ -127,10 +141,22 @@ public:
 	void *				GetAPIObject() const { return apiObject; }
 	int					GetOffset() const { return ( offsetInOtherBuffer & ~OWNS_BUFFER_FLAG ); }
 
+	void				Sync();
+
 private:
 	int					size;					// size in bytes
 	int					offsetInOtherBuffer;	// offset in bytes
 	void *				apiObject;
+
+#ifdef DOOM3_VULKAN
+	VkDeviceMemory stagingMemory;
+	VkDeviceMemory memory;
+
+	VkBuffer stagingBuffer;
+	VkBuffer buffer;
+#endif
+
+
 
 	// sizeof() confuses typeinfo...
 	static const int	MAPPED_FLAG			= 1 << ( 4 /* sizeof( int ) */ * 8 - 1 );
@@ -180,11 +206,21 @@ public:
 	int					GetOffset() const { return ( offsetInOtherBuffer & ~OWNS_BUFFER_FLAG ); }
 
 	void				Swap( idJointBuffer & other );
+	void				Sync();
 
 private:
 	int					numJoints;
 	int					offsetInOtherBuffer;	// offset in bytes
 	void *				apiObject;
+
+#ifdef DOOM3_VULKAN
+	VkDeviceMemory stagingMemory;
+	VkDeviceMemory memory;
+
+	VkBuffer stagingBuffer;
+	VkBuffer buffer;
+#endif
+
 
 	// sizeof() confuses typeinfo...
 	static const int	MAPPED_FLAG			= 1 << ( 4 /* sizeof( int ) */ * 8 - 1 );

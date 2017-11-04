@@ -1,6 +1,8 @@
 #ifndef VULKAN_IMPL_UTIL_H_
 #define VULKAN_IMPL_UTIL_H_
 
+#ifdef DOOM3_VULKAN
+
 #include <vulkan/vulkan.h>
 #include <vector>
 #include <assert.h>
@@ -59,5 +61,7 @@ struct VulkanUtil
 		assert(res == VK_SUCCESS);
 	}
 };
+
+#endif
 
 #endif //VULKAN_IMPL_UTIL_H_
