@@ -603,8 +603,8 @@ void idCommonLocal::ExecuteMapChange() {
 	renderWorld->GenerateAllInteractions();
 
 	{
-		int vertexMemUsedKB = vertexCache.staticData.vertexMemUsed.GetValue() / 1024;
-		int indexMemUsedKB = vertexCache.staticData.indexMemUsed.GetValue() / 1024;
+		int vertexMemUsedKB = vertexCache->staticData.vertexMemUsed.GetValue() / 1024;
+		int indexMemUsedKB = vertexCache->staticData.indexMemUsed.GetValue() / 1024;
 		idLib::Printf( "Used %dkb of static vertex memory (%d%%)\n", vertexMemUsedKB, vertexMemUsedKB * 100 / ( STATIC_VERTEX_MEMORY / 1024 ) );
 		idLib::Printf( "Used %dkb of static index memory (%d%%)\n", indexMemUsedKB, indexMemUsedKB * 100 / ( STATIC_INDEX_MEMORY / 1024 ) );
 	}

@@ -147,8 +147,7 @@ idVertexBuffer::idVertexBuffer() {
 	size = 0;
 	offsetInOtherBuffer = OWNS_BUFFER_FLAG;
 	apiObject = NULL;
-	buffer = stagingBuffer = VK_NULL_HANDLE;
-	memory = stagingMemory = VK_NULL_HANDLE;
+
 	SetUnmapped();
 }
 
@@ -180,7 +179,6 @@ bool idVertexBuffer::AllocBufferObject( const void * data, int allocSize ) {
 
 	int numBytes = GetAllocedSize();
 
-#ifdef DOOM3_OPENGL
 	// clear out any previous error
 	qglGetError();
 
@@ -200,38 +198,6 @@ bool idVertexBuffer::AllocBufferObject( const void * data, int allocSize ) {
 		idLib::Warning( "idVertexBuffer::AllocBufferObject: allocation failed" );
 		allocationFailed = true;
 	}
-#elif DOOM3_VULKAN
-	VkMemoryRequirements memReq;
-
-	//Staging buffer
-	VkBufferCreateInfo info = {};
-	info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-	info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	info.size = size;
-	
-	VkCheck(vkCreateBuffer(vkDevice, &info, nullptr, &stagingBuffer));
-	vkGetBufferMemoryRequirements(vkDevice, stagingBuffer, &memReq);
-
-	VkMemoryAllocateInfo alloc = {};
-	alloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-	alloc.allocationSize = memReq.size;
-	alloc.memoryTypeIndex = Vk_GetMemoryTypeIndex(memReq.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-	VkCheck(vkAllocateMemory(vkDevice, &alloc, nullptr, &stagingMemory));
-	VkCheck(vkBindBufferMemory(vkDevice, stagingBuffer, stagingMemory, 0));
-
-	//Now the main buffer
-	info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-	VkCheck(vkCreateBuffer(vkDevice, &info, nullptr, &buffer));
-	vkGetBufferMemoryRequirements(vkDevice, buffer, &memReq);
-
-	alloc.memoryTypeIndex = Vk_GetMemoryTypeIndex(memReq.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-	VkCheck(vkAllocateMemory(vkDevice, &alloc, nullptr, &memory));
-	VkCheck(vkBindBufferMemory(vkDevice, buffer, memory, 0));
-	apiObject = reinterpret_cast<void*>(buffer);
-#endif
 
 	if ( r_showBuffers.GetBool() ) {
 		idLib::Printf( "vertex buffer alloc %p, api %p (%i bytes)\n", this, GetAPIObject(), GetSize() );
@@ -269,18 +235,8 @@ void idVertexBuffer::FreeBufferObject() {
 		idLib::Printf( "vertex buffer free %p, api %p (%i bytes)\n", this, GetAPIObject(), GetSize() );
 	}
 	
-#ifdef DOOM3_OPENGL
 	GLuint bufferObject = reinterpret_cast< GLuint >( apiObject );
 	qglDeleteBuffersARB( 1, & bufferObject );
-#elif DOOM3_VULKAN
-	vkDestroyBuffer(vkDevice, stagingBuffer, nullptr);
-	vkDestroyBuffer(vkDevice, buffer, nullptr);
-	vkFreeMemory(vkDevice, stagingMemory, nullptr);
-	vkFreeMemory(vkDevice, memory, nullptr);
-	buffer = stagingBuffer = VK_NULL_HANDLE;
-	memory = stagingMemory = VK_NULL_HANDLE;
-	apiObject = NULL;
-#endif
 
 	ClearWithoutFreeing();
 }
@@ -290,16 +246,18 @@ void idVertexBuffer::FreeBufferObject() {
 idVertexBuffer::Reference
 ========================
 */
-void idVertexBuffer::Reference( const idVertexBuffer & other ) {
+void idVertexBuffer::Reference( const idBufferObject & other ) {
+	const idVertexBuffer& vb = static_cast<const idVertexBuffer&>(other);
+
 	assert( IsMapped() == false );
-	//assert( other.IsMapped() == false );	// this happens when building idTriangles while at the same time setting up idDrawVerts
-	assert( other.GetAPIObject() != NULL );
-	assert( other.GetSize() > 0 );
+	//assert( vb.IsMapped() == false );	// this happens when building idTriangles while at the same time setting up idDrawVerts
+	assert( vb.GetAPIObject() != NULL );
+	assert( vb.GetSize() > 0 );
 
 	FreeBufferObject();
-	size = other.GetSize();						// this strips the MAPPED_FLAG
-	offsetInOtherBuffer = other.GetOffset();	// this strips the OWNS_BUFFER_FLAG
-	apiObject = other.apiObject;
+	size = vb.GetSize();						// this strips the MAPPED_FLAG
+	offsetInOtherBuffer = vb.GetOffset();	// this strips the OWNS_BUFFER_FLAG
+	apiObject = vb.apiObject;
 	assert( OwnsBuffer() == false );
 }
 
@@ -308,18 +266,20 @@ void idVertexBuffer::Reference( const idVertexBuffer & other ) {
 idVertexBuffer::Reference
 ========================
 */
-void idVertexBuffer::Reference( const idVertexBuffer & other, int refOffset, int refSize ) {
+void idVertexBuffer::Reference( const idBufferObject & other, int refOffset, int refSize ) {
+	const idVertexBuffer& vb = static_cast<const idVertexBuffer&>(other);
+
 	assert( IsMapped() == false );
-	//assert( other.IsMapped() == false );	// this happens when building idTriangles while at the same time setting up idDrawVerts
-	assert( other.GetAPIObject() != NULL );
+	//assert( vb.IsMapped() == false );	// this happens when building idTriangles while at the same time setting up idDrawVerts
+	assert( vb.GetAPIObject() != NULL );
 	assert( refOffset >= 0 );
 	assert( refSize >= 0 );
-	assert( refOffset + refSize <= other.GetSize() );
+	assert( refOffset + refSize <= vb.GetSize() );
 
 	FreeBufferObject();
 	size = refSize;
-	offsetInOtherBuffer = other.GetOffset() + refOffset;
-	apiObject = other.apiObject;
+	offsetInOtherBuffer = vb.GetOffset() + refOffset;
+	apiObject = vb.apiObject;
 	assert( OwnsBuffer() == false );
 }
 
@@ -340,26 +300,10 @@ void idVertexBuffer::Update( const void * data, int updateSize ) const {
 
 	int numBytes = ( updateSize + 15 ) & ~15;
 
-#ifdef DOOM3_OPENGL
 	GLuint bufferObject = reinterpret_cast< GLuint >( apiObject );
 	qglBindBufferARB( GL_ARRAY_BUFFER_ARB, bufferObject );
 	qglBufferSubDataARB( GL_ARRAY_BUFFER_ARB, GetOffset(), (GLsizeiptrARB)numBytes, data );
-#elif DOOM3_VULKAN
-	void* dst;
-	VkCheck(vkMapMemory(vkDevice, stagingMemory, GetOffset(), numBytes, 0, &dst));
-	memcpy(dst, data, numBytes);
-	vkUnmapMemory(vkDevice, stagingMemory);
-	
-	VkCommandBuffer cmd = Vk_StartOneShotCommandBuffer();
 
-	VkBufferCopy copy = {};
-	copy.size = size;
-	copy.dstOffset = copy.srcOffset = GetOffset();
-
-	vkCmdCopyBuffer(cmd, stagingBuffer, buffer, 1, &copy);
-	
-	Vk_SubmitOneShotCommandBuffer(cmd);
-#endif
 /*
 	void * buffer = MapBuffer( BM_WRITE );
 	CopyBuffer( (byte *)buffer + GetOffset(), (byte *)data, numBytes );
@@ -377,7 +321,6 @@ void * idVertexBuffer::MapBuffer( bufferMapType_t mapType ) const {
 
 	void * buffer = NULL;
 
-#ifdef DOOM3_OPENGL
 	assert( apiObject != NULL );
 	GLuint bufferObject = reinterpret_cast< GLuint >( apiObject );
 	qglBindBufferARB( GL_ARRAY_BUFFER_ARB, bufferObject );
@@ -397,9 +340,6 @@ void * idVertexBuffer::MapBuffer( bufferMapType_t mapType ) const {
 	} else {
 		assert( false );
 	}
-#elif DOOM3_VULKAN
-	VkCheck(vkMapMemory(vkDevice, stagingMemory, 0, GetAllocedSize(), 0, &buffer));
-#endif
 
 	SetMapped();
 
@@ -418,31 +358,15 @@ void idVertexBuffer::UnmapBuffer() const {
 	assert( apiObject != NULL );
 	assert( IsMapped() );
 
-#ifdef DOOM3_OPENGL
 	GLuint bufferObject = reinterpret_cast< GLuint >( apiObject );
 	qglBindBufferARB( GL_ARRAY_BUFFER_ARB, bufferObject );
 	if ( !qglUnmapBufferARB( GL_ARRAY_BUFFER_ARB ) ) {
 		idLib::Printf( "idVertexBuffer::UnmapBuffer failed\n" );
 	}
-#elif DOOM3_VULKAN
-	vkUnmapMemory(vkDevice, stagingMemory);
-#endif
 
 	SetUnmapped();
 }
 
-void idVertexBuffer::Sync()
-{
-	VkCommandBuffer cmd = Vk_StartOneShotCommandBuffer();
-
-	VkBufferCopy copy = {};
-	copy.size = size;
-	copy.dstOffset = copy.srcOffset = 0;
-
-	vkCmdCopyBuffer(cmd, stagingBuffer, buffer, 1, &copy);
-	
-	Vk_SubmitOneShotCommandBuffer(cmd);
-}
 
 /*
 ========================
@@ -453,8 +377,6 @@ void idVertexBuffer::ClearWithoutFreeing() {
 	size = 0;
 	offsetInOtherBuffer = OWNS_BUFFER_FLAG;
 	apiObject = NULL;
-	buffer = stagingBuffer = VK_NULL_HANDLE;
-	memory = stagingMemory = VK_NULL_HANDLE;
 }
 
 /*
@@ -505,7 +427,6 @@ bool idIndexBuffer::AllocBufferObject( const void * data, int allocSize ) {
 
 	int numBytes = GetAllocedSize();
 
-#ifdef DOOM3_OPENGL
 	// clear out any previous error
 	qglGetError();
 
@@ -526,38 +447,6 @@ bool idIndexBuffer::AllocBufferObject( const void * data, int allocSize ) {
 		idLib::Warning( "idIndexBuffer:AllocBufferObject: allocation failed" );
 		allocationFailed = true;
 	}
-#elif DOOM3_VULKAN
-	VkMemoryRequirements memReq;
-
-	//Staging buffer
-	VkBufferCreateInfo info = {};
-	info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-	info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	info.size = size;
-	
-	VkCheck(vkCreateBuffer(vkDevice, &info, nullptr, &stagingBuffer));
-	vkGetBufferMemoryRequirements(vkDevice, stagingBuffer, &memReq);
-
-	VkMemoryAllocateInfo alloc = {};
-	alloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-	alloc.allocationSize = memReq.size;
-	alloc.memoryTypeIndex = Vk_GetMemoryTypeIndex(memReq.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-	VkCheck(vkAllocateMemory(vkDevice, &alloc, nullptr, &stagingMemory));
-	VkCheck(vkBindBufferMemory(vkDevice, stagingBuffer, stagingMemory, 0));
-
-	//Now the main buffer
-	info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-	VkCheck(vkCreateBuffer(vkDevice, &info, nullptr, &buffer));
-	vkGetBufferMemoryRequirements(vkDevice, buffer, &memReq);
-
-	alloc.memoryTypeIndex = Vk_GetMemoryTypeIndex(memReq.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-	VkCheck(vkAllocateMemory(vkDevice, &alloc, nullptr, &memory));
-	VkCheck(vkBindBufferMemory(vkDevice, buffer, memory, 0));
-	apiObject = reinterpret_cast<void*>(buffer);
-#endif
 
 
 	if ( r_showBuffers.GetBool() ) {
@@ -596,18 +485,8 @@ void idIndexBuffer::FreeBufferObject() {
 		idLib::Printf( "index buffer free %p, api %p (%i bytes)\n", this, GetAPIObject(), GetSize() );
 	}
 
-#ifdef DOOM3_OPENGL
 	GLuint bufferObject = reinterpret_cast< GLuint >( apiObject );
 	qglDeleteBuffersARB( 1, & bufferObject );
-#elif DOOM3_VULKAN
-	vkDestroyBuffer(vkDevice, stagingBuffer, nullptr);
-	vkDestroyBuffer(vkDevice, buffer, nullptr);
-	vkFreeMemory(vkDevice, stagingMemory, nullptr);
-	vkFreeMemory(vkDevice, memory, nullptr);
-	buffer = stagingBuffer = VK_NULL_HANDLE;
-	memory = stagingMemory = VK_NULL_HANDLE;
-	apiObject = NULL;
-#endif
 
 	ClearWithoutFreeing();
 }
@@ -617,16 +496,18 @@ void idIndexBuffer::FreeBufferObject() {
 idIndexBuffer::Reference
 ========================
 */
-void idIndexBuffer::Reference( const idIndexBuffer & other ) {
+void idIndexBuffer::Reference( const idBufferObject & other ) {
+	const idIndexBuffer& ib = static_cast<const idIndexBuffer &>(other);
+
 	assert( IsMapped() == false );
-	//assert( other.IsMapped() == false );	// this happens when building idTriangles while at the same time setting up triIndex_t
-	assert( other.GetAPIObject() != NULL );
-	assert( other.GetSize() > 0 );
+	//assert( ib.IsMapped() == false );	// this happens when building idTriangles while at the same time setting up triIndex_t
+	assert( ib.GetAPIObject() != NULL );
+	assert( ib.GetSize() > 0 );
 
 	FreeBufferObject();
-	size = other.GetSize();						// this strips the MAPPED_FLAG
-	offsetInOtherBuffer = other.GetOffset();	// this strips the OWNS_BUFFER_FLAG
-	apiObject = other.apiObject;
+	size = ib.GetSize();						// this strips the MAPPED_FLAG
+	offsetInOtherBuffer = ib.GetOffset();	// this strips the OWNS_BUFFER_FLAG
+	apiObject = ib.apiObject;
 	assert( OwnsBuffer() == false );
 }
 
@@ -635,18 +516,20 @@ void idIndexBuffer::Reference( const idIndexBuffer & other ) {
 idIndexBuffer::Reference
 ========================
 */
-void idIndexBuffer::Reference( const idIndexBuffer & other, int refOffset, int refSize ) {
+void idIndexBuffer::Reference( const idBufferObject & other, int refOffset, int refSize ) {
+	const idIndexBuffer& ib = static_cast<const idIndexBuffer &>(other);
+
 	assert( IsMapped() == false );
-	//assert( other.IsMapped() == false );	// this happens when building idTriangles while at the same time setting up triIndex_t
-	assert( other.GetAPIObject() != NULL );
+	//assert( ib.IsMapped() == false );	// this happens when building idTriangles while at the same time setting up triIndex_t
+	assert( ib.GetAPIObject() != NULL );
 	assert( refOffset >= 0 );
 	assert( refSize >= 0 );
-	assert( refOffset + refSize <= other.GetSize() );
+	assert( refOffset + refSize <= ib.GetSize() );
 
 	FreeBufferObject();
 	size = refSize;
-	offsetInOtherBuffer = other.GetOffset() + refOffset;
-	apiObject = other.apiObject;
+	offsetInOtherBuffer = ib.GetOffset() + refOffset;
+	apiObject = ib.apiObject;
 	assert( OwnsBuffer() == false );
 }
 
@@ -668,26 +551,10 @@ void idIndexBuffer::Update( const void * data, int updateSize ) const {
 
 	int numBytes = ( updateSize + 15 ) & ~15;
 
-#ifdef DOOM3_OPENGL
 	GLuint bufferObject = reinterpret_cast< GLuint >( apiObject );
 	qglBindBufferARB( GL_ELEMENT_ARRAY_BUFFER_ARB, bufferObject );
 	qglBufferSubDataARB( GL_ELEMENT_ARRAY_BUFFER_ARB, GetOffset(), (GLsizeiptrARB)numBytes, data );
-#elif DOOM3_VULKAN
-	void* dst;
-	VkCheck(vkMapMemory(vkDevice, stagingMemory, GetOffset(), numBytes, 0, &dst));
-	memcpy(dst, data, numBytes);
-	vkUnmapMemory(vkDevice, stagingMemory);
-	
-	VkCommandBuffer cmd = Vk_StartOneShotCommandBuffer();
 
-	VkBufferCopy copy = {};
-	copy.size = size;
-	copy.dstOffset = copy.srcOffset = GetOffset();
-
-	vkCmdCopyBuffer(cmd, stagingBuffer, buffer, 1, &copy);
-	
-	Vk_SubmitOneShotCommandBuffer(cmd);
-#endif
 /*
 	void * buffer = MapBuffer( BM_WRITE );
 	CopyBuffer( (byte *)buffer + GetOffset(), (byte *)data, numBytes );
@@ -707,7 +574,6 @@ void * idIndexBuffer::MapBuffer( bufferMapType_t mapType ) const {
 
 	void * buffer = NULL;
 
-#ifdef DOOM3_OPENGL
 	GLuint bufferObject = reinterpret_cast< GLuint >( apiObject );
 	qglBindBufferARB( GL_ELEMENT_ARRAY_BUFFER_ARB, bufferObject );
 	if ( mapType == BM_READ ) {
@@ -726,9 +592,6 @@ void * idIndexBuffer::MapBuffer( bufferMapType_t mapType ) const {
 	} else {
 		assert( false );
 	}
-#elif DOOM3_VULKAN
-	VkCheck(vkMapMemory(vkDevice, stagingMemory, 0, GetAllocedSize(), 0, &buffer));
-#endif
 
 	SetMapped();
 
@@ -747,30 +610,13 @@ void idIndexBuffer::UnmapBuffer() const {
 	assert( apiObject != NULL );
 	assert( IsMapped() );
 
-#ifdef DOOM3_OPENGL
 	GLuint bufferObject = reinterpret_cast< GLuint >( apiObject );
 	qglBindBufferARB( GL_ELEMENT_ARRAY_BUFFER_ARB, bufferObject );
 	if ( !qglUnmapBufferARB( GL_ELEMENT_ARRAY_BUFFER_ARB ) ) {
 		idLib::Printf( "idIndexBuffer::UnmapBuffer failed\n" );
 	}
-#elif DOOM3_VULKAN
-	vkUnmapMemory(vkDevice, stagingMemory);
-#endif
 
 	SetUnmapped();
-}
-
-void idIndexBuffer::Sync()
-{
-	VkCommandBuffer cmd = Vk_StartOneShotCommandBuffer();
-
-	VkBufferCopy copy = {};
-	copy.size = size;
-	copy.dstOffset = copy.srcOffset = 0;
-
-	vkCmdCopyBuffer(cmd, stagingBuffer, buffer, 1, &copy);
-	
-	Vk_SubmitOneShotCommandBuffer(cmd);
 }
 
 /*
@@ -782,8 +628,6 @@ void idIndexBuffer::ClearWithoutFreeing() {
 	size = 0;
 	offsetInOtherBuffer = OWNS_BUFFER_FLAG;
 	apiObject = NULL;
-	buffer = stagingBuffer = VK_NULL_HANDLE;
-	memory = stagingMemory = VK_NULL_HANDLE;
 }
 
 /*
@@ -820,7 +664,7 @@ idJointBuffer::~idJointBuffer() {
 idJointBuffer::AllocBufferObject
 ========================
 */
-bool idJointBuffer::AllocBufferObject( const float * joints, int numAllocJoints ) {
+bool idJointBuffer::AllocBufferObject( const void * joints, int numAllocJoints ) {
 	assert( apiObject == NULL );
 	assert_16_byte_aligned( joints );
 
@@ -834,45 +678,12 @@ bool idJointBuffer::AllocBufferObject( const float * joints, int numAllocJoints 
 
 	const int numBytes = GetAllocedSize();
 
-#ifdef DOOM3_OPENGL
 	GLuint buffer = 0;
 	qglGenBuffersARB( 1, &buffer );
 	qglBindBufferARB( GL_UNIFORM_BUFFER, buffer );
 	qglBufferDataARB( GL_UNIFORM_BUFFER, numBytes, NULL, GL_STREAM_DRAW_ARB );
 	qglBindBufferARB( GL_UNIFORM_BUFFER, 0);
 	apiObject = reinterpret_cast< void * >( buffer );
-#elif DOOM3_VULKAN
-	VkMemoryRequirements memReq;
-
-	//Staging buffer
-	VkBufferCreateInfo info = {};
-	info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-	info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	info.size = numBytes;
-	
-	VkCheck(vkCreateBuffer(vkDevice, &info, nullptr, &stagingBuffer));
-	vkGetBufferMemoryRequirements(vkDevice, stagingBuffer, &memReq);
-
-	VkMemoryAllocateInfo alloc = {};
-	alloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-	alloc.allocationSize = memReq.size;
-	alloc.memoryTypeIndex = Vk_GetMemoryTypeIndex(memReq.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-	VkCheck(vkAllocateMemory(vkDevice, &alloc, nullptr, &stagingMemory));
-	VkCheck(vkBindBufferMemory(vkDevice, stagingBuffer, stagingMemory, 0));
-
-	//Now the main buffer
-	info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-	VkCheck(vkCreateBuffer(vkDevice, &info, nullptr, &buffer));
-	vkGetBufferMemoryRequirements(vkDevice, buffer, &memReq);
-
-	alloc.memoryTypeIndex = Vk_GetMemoryTypeIndex(memReq.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-	VkCheck(vkAllocateMemory(vkDevice, &alloc, nullptr, &memory));
-	VkCheck(vkBindBufferMemory(vkDevice, buffer, memory, 0));
-	apiObject = reinterpret_cast<void*>(buffer);
-#endif
 
 	if ( r_showBuffers.GetBool() ) {
 		idLib::Printf( "joint buffer alloc %p, api %p (%i joints)\n", this, GetAPIObject(), GetNumJoints() );
@@ -910,19 +721,9 @@ void idJointBuffer::FreeBufferObject() {
 		idLib::Printf( "joint buffer free %p, api %p (%i joints)\n", this, GetAPIObject(), GetNumJoints() );
 	}
 
-#ifdef DOOM3_OPENGL
 	GLuint buffer = reinterpret_cast< GLuint > ( apiObject );
 	qglBindBufferARB( GL_UNIFORM_BUFFER, 0 );
 	qglDeleteBuffersARB( 1, & buffer );
-#elif DOOM3_VULKAN
-	vkDestroyBuffer(vkDevice, stagingBuffer, nullptr);
-	vkDestroyBuffer(vkDevice, buffer, nullptr);
-	vkFreeMemory(vkDevice, stagingMemory, nullptr);
-	vkFreeMemory(vkDevice, memory, nullptr);
-	buffer = stagingBuffer = VK_NULL_HANDLE;
-	memory = stagingMemory = VK_NULL_HANDLE;
-	apiObject = NULL;
-#endif
 
 	ClearWithoutFreeing();
 }
@@ -932,16 +733,18 @@ void idJointBuffer::FreeBufferObject() {
 idJointBuffer::Reference
 ========================
 */
-void idJointBuffer::Reference( const idJointBuffer & other ) {
+void idJointBuffer::Reference( const idBufferObject & other ) {
+	const idJointBuffer& jb = static_cast<const idJointBuffer &>(other);
+
 	assert( IsMapped() == false );
-	assert( other.IsMapped() == false );
-	assert( other.GetAPIObject() != NULL );
-	assert( other.GetNumJoints() > 0 );
+	assert( jb.IsMapped() == false );
+	assert( jb.GetAPIObject() != NULL );
+	assert( jb.GetNumJoints() > 0 );
 
 	FreeBufferObject();
-	numJoints = other.GetNumJoints();			// this strips the MAPPED_FLAG
-	offsetInOtherBuffer = other.GetOffset();	// this strips the OWNS_BUFFER_FLAG
-	apiObject = other.apiObject;
+	numJoints = jb.GetNumJoints();			// this strips the MAPPED_FLAG
+	offsetInOtherBuffer = jb.GetOffset();	// this strips the OWNS_BUFFER_FLAG
+	apiObject = jb.apiObject;
 	assert( OwnsBuffer() == false );
 }
 
@@ -950,19 +753,21 @@ void idJointBuffer::Reference( const idJointBuffer & other ) {
 idJointBuffer::Reference
 ========================
 */
-void idJointBuffer::Reference( const idJointBuffer & other, int jointRefOffset, int numRefJoints ) {
+void idJointBuffer::Reference( const idBufferObject & other, int jointRefOffset, int numRefJoints ) {
+	const idJointBuffer& jb = static_cast<const idJointBuffer &>(other);
+
 	assert( IsMapped() == false );
-	assert( other.IsMapped() == false );
-	assert( other.GetAPIObject() != NULL );
+	assert( jb.IsMapped() == false );
+	assert( jb.GetAPIObject() != NULL );
 	assert( jointRefOffset >= 0 );
 	assert( numRefJoints >= 0 );
-	assert( jointRefOffset + numRefJoints * sizeof( idJointMat ) <= other.GetNumJoints() * sizeof( idJointMat ) );
+	assert( jointRefOffset + numRefJoints * sizeof( idJointMat ) <= jb.GetNumJoints() * sizeof( idJointMat ) );
 	assert_16_byte_aligned( numRefJoints * 3 * 4 * sizeof( float ) );
 
 	FreeBufferObject();
 	numJoints = numRefJoints;
-	offsetInOtherBuffer = other.GetOffset() + jointRefOffset;
-	apiObject = other.apiObject;
+	offsetInOtherBuffer = jb.GetOffset() + jointRefOffset;
+	apiObject = jb.apiObject;
 	assert( OwnsBuffer() == false );
 }
 
@@ -971,7 +776,7 @@ void idJointBuffer::Reference( const idJointBuffer & other, int jointRefOffset, 
 idJointBuffer::Update
 ========================
 */
-void idJointBuffer::Update( const float * joints, int numUpdateJoints ) const {
+void idJointBuffer::Update( const void * joints, int numUpdateJoints ) const {
 	assert( apiObject != NULL );
 	assert( IsMapped() == false );
 	assert_16_byte_aligned( joints );
@@ -983,25 +788,8 @@ void idJointBuffer::Update( const float * joints, int numUpdateJoints ) const {
 
 	const int numBytes = numUpdateJoints * 3 * 4 * sizeof( float );
 
-#ifdef DOOM3_OPENGL
 	qglBindBufferARB( GL_UNIFORM_BUFFER, reinterpret_cast< GLuint >( apiObject ) );
 	qglBufferSubDataARB( GL_UNIFORM_BUFFER, GetOffset(), (GLsizeiptrARB)numBytes, joints );
-#elif DOOM3_VULKAN
-	void* dst;
-	VkCheck(vkMapMemory(vkDevice, stagingMemory, GetOffset(), numBytes, 0, &dst));
-	memcpy(dst, (void*)joints, numBytes);
-	vkUnmapMemory(vkDevice, stagingMemory);
-	
-	VkCommandBuffer cmd = Vk_StartOneShotCommandBuffer();
-
-	VkBufferCopy copy = {};
-	copy.size = numBytes;
-	copy.dstOffset = copy.srcOffset = GetOffset();
-
-	vkCmdCopyBuffer(cmd, stagingBuffer, buffer, 1, &copy);
-	
-	Vk_SubmitOneShotCommandBuffer(cmd);
-#endif
 }
 
 /*
@@ -1009,7 +797,7 @@ void idJointBuffer::Update( const float * joints, int numUpdateJoints ) const {
 idJointBuffer::MapBuffer
 ========================
 */
-float * idJointBuffer::MapBuffer( bufferMapType_t mapType ) const {
+void * idJointBuffer::MapBuffer( bufferMapType_t mapType ) const {
 	assert( IsMapped() == false );
 	assert( mapType == BM_WRITE );
 	assert( apiObject != NULL );
@@ -1018,7 +806,6 @@ float * idJointBuffer::MapBuffer( bufferMapType_t mapType ) const {
 
 	void * buffer = NULL;
 
-#ifdef DOOM3_OPENGL
 	qglBindBufferARB( GL_UNIFORM_BUFFER, reinterpret_cast< GLuint >( apiObject ) );
 	numBytes = numBytes;
 	assert( GetOffset() == 0 );
@@ -1027,16 +814,13 @@ float * idJointBuffer::MapBuffer( bufferMapType_t mapType ) const {
 	if ( buffer != NULL ) {
 		buffer = (byte *)buffer + GetOffset();
 	}
-#elif DOOM3_VULKAN
-	VkCheck(vkMapMemory(vkDevice, stagingMemory, 0, GetAllocedSize(), 0, &buffer));
-#endif
 
 	SetMapped();
 
 	if ( buffer == NULL ) {
 		idLib::FatalError( "idJointBuffer::MapBuffer: failed" );
 	}
-	return (float *) buffer;
+	return  buffer;
 }
 
 /*
@@ -1048,14 +832,10 @@ void idJointBuffer::UnmapBuffer() const {
 	assert( apiObject != NULL );
 	assert( IsMapped() );
 
-#ifdef DOOM3_OPENGL
 	qglBindBufferARB( GL_UNIFORM_BUFFER, reinterpret_cast< GLuint >( apiObject ) );
 	if ( !qglUnmapBufferARB( GL_UNIFORM_BUFFER ) ) {
 		idLib::Printf( "idJointBuffer::UnmapBuffer failed\n" );
 	}
-#elif DOOM3_VULKAN
-	vkUnmapMemory(vkDevice, stagingMemory);
-#endif
 
 	SetUnmapped();
 }
@@ -1069,8 +849,6 @@ void idJointBuffer::ClearWithoutFreeing() {
 	numJoints = 0;
 	offsetInOtherBuffer = OWNS_BUFFER_FLAG;
 	apiObject = NULL;
-	buffer = stagingBuffer = VK_NULL_HANDLE;
-	memory = stagingMemory = VK_NULL_HANDLE;
 }
 
 /*
@@ -1087,15 +865,189 @@ void idJointBuffer::Swap( idJointBuffer & other ) {
 	SwapValues( other.apiObject, apiObject );
 }
 
-void idJointBuffer::Sync()
+idBufferObject::idBufferObject()
+{
+	SetUnmapped();
+}
+
+idBufferObject::~idBufferObject()
+{
+}
+
+#ifdef DOOM3_VULKAN
+
+idBufferObjectVk::idBufferObjectVk() : idBufferObject()
+{
+	buffer = stagingBuffer = VK_NULL_HANDLE;
+	memory = stagingMemory = VK_NULL_HANDLE;
+}
+
+idBufferObjectVk::~idBufferObjectVk()
+{
+	FreeBufferObject();
+}
+
+bool idBufferObjectVk::AllocBufferObject(const void * data, int allocSize){
+	assert_16_byte_aligned( data );
+
+	if ( allocSize <= 0 ) {
+		idLib::Error( "idVertexBuffer::AllocBufferObject: allocSize = %i", allocSize );
+	}
+
+	size = allocSize;
+
+	bool allocationFailed = false;
+
+	int numBytes = GetAllocedSize();
+
+	VkMemoryRequirements memReq;
+
+	//Staging buffer
+	VkBufferCreateInfo info = {};
+	info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+	info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	info.size = size;
+	
+	VkCheck(vkCreateBuffer(vkDevice, &info, nullptr, &stagingBuffer));
+	vkGetBufferMemoryRequirements(vkDevice, stagingBuffer, &memReq);
+
+	VkMemoryAllocateInfo alloc = {};
+	alloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	alloc.allocationSize = memReq.size;
+	alloc.memoryTypeIndex = Vk_GetMemoryTypeIndex(memReq.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+	VkCheck(vkAllocateMemory(vkDevice, &alloc, nullptr, &stagingMemory));
+	VkCheck(vkBindBufferMemory(vkDevice, stagingBuffer, stagingMemory, 0));
+
+	//Now the main buffer
+	info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+	VkCheck(vkCreateBuffer(vkDevice, &info, nullptr, &buffer));
+	vkGetBufferMemoryRequirements(vkDevice, buffer, &memReq);
+
+	alloc.memoryTypeIndex = Vk_GetMemoryTypeIndex(memReq.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+	VkCheck(vkAllocateMemory(vkDevice, &alloc, nullptr, &memory));
+	VkCheck(vkBindBufferMemory(vkDevice, buffer, memory, 0));
+
+	if ( r_showBuffers.GetBool() ) {
+		idLib::Printf( "vertex buffer alloc %p, api %p (%i bytes)\n", this, "vk", GetSize() );
+	}
+
+	// copy the data
+	if ( data != NULL ) {
+		Update( data, allocSize );
+	}
+
+	return !allocationFailed;
+}
+
+void idBufferObjectVk::FreeBufferObject()
+{
+	if ( IsMapped() ) {
+		UnmapBuffer();
+	}
+
+	// if this is a sub-allocation inside a larger buffer, don't actually free anything.
+	if ( OwnsBuffer() == false ) {
+		ClearWithoutFreeing();
+		return;
+	}
+
+	if ( r_showBuffers.GetBool() ) {
+		idLib::Printf( "vertex buffer free %p, api %p (%i bytes)\n", this, "vk", GetSize() );
+	}
+	
+	vkDestroyBuffer(vkDevice, stagingBuffer, nullptr);
+	vkDestroyBuffer(vkDevice, buffer, nullptr);
+	vkFreeMemory(vkDevice, stagingMemory, nullptr);
+	vkFreeMemory(vkDevice, memory, nullptr);
+	buffer = stagingBuffer = VK_NULL_HANDLE;
+	memory = stagingMemory = VK_NULL_HANDLE;
+
+	ClearWithoutFreeing();
+}
+
+void idBufferObjectVk::Reference(const idBufferObject & other)
+{
+	//TODO
+}
+
+void idBufferObjectVk::Reference(const idBufferObject & other, int refOffset, int refSize)
+{
+	//TODO
+}
+
+void idBufferObjectVk::Update(const void * data, int updateSize) const
+{
+	assert( IsMapped() == false );
+	assert_16_byte_aligned( data );
+	assert( ( GetOffset() & 15 ) == 0 );
+
+	if ( updateSize > size ) {
+		idLib::FatalError( "idVertexBuffer::Update: size overrun, %i > %i\n", updateSize, GetSize() );
+	}
+
+	int numBytes = ( updateSize + 15 ) & ~15;
+
+	void* dst;
+	VkCheck(vkMapMemory(vkDevice, stagingMemory, GetOffset(), numBytes, 0, &dst));
+	memcpy(dst, data, numBytes);
+	vkUnmapMemory(vkDevice, stagingMemory);
+	
+	VkCommandBuffer cmd = Vk_StartOneShotCommandBuffer();
+
+	VkBufferCopy copy = {};
+	copy.size = size;
+	copy.dstOffset = copy.srcOffset = GetOffset();
+
+	vkCmdCopyBuffer(cmd, stagingBuffer, buffer, 1, &copy);
+	
+	Vk_SubmitOneShotCommandBuffer(cmd);
+}
+
+void * idBufferObjectVk::MapBuffer(bufferMapType_t mapType) const
+{
+	assert( IsMapped() == false );
+
+	void * buffer = NULL;
+
+	VkCheck(vkMapMemory(vkDevice, stagingMemory, 0, GetAllocedSize(), 0, &buffer));
+
+	SetMapped();
+
+	if ( buffer == NULL ) {
+		idLib::FatalError( "idVertexBuffer::MapBuffer: failed" );
+	}
+	return buffer;
+}
+
+void idBufferObjectVk::UnmapBuffer() const
+{
+	assert( IsMapped() );
+
+	vkUnmapMemory(vkDevice, stagingMemory);
+
+	SetUnmapped();
+}
+
+void idBufferObjectVk::Sync()
 {
 	VkCommandBuffer cmd = Vk_StartOneShotCommandBuffer();
 
 	VkBufferCopy copy = {};
-	copy.size = numJoints * sizeof(float);
+	copy.size = size;
 	copy.dstOffset = copy.srcOffset = 0;
 
 	vkCmdCopyBuffer(cmd, stagingBuffer, buffer, 1, &copy);
 	
 	Vk_SubmitOneShotCommandBuffer(cmd);
 }
+
+void idBufferObjectVk::ClearWithoutFreeing()
+{
+	buffer = stagingBuffer = VK_NULL_HANDLE;
+	memory = stagingMemory = VK_NULL_HANDLE;
+}
+
+#endif

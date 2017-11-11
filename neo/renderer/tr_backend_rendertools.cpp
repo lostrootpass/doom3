@@ -717,7 +717,7 @@ static void RB_ShowSilhouette() {
 				const srfTriangles_t * tri = surf->frontEndGeo;
 
 				idVertexBuffer vertexBuffer;
-				if ( !vertexCache.GetVertexBuffer( tri->shadowCache, &vertexBuffer ) ) {
+				if ( !vertexCache->GetVertexBuffer( tri->shadowCache, &vertexBuffer ) ) {
 					continue;
 				}
 

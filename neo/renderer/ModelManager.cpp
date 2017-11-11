@@ -544,7 +544,7 @@ void idRenderModelManagerLocal::BeginLevelLoad() {
 		model->SetLevelLoadReferenced( false );
 	}
 
-	vertexCache.FreeStaticData();
+	vertexCache->FreeStaticData();
 }
 
 /*

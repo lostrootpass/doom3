@@ -51,12 +51,130 @@ enum bufferMapType_t {
 // Call this before doing any conventional buffer reads, like screenshots.
 void UnbindBufferObjects();
 
+class idBufferObject
+{
+public:
+	idBufferObject();
+	~idBufferObject();
+
+	// Allocate or free the buffer.
+	virtual bool				AllocBufferObject( const void * data, int allocSize )=0;
+	virtual void				FreeBufferObject()=0;
+
+	// Make this buffer a reference to another buffer.
+	virtual void				Reference( const idBufferObject & other )=0;
+	virtual void				Reference( const idBufferObject & other, int refOffset, int refSize )=0;
+
+	// Copies data to the buffer. 'size' may be less than the originally allocated size.
+	virtual void				Update( const void * data, int updateSize ) const=0;
+
+	virtual void *				MapBuffer( bufferMapType_t mapType ) const=0;
+	idDrawVert *		MapVertexBuffer( bufferMapType_t mapType ) const { return static_cast< idDrawVert * >( MapBuffer( mapType ) ); }
+	virtual void				UnmapBuffer() const=0;
+	bool				IsMapped() const { return ( size & MAPPED_FLAG ) != 0; }
+
+	int					GetSize() const { return ( size & ~MAPPED_FLAG ); }
+	int					GetAllocedSize() const { return ( ( size & ~MAPPED_FLAG ) + 15 ) & ~15; }
+	int					GetOffset() const { return ( offsetInOtherBuffer & ~OWNS_BUFFER_FLAG ); }
+	void*				GetAPIObject() const { return apiObject; }
+
+	virtual void				Sync() {};
+	
+	// sizeof() confuses typeinfo...
+	static const int	MAPPED_FLAG			= 1 << ( 4 /* sizeof( int ) */ * 8 - 1 );
+	static const int	OWNS_BUFFER_FLAG	= 1 << ( 4 /* sizeof( int ) */ * 8 - 1 );
+
+protected:
+	virtual void				ClearWithoutFreeing()=0;
+	void				SetMapped() const { const_cast< int & >( size ) |= MAPPED_FLAG; }
+	void				SetUnmapped() const { const_cast< int & >( size ) &= ~MAPPED_FLAG; }
+	bool				OwnsBuffer() const { return ( ( offsetInOtherBuffer & OWNS_BUFFER_FLAG ) != 0 ); }
+
+
+	int					size;					// size in bytes
+	int					offsetInOtherBuffer;	// offset in bytes
+	void*				apiObject;
+};
+
+#ifdef DOOM3_VULKAN
+/*
+================================================
+idBufferObjectVk
+================================================
+*/
+class idBufferObjectVk : public idBufferObject
+{
+public:
+	idBufferObjectVk();
+	~idBufferObjectVk();
+
+	// Allocate or free the buffer.
+	virtual bool				AllocBufferObject( const void * data, int allocSize ) override;
+	virtual void				FreeBufferObject() override;
+
+	// Make this buffer a reference to another buffer.
+	virtual void				Reference( const idBufferObject & other ) override;
+	virtual void				Reference( const idBufferObject & other, int refOffset, int refSize ) override;
+
+	// Copies data to the buffer. 'size' may be less than the originally allocated size.
+	virtual void				Update( const void * data, int updateSize ) const override;
+
+	virtual void *				MapBuffer( bufferMapType_t mapType ) const override;
+
+	virtual void				UnmapBuffer() const override;
+
+	virtual void				Sync() override;
+
+protected:
+	virtual void				ClearWithoutFreeing() override;
+
+	VkDeviceMemory stagingMemory;
+	VkDeviceMemory memory;
+
+	VkBuffer stagingBuffer;
+	VkBuffer buffer;
+
+	DISALLOW_COPY_AND_ASSIGN( idBufferObjectVk );
+};
+
+/*
+================================================
+idVertexBufferVk
+================================================
+*/
+class idVertexBufferVk : public idBufferObjectVk
+{
+
+};
+
+/*
+================================================
+idIndexBufferVk
+================================================
+*/
+class idIndexBufferVk : public idBufferObjectVk
+{
+
+};
+
+/*
+================================================
+idJointBufferVk
+================================================
+*/
+class idJointBufferVk : public idBufferObjectVk
+{
+private:
+	int numJoints;
+};
+#endif
+
 /*
 ================================================
 idVertexBuffer
 ================================================
 */
-class idVertexBuffer {
+class idVertexBuffer : public idBufferObject {
 public:
 						idVertexBuffer();
 						~idVertexBuffer();
@@ -66,8 +184,8 @@ public:
 	void				FreeBufferObject();
 
 	// Make this buffer a reference to another buffer.
-	void				Reference( const idVertexBuffer & other );
-	void				Reference( const idVertexBuffer & other, int refOffset, int refSize );
+	void				Reference( const idBufferObject & other );
+	void				Reference( const idBufferObject & other, int refOffset, int refSize );
 
 	// Copies data to the buffer. 'size' may be less than the originally allocated size.
 	void				Update( const void * data, int updateSize ) const;
@@ -75,37 +193,11 @@ public:
 	void *				MapBuffer( bufferMapType_t mapType ) const;
 	idDrawVert *		MapVertexBuffer( bufferMapType_t mapType ) const { return static_cast< idDrawVert * >( MapBuffer( mapType ) ); }
 	void				UnmapBuffer() const;
-	bool				IsMapped() const { return ( size & MAPPED_FLAG ) != 0; }
 
-	int					GetSize() const { return ( size & ~MAPPED_FLAG ); }
-	int					GetAllocedSize() const { return ( ( size & ~MAPPED_FLAG ) + 15 ) & ~15; }
-	void *				GetAPIObject() const { return apiObject; }
-	int					GetOffset() const { return ( offsetInOtherBuffer & ~OWNS_BUFFER_FLAG ); }
-
-	void				Sync();
 
 private:
-	int					size;					// size in bytes
-	int					offsetInOtherBuffer;	// offset in bytes
-	void *				apiObject;
 
-#ifdef DOOM3_VULKAN
-	VkDeviceMemory stagingMemory;
-	VkDeviceMemory memory;
-
-	VkBuffer stagingBuffer;
-	VkBuffer buffer;
-#endif
-
-	// sizeof() confuses typeinfo...
-	static const int	MAPPED_FLAG			= 1 << ( 4 /* sizeof( int ) */ * 8 - 1 );
-	static const int	OWNS_BUFFER_FLAG	= 1 << ( 4 /* sizeof( int ) */ * 8 - 1 );
-
-private:
 	void				ClearWithoutFreeing();
-	void				SetMapped() const { const_cast< int & >( size ) |= MAPPED_FLAG; }
-	void				SetUnmapped() const { const_cast< int & >( size ) &= ~MAPPED_FLAG; }
-	bool				OwnsBuffer() const { return ( ( offsetInOtherBuffer & OWNS_BUFFER_FLAG ) != 0 ); }
 
 	DISALLOW_COPY_AND_ASSIGN( idVertexBuffer );
 };
@@ -115,7 +207,7 @@ private:
 idIndexBuffer
 ================================================
 */
-class idIndexBuffer {
+class idIndexBuffer : public idBufferObject {
 public:
 						idIndexBuffer();
 						~idIndexBuffer();
@@ -125,48 +217,19 @@ public:
 	void				FreeBufferObject();
 
 	// Make this buffer a reference to another buffer.
-	void				Reference( const idIndexBuffer & other );
-	void				Reference( const idIndexBuffer & other, int refOffset, int refSize );
+	void				Reference( const idBufferObject & other );
+	void				Reference( const idBufferObject & other, int refOffset, int refSize );
 
 	// Copies data to the buffer. 'size' may be less than the originally allocated size.
 	void				Update( const void * data, int updateSize ) const;
 
 	void *				MapBuffer( bufferMapType_t mapType ) const;
-	triIndex_t *		MapIndexBuffer( bufferMapType_t mapType ) const { return static_cast< triIndex_t * >( MapBuffer( mapType ) ); }
 	void				UnmapBuffer() const;
-	bool				IsMapped() const { return ( size & MAPPED_FLAG ) != 0; }
 
-	int					GetSize() const { return ( size & ~MAPPED_FLAG ); }
-	int					GetAllocedSize() const { return ( ( size & ~MAPPED_FLAG ) + 15 ) & ~15; }
-	void *				GetAPIObject() const { return apiObject; }
-	int					GetOffset() const { return ( offsetInOtherBuffer & ~OWNS_BUFFER_FLAG ); }
-
-	void				Sync();
 
 private:
-	int					size;					// size in bytes
-	int					offsetInOtherBuffer;	// offset in bytes
-	void *				apiObject;
 
-#ifdef DOOM3_VULKAN
-	VkDeviceMemory stagingMemory;
-	VkDeviceMemory memory;
-
-	VkBuffer stagingBuffer;
-	VkBuffer buffer;
-#endif
-
-
-
-	// sizeof() confuses typeinfo...
-	static const int	MAPPED_FLAG			= 1 << ( 4 /* sizeof( int ) */ * 8 - 1 );
-	static const int	OWNS_BUFFER_FLAG	= 1 << ( 4 /* sizeof( int ) */ * 8 - 1 );
-
-private:
 	void				ClearWithoutFreeing();
-	void				SetMapped() const { const_cast< int & >( size ) |= MAPPED_FLAG; }
-	void				SetUnmapped() const { const_cast< int & >( size ) &= ~MAPPED_FLAG; }
-	bool				OwnsBuffer() const { return ( ( offsetInOtherBuffer & OWNS_BUFFER_FLAG ) != 0 ); }
 
 	DISALLOW_COPY_AND_ASSIGN( idIndexBuffer );
 };
@@ -180,57 +243,33 @@ is limited to GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, which is 256 on current nvidia
 so joint offsets, which are multiples of 48 bytes, must be in multiples of 16 = 768 bytes.
 ================================================
 */
-class idJointBuffer {
+class idJointBuffer : public idBufferObject {
 public:
 						idJointBuffer();
 						~idJointBuffer();
 
 	// Allocate or free the buffer.
-	bool				AllocBufferObject( const float * joints, int numAllocJoints );
+	bool				AllocBufferObject( const void * joints, int numAllocJoints );
 	void				FreeBufferObject();
 
 	// Make this buffer a reference to another buffer.
-	void				Reference( const idJointBuffer & other );
-	void				Reference( const idJointBuffer & other, int jointRefOffset, int numRefJoints );
+	void				Reference( const idBufferObject & other );
+	void				Reference( const idBufferObject & other, int jointRefOffset, int numRefJoints );
 
 	// Copies data to the buffer. 'numJoints' may be less than the originally allocated size.
-	void				Update( const float * joints, int numUpdateJoints ) const;
+	void				Update( const void * joints, int numUpdateJoints ) const;
 
-	float *				MapBuffer( bufferMapType_t mapType ) const;
+	void *				MapBuffer( bufferMapType_t mapType ) const;
 	void				UnmapBuffer() const;
-	bool				IsMapped() const { return ( numJoints & MAPPED_FLAG ) != 0; }
 
-	int					GetNumJoints() const { return ( numJoints & ~MAPPED_FLAG ); }
-	int					GetAllocedSize() const { return ( numJoints & ~MAPPED_FLAG ) * 3 * 4 * sizeof( float ); }
-	void *				GetAPIObject() const { return apiObject; }
-	int					GetOffset() const { return ( offsetInOtherBuffer & ~OWNS_BUFFER_FLAG ); }
+	int					GetNumJoints() const { return numJoints; }
 
 	void				Swap( idJointBuffer & other );
-	void				Sync();
 
 private:
 	int					numJoints;
-	int					offsetInOtherBuffer;	// offset in bytes
-	void *				apiObject;
 
-#ifdef DOOM3_VULKAN
-	VkDeviceMemory stagingMemory;
-	VkDeviceMemory memory;
-
-	VkBuffer stagingBuffer;
-	VkBuffer buffer;
-#endif
-
-
-	// sizeof() confuses typeinfo...
-	static const int	MAPPED_FLAG			= 1 << ( 4 /* sizeof( int ) */ * 8 - 1 );
-	static const int	OWNS_BUFFER_FLAG	= 1 << ( 4 /* sizeof( int ) */ * 8 - 1 );
-
-private:
 	void				ClearWithoutFreeing();
-	void				SetMapped() const { const_cast< int & >( numJoints ) |= MAPPED_FLAG; }
-	void				SetUnmapped() const { const_cast< int & >( numJoints ) &= ~MAPPED_FLAG; }
-	bool				OwnsBuffer() const { return ( ( offsetInOtherBuffer & OWNS_BUFFER_FLAG ) != 0 ); }
 
 	DISALLOW_COPY_AND_ASSIGN( idJointBuffer );
 };

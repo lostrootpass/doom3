@@ -929,7 +929,8 @@ void R_InitOpenGL() {
 	r_initialized = true;
 
 	// allocate the vertex array range or vertex objects
-	vertexCache.Init();
+	vertexCache = new idVertexCacheGL();
+	vertexCache->Init();
 
 	// allocate the frame data, which may be more if smp is enabled
 	R_InitFrameData();
@@ -975,7 +976,8 @@ void R_InitVulkan() {
 
 	r_initialized = true;
 	
-	vertexCache.Init();
+	vertexCache = new idVertexCacheVk();
+	vertexCache->Init();
 
 	R_InitFrameData();
 
@@ -1861,7 +1863,7 @@ void R_VidRestart_f( const idCmdArgs &args ) {
 	R_ToggleSmpFrame();
 
 	// free the vertex caches so they will be regenerated again
-	vertexCache.PurgeAll();
+	vertexCache->PurgeAll();
 
 	// sound and input are tied to the window we are about to destroy
 
@@ -2353,7 +2355,8 @@ void idRenderSystemLocal::Shutdown() {
 	UnbindBufferObjects();
 
 	// free the vertex cache, which should have nothing allocated now
-	vertexCache.Shutdown();
+	vertexCache->Shutdown();
+	delete vertexCache;
 
 	RB_ShutdownDebugTools();
 
@@ -2385,7 +2388,8 @@ void idRenderSystemVk::Shutdown() {
 	R_ShutdownFrameData();
 
 	// free the vertex cache, which should have nothing allocated now
-	vertexCache.Shutdown();
+	vertexCache->Shutdown();
+	delete vertexCache;
 
 	RB_ShutdownDebugTools();
 

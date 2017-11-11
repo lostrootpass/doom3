@@ -636,11 +636,11 @@ drawSurf_t * idRenderModelOverlay::CreateOverlayDrawSurf( const viewEntity_t *sp
 	srfTriangles_t *newTri = (srfTriangles_t *)R_ClearedFrameAlloc( sizeof( *newTri ), FRAME_ALLOC_SURFACE_TRIANGLES );
 	newTri->staticModelWithJoints = ( staticModel->jointsInverted != NULL ) ? const_cast< idRenderModelStatic * >( staticModel ) : NULL;	// allow GPU skinning
 
-	newTri->ambientCache = vertexCache.AllocVertex( NULL, ALIGN( maxVerts * sizeof( idDrawVert ), VERTEX_CACHE_ALIGN ) );
-	newTri->indexCache = vertexCache.AllocIndex( NULL, ALIGN( maxIndexes * sizeof( triIndex_t ), INDEX_CACHE_ALIGN ) );
+	newTri->ambientCache = vertexCache->AllocVertex( NULL, ALIGN( maxVerts * sizeof( idDrawVert ), VERTEX_CACHE_ALIGN ) );
+	newTri->indexCache = vertexCache->AllocIndex( NULL, ALIGN( maxIndexes * sizeof( triIndex_t ), INDEX_CACHE_ALIGN ) );
 
-	idDrawVert * mappedVerts = (idDrawVert *)vertexCache.MappedVertexBuffer( newTri->ambientCache );
-	triIndex_t * mappedIndexes = (triIndex_t *)vertexCache.MappedIndexBuffer( newTri->indexCache );
+	idDrawVert * mappedVerts = (idDrawVert *)vertexCache->MappedVertexBuffer( newTri->ambientCache );
+	triIndex_t * mappedIndexes = (triIndex_t *)vertexCache->MappedIndexBuffer( newTri->indexCache );
 
 	int numVerts = 0;
 	int numIndexes = 0;

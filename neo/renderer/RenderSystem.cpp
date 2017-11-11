@@ -765,7 +765,7 @@ const emptyCommand_t * idRenderSystemLocal::SwapCommandBuffers_FinishCommandBuff
 	guiModel->Clear();
 
 	// unmap the buffer objects so they can be used by the GPU
-	vertexCache.BeginBackEnd();
+	vertexCache->BeginBackEnd();
 
 	// save off this command buffer
 	const emptyCommand_t * commandBufferHead = frameData->cmdHead;

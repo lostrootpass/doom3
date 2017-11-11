@@ -128,30 +128,30 @@ void RB_DrawElementsWithCounters( const drawSurf_t *surf ) {
 	// get vertex buffer
 	const vertCacheHandle_t vbHandle = surf->ambientCache;
 	idVertexBuffer * vertexBuffer;
-	if ( vertexCache.CacheIsStatic( vbHandle ) ) {
-		vertexBuffer = &vertexCache.staticData.vertexBuffer;
+	if ( vertexCache->CacheIsStatic( vbHandle ) ) {
+		vertexBuffer = (idVertexBuffer*)vertexCache->staticData.vertexBuffer;
 	} else {
 		const uint64 frameNum = (int)( vbHandle >> VERTCACHE_FRAME_SHIFT ) & VERTCACHE_FRAME_MASK;
-		if ( frameNum != ( ( vertexCache.currentFrame - 1 ) & VERTCACHE_FRAME_MASK ) ) {
+		if ( frameNum != ( ( vertexCache->currentFrame - 1 ) & VERTCACHE_FRAME_MASK ) ) {
 			idLib::Warning( "RB_DrawElementsWithCounters, vertexBuffer == NULL" );
 			return;
 		}
-		vertexBuffer = &vertexCache.frameData[vertexCache.drawListNum].vertexBuffer;
+		vertexBuffer = (idVertexBuffer*)vertexCache->frameData[vertexCache->drawListNum].vertexBuffer;
 	}
 	const int vertOffset = (int)( vbHandle >> VERTCACHE_OFFSET_SHIFT ) & VERTCACHE_OFFSET_MASK;
 
 	// get index buffer
 	const vertCacheHandle_t ibHandle = surf->indexCache;
 	idIndexBuffer * indexBuffer;
-	if ( vertexCache.CacheIsStatic( ibHandle ) ) {
-		indexBuffer = &vertexCache.staticData.indexBuffer;
+	if ( vertexCache->CacheIsStatic( ibHandle ) ) {
+		indexBuffer = (idIndexBuffer*)vertexCache->staticData.indexBuffer;
 	} else {
 		const uint64 frameNum = (int)( ibHandle >> VERTCACHE_FRAME_SHIFT ) & VERTCACHE_FRAME_MASK;
-		if ( frameNum != ( ( vertexCache.currentFrame - 1 ) & VERTCACHE_FRAME_MASK ) ) {
+		if ( frameNum != ( ( vertexCache->currentFrame - 1 ) & VERTCACHE_FRAME_MASK ) ) {
 			idLib::Warning( "RB_DrawElementsWithCounters, indexBuffer == NULL" );
 			return;
 		}
-		indexBuffer = &vertexCache.frameData[vertexCache.drawListNum].indexBuffer;
+		indexBuffer = (idIndexBuffer*)vertexCache->frameData[vertexCache->drawListNum].indexBuffer;
 	}
 	const int indexOffset = (int)( ibHandle >> VERTCACHE_OFFSET_SHIFT ) & VERTCACHE_OFFSET_MASK;
 
@@ -170,7 +170,7 @@ void RB_DrawElementsWithCounters( const drawSurf_t *surf ) {
 
 	if ( surf->jointCache ) {
 		idJointBuffer jointBuffer;
-		if ( !vertexCache.GetJointBuffer( surf->jointCache, &jointBuffer ) ) {
+		if ( !vertexCache->GetJointBuffer( surf->jointCache, &jointBuffer ) ) {
 			idLib::Warning( "RB_DrawElementsWithCounters, jointBuffer == NULL" );
 			return;
 		}
@@ -1468,30 +1468,30 @@ static void RB_StencilShadowPass( const drawSurf_t *drawSurfs, const viewLight_t
 		// get vertex buffer
 		const vertCacheHandle_t vbHandle = drawSurf->shadowCache;
 		idVertexBuffer * vertexBuffer;
-		if ( vertexCache.CacheIsStatic( vbHandle ) ) {
-			vertexBuffer = &vertexCache.staticData.vertexBuffer;
+		if ( vertexCache->CacheIsStatic( vbHandle ) ) {
+			vertexBuffer = (idVertexBuffer*)vertexCache->staticData.vertexBuffer;
 		} else {
 			const uint64 frameNum = (int)( vbHandle >> VERTCACHE_FRAME_SHIFT ) & VERTCACHE_FRAME_MASK;
-			if ( frameNum != ( ( vertexCache.currentFrame - 1 ) & VERTCACHE_FRAME_MASK ) ) {
+			if ( frameNum != ( ( vertexCache->currentFrame - 1 ) & VERTCACHE_FRAME_MASK ) ) {
 				idLib::Warning( "RB_DrawElementsWithCounters, vertexBuffer == NULL" );
 				continue;
 			}
-			vertexBuffer = &vertexCache.frameData[vertexCache.drawListNum].vertexBuffer;
+			vertexBuffer = (idVertexBuffer*)vertexCache->frameData[vertexCache->drawListNum].vertexBuffer;
 		}
 		const int vertOffset = (int)( vbHandle >> VERTCACHE_OFFSET_SHIFT ) & VERTCACHE_OFFSET_MASK;
 
 		// get index buffer
 		const vertCacheHandle_t ibHandle = drawSurf->indexCache;
 		idIndexBuffer * indexBuffer;
-		if ( vertexCache.CacheIsStatic( ibHandle ) ) {
-			indexBuffer = &vertexCache.staticData.indexBuffer;
+		if ( vertexCache->CacheIsStatic( ibHandle ) ) {
+			indexBuffer = (idIndexBuffer*)vertexCache->staticData.indexBuffer;
 		} else {
 			const uint64 frameNum = (int)( ibHandle >> VERTCACHE_FRAME_SHIFT ) & VERTCACHE_FRAME_MASK;
-			if ( frameNum != ( ( vertexCache.currentFrame - 1 ) & VERTCACHE_FRAME_MASK ) ) {
+			if ( frameNum != ( ( vertexCache->currentFrame - 1 ) & VERTCACHE_FRAME_MASK ) ) {
 				idLib::Warning( "RB_DrawElementsWithCounters, indexBuffer == NULL" );
 				continue;
 			}
-			indexBuffer = &vertexCache.frameData[vertexCache.drawListNum].indexBuffer;
+			indexBuffer = (idIndexBuffer*)vertexCache->frameData[vertexCache->drawListNum].indexBuffer;
 		}
 		const uint64 indexOffset = (int)( ibHandle >> VERTCACHE_OFFSET_SHIFT ) & VERTCACHE_OFFSET_MASK;
 
@@ -1507,7 +1507,7 @@ static void RB_StencilShadowPass( const drawSurf_t *drawSurfs, const viewLight_t
 			assert( renderProgManager.ShaderUsesJoints() );
 
 			idJointBuffer jointBuffer;
-			if ( !vertexCache.GetJointBuffer( drawSurf->jointCache, &jointBuffer ) ) {
+			if ( !vertexCache->GetJointBuffer( drawSurf->jointCache, &jointBuffer ) ) {
 				idLib::Warning( "RB_DrawElementsWithCounters, jointBuffer == NULL" );
 				continue;
 			}

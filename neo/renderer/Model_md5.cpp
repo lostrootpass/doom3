@@ -755,9 +755,9 @@ bool idRenderModelMD5::LoadBinaryModel( idFile * file, const ID_TIME_T sourceTim
 		idShadowVertSkinned * shadowVerts = (idShadowVertSkinned *) Mem_Alloc( ALIGN( deform.numOutputVerts * 2 * sizeof( idShadowVertSkinned ), 16 ), TAG_MODEL );
 		idShadowVertSkinned::CreateShadowCache( shadowVerts, deform.verts, deform.numOutputVerts );
 
-		deform.staticAmbientCache = vertexCache.AllocStaticVertex( deform.verts, ALIGN( deform.numOutputVerts * sizeof( idDrawVert ), VERTEX_CACHE_ALIGN ) );
-		deform.staticIndexCache = vertexCache.AllocStaticIndex( deform.indexes, ALIGN( deform.numIndexes * sizeof( triIndex_t ), INDEX_CACHE_ALIGN ) );
-		deform.staticShadowCache = vertexCache.AllocStaticVertex( shadowVerts, ALIGN( deform.numOutputVerts * 2 * sizeof( idShadowVertSkinned ), VERTEX_CACHE_ALIGN ) );
+		deform.staticAmbientCache = vertexCache->AllocStaticVertex( deform.verts, ALIGN( deform.numOutputVerts * sizeof( idDrawVert ), VERTEX_CACHE_ALIGN ) );
+		deform.staticIndexCache = vertexCache->AllocStaticIndex( deform.indexes, ALIGN( deform.numIndexes * sizeof( triIndex_t ), INDEX_CACHE_ALIGN ) );
+		deform.staticShadowCache = vertexCache->AllocStaticVertex( shadowVerts, ALIGN( deform.numOutputVerts * 2 * sizeof( idShadowVertSkinned ), VERTEX_CACHE_ALIGN ) );
 
 		Mem_Free( shadowVerts );
 

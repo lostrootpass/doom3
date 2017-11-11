@@ -1822,9 +1822,9 @@ deformInfo_t *R_BuildDeformInfo( int numVerts, const idDrawVert *verts, int numI
 	idShadowVertSkinned * shadowVerts = (idShadowVertSkinned *) Mem_Alloc16( ALIGN( deform->numOutputVerts * 2 * sizeof( idShadowVertSkinned ), 16 ), TAG_MODEL );
 	idShadowVertSkinned::CreateShadowCache( shadowVerts, deform->verts, deform->numOutputVerts );
 
-	deform->staticAmbientCache = vertexCache.AllocStaticVertex( deform->verts, ALIGN( deform->numOutputVerts * sizeof( idDrawVert ), VERTEX_CACHE_ALIGN ) );
-	deform->staticIndexCache = vertexCache.AllocStaticIndex( deform->indexes, ALIGN( deform->numIndexes * sizeof( triIndex_t ), INDEX_CACHE_ALIGN ) );
-	deform->staticShadowCache = vertexCache.AllocStaticVertex( shadowVerts, ALIGN( deform->numOutputVerts * 2 * sizeof( idShadowVertSkinned ), VERTEX_CACHE_ALIGN ) );
+	deform->staticAmbientCache = vertexCache->AllocStaticVertex( deform->verts, ALIGN( deform->numOutputVerts * sizeof( idDrawVert ), VERTEX_CACHE_ALIGN ) );
+	deform->staticIndexCache = vertexCache->AllocStaticIndex( deform->indexes, ALIGN( deform->numIndexes * sizeof( triIndex_t ), INDEX_CACHE_ALIGN ) );
+	deform->staticShadowCache = vertexCache->AllocStaticVertex( shadowVerts, ALIGN( deform->numOutputVerts * 2 * sizeof( idShadowVertSkinned ), VERTEX_CACHE_ALIGN ) );
 
 	Mem_Free( shadowVerts );
 
@@ -1915,11 +1915,11 @@ void R_InitDrawSurfFromTri( drawSurf_t & ds, srfTriangles_t & tri ) {
 	if ( ( tri.verts == NULL ) && !tri.referencedIndexes ) {
 		// pre-generated shadow models will not have any verts, just shadowVerts
 		tri.ambientCache = 0;
-	} else if ( !vertexCache.CacheIsCurrent( tri.ambientCache ) ) {
-		tri.ambientCache = vertexCache.AllocVertex( tri.verts, ALIGN( tri.numVerts * sizeof( tri.verts[0] ), VERTEX_CACHE_ALIGN ) );
+	} else if ( !vertexCache->CacheIsCurrent( tri.ambientCache ) ) {
+		tri.ambientCache = vertexCache->AllocVertex( tri.verts, ALIGN( tri.numVerts * sizeof( tri.verts[0] ), VERTEX_CACHE_ALIGN ) );
 	}
-	if ( !vertexCache.CacheIsCurrent( tri.indexCache ) ) {
-		tri.indexCache = vertexCache.AllocIndex( tri.indexes, ALIGN( tri.numIndexes * sizeof( tri.indexes[0] ), INDEX_CACHE_ALIGN ) );
+	if ( !vertexCache->CacheIsCurrent( tri.indexCache ) ) {
+		tri.indexCache = vertexCache->AllocIndex( tri.indexes, ALIGN( tri.numIndexes * sizeof( tri.indexes[0] ), INDEX_CACHE_ALIGN ) );
 	}
 
 	ds.numIndexes = tri.numIndexes;
@@ -1944,12 +1944,12 @@ void R_CreateStaticBuffersForTri( srfTriangles_t & tri ) {
 
 	// index cache
 	if ( tri.indexes != NULL ) {
-		tri.indexCache = vertexCache.AllocStaticIndex( tri.indexes, ALIGN( tri.numIndexes * sizeof( tri.indexes[0] ), INDEX_CACHE_ALIGN ) );
+		tri.indexCache = vertexCache->AllocStaticIndex( tri.indexes, ALIGN( tri.numIndexes * sizeof( tri.indexes[0] ), INDEX_CACHE_ALIGN ) );
 	}
 
 	// vertex cache
 	if ( tri.verts != NULL ) {
-		tri.ambientCache = vertexCache.AllocStaticVertex( tri.verts, ALIGN( tri.numVerts * sizeof( tri.verts[0] ), VERTEX_CACHE_ALIGN ) );
+		tri.ambientCache = vertexCache->AllocStaticVertex( tri.verts, ALIGN( tri.numVerts * sizeof( tri.verts[0] ), VERTEX_CACHE_ALIGN ) );
 	}
 
 	// shadow cache
@@ -1957,7 +1957,7 @@ void R_CreateStaticBuffersForTri( srfTriangles_t & tri ) {
 		// this should only be true for the _prelight<NAME> pre-calculated shadow volumes
 		assert( tri.verts == NULL );	// pre-light shadow volume surfaces don't have ambient vertices
 		const int shadowSize = ALIGN( tri.numVerts * 2 * sizeof( idShadowVert ), VERTEX_CACHE_ALIGN );
-		tri.shadowCache = vertexCache.AllocStaticVertex( tri.preLightShadowVertexes, shadowSize );
+		tri.shadowCache = vertexCache->AllocStaticVertex( tri.preLightShadowVertexes, shadowSize );
 	} else if ( tri.verts != NULL ) {
 		// the shadowVerts for normal models include all the xyz values duplicated
 		// for a W of 1 (near cap) and a W of 0 (end cap, projected to infinity)
@@ -1966,7 +1966,7 @@ void R_CreateStaticBuffersForTri( srfTriangles_t & tri ) {
 			tri.staticShadowVertexes = (idShadowVert *) Mem_Alloc16( shadowSize, TAG_TEMP );
 			idShadowVert::CreateShadowCache( tri.staticShadowVertexes, tri.verts, tri.numVerts );
 		}
-		tri.shadowCache = vertexCache.AllocStaticVertex( tri.staticShadowVertexes, shadowSize );
+		tri.shadowCache = vertexCache->AllocStaticVertex( tri.staticShadowVertexes, shadowSize );
 
 #if !defined( KEEP_INTERACTION_CPU_DATA )
 		Mem_Free( tri.staticShadowVertexes );

@@ -81,10 +81,10 @@ idGuiModel::BeginFrame
 ================
 */
 void idGuiModel::BeginFrame() {
-	vertexBlock = vertexCache.AllocVertex( NULL, ALIGN( MAX_VERTS * sizeof( idDrawVert ), VERTEX_CACHE_ALIGN ) );
-	indexBlock = vertexCache.AllocIndex( NULL, ALIGN( MAX_INDEXES * sizeof( triIndex_t ), INDEX_CACHE_ALIGN ) );
-	vertexPointer = (idDrawVert *)vertexCache.MappedVertexBuffer( vertexBlock );
-	indexPointer = (triIndex_t *)vertexCache.MappedIndexBuffer( indexBlock );
+	vertexBlock = vertexCache->AllocVertex( NULL, ALIGN( MAX_VERTS * sizeof( idDrawVert ), VERTEX_CACHE_ALIGN ) );
+	indexBlock = vertexCache->AllocIndex( NULL, ALIGN( MAX_INDEXES * sizeof( triIndex_t ), INDEX_CACHE_ALIGN ) );
+	vertexPointer = (idDrawVert *)vertexCache->MappedVertexBuffer( vertexBlock );
+	indexPointer = (triIndex_t *)vertexCache->MappedIndexBuffer( indexBlock );
 	numVerts = 0;
 	numIndexes = 0;
 	Clear();

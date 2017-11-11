@@ -60,9 +60,9 @@ enum cacheType_t {
 };
 
 struct geoBufferSet_t {
-	idIndexBuffer			indexBuffer;
-	idVertexBuffer			vertexBuffer;
-	idJointBuffer			jointBuffer;
+	idBufferObject*			indexBuffer;
+	idBufferObject*			vertexBuffer;
+	idBufferObject*			jointBuffer;
 	byte *					mappedVertexBase;
 	byte *					mappedIndexBase;
 	byte *					mappedJointBase;
@@ -74,13 +74,6 @@ struct geoBufferSet_t {
 
 class idVertexCache {
 public:
-	void			Init( bool restart = false );
-	void			Shutdown();
-	void			PurgeAll();
-
-	// call on loading a new map
-	void			FreeStaticData();
-
 	// this data is only valid for one frame of rendering
 	vertCacheHandle_t	AllocVertex( const void * data, int bytes ) {
 		return ActuallyAlloc( frameData[listNum], data, bytes, CACHE_VERTEX );
@@ -122,6 +115,18 @@ public:
 		return frameData[ listNum ].mappedIndexBase + offset;
 	}
 
+	// Try to make room for <bytes> bytes
+	virtual vertCacheHandle_t	ActuallyAlloc( geoBufferSet_t & vcs, const void * data, int bytes, cacheType_t type )=0;
+
+	virtual void			Init( bool restart = false )=0;
+	virtual void			Shutdown()=0;
+	virtual void			PurgeAll()=0;
+
+	// call on loading a new map
+	virtual void			FreeStaticData()=0;
+
+
+
 	// Returns false if it's been purged
 	// This can only be called by the front end, the back end should only be looking at
 	// vertCacheHandle_t that are already validated.
@@ -142,33 +147,92 @@ public:
 	}
 
 	// vb/ib is a temporary reference -- don't store it
-	bool			GetVertexBuffer( vertCacheHandle_t handle, idVertexBuffer * vb );
-	bool			GetIndexBuffer( vertCacheHandle_t handle, idIndexBuffer * ib );
-	bool			GetJointBuffer( vertCacheHandle_t handle, idJointBuffer * jb );
+	virtual bool			GetVertexBuffer( vertCacheHandle_t handle, idVertexBuffer * vb )=0;
+	virtual bool			GetIndexBuffer( vertCacheHandle_t handle, idIndexBuffer * ib )=0;
+	virtual bool			GetJointBuffer( vertCacheHandle_t handle, idJointBuffer * jb )=0;
 
-	void			BeginBackEnd();
-
-public:
-	int				currentFrame;	// for determining the active buffers
-	int				listNum;		// currentFrame % VERTCACHE_NUM_FRAMES
-	int				drawListNum;	// (currentFrame-1) % VERTCACHE_NUM_FRAMES
+	virtual void			BeginBackEnd()=0;
 
 	geoBufferSet_t	staticData;
 	geoBufferSet_t	frameData[VERTCACHE_NUM_FRAMES];
+	
+
+	int				currentFrame;	// for determining the active buffers
+	int				listNum;		// currentFrame % VERTCACHE_NUM_FRAMES
+	int				drawListNum;	// (currentFrame-1) % VERTCACHE_NUM_FRAMES
 
 	// High water marks for the per-frame buffers
 	int				mostUsedVertex;
 	int				mostUsedIndex;
 	int				mostUsedJoint;
+};
+
+class idVertexCacheGL : public idVertexCache {
+public:
+
+
+	virtual void Init(bool restart = false) override;
+
+
+	virtual void Shutdown() override;
+
+
+	virtual void PurgeAll() override;
+
+
+	virtual void FreeStaticData() override;
+
+
+	virtual bool GetVertexBuffer(vertCacheHandle_t handle, idVertexBuffer * vb) override;
+
+
+	virtual bool GetIndexBuffer(vertCacheHandle_t handle, idIndexBuffer * ib) override;
+
+
+	virtual bool GetJointBuffer(vertCacheHandle_t handle, idJointBuffer * jb) override;
+
+
+	virtual void BeginBackEnd() override;
 
 	// Try to make room for <bytes> bytes
-	vertCacheHandle_t	ActuallyAlloc( geoBufferSet_t & vcs, const void * data, int bytes, cacheType_t type );
+	vertCacheHandle_t	ActuallyAlloc( geoBufferSet_t & vcs, const void * data, int bytes, cacheType_t type ) override;
 };
+
+#ifdef DOOM3_VULKAN
+class idVertexCacheVk : public idVertexCache {
+public:
+	virtual void Init(bool restart = false) override;
+
+
+	virtual void Shutdown() override;
+
+
+	virtual void PurgeAll() override;
+
+
+	virtual void FreeStaticData() override;
+
+
+	virtual bool GetVertexBuffer(vertCacheHandle_t handle, idVertexBuffer * vb) override;
+
+
+	virtual bool GetIndexBuffer(vertCacheHandle_t handle, idIndexBuffer * ib) override;
+
+
+	virtual bool GetJointBuffer(vertCacheHandle_t handle, idJointBuffer * jb) override;
+
+
+	virtual void BeginBackEnd() override;
+
+	// Try to make room for <bytes> bytes
+	vertCacheHandle_t	ActuallyAlloc( geoBufferSet_t & vcs, const void * data, int bytes, cacheType_t type ) override;
+};
+#endif
 
 // platform specific code to memcpy into vertex buffers efficiently
 // 16 byte alignment is guaranteed
 void CopyBuffer( byte * dst, const byte * src, int numBytes );
 
-extern	idVertexCache	vertexCache;
+extern	idVertexCache*	vertexCache;
 
 #endif // __VERTEXCACHE2_H__

@@ -297,9 +297,9 @@ void R_SetupDrawSurfJoints( drawSurf_t * drawSurf, const srfTriangles_t * tri, c
 	idRenderModelStatic * model = tri->staticModelWithJoints;
 	assert( model->jointsInverted != NULL );
 
-	if ( !vertexCache.CacheIsCurrent( model->jointsInvertedBuffer ) ) {
+	if ( !vertexCache->CacheIsCurrent( model->jointsInvertedBuffer ) ) {
 		const int alignment = glConfig.uniformBufferOffsetAlignment;
-		model->jointsInvertedBuffer = vertexCache.AllocJoint( model->jointsInverted, ALIGN( model->numInvertedJoints * sizeof( idJointMat ), alignment ) );
+		model->jointsInvertedBuffer = vertexCache->AllocJoint( model->jointsInverted, ALIGN( model->numInvertedJoints * sizeof( idJointMat ), alignment ) );
 	}
 	drawSurf->jointCache = model->jointsInvertedBuffer;
 }
@@ -584,17 +584,17 @@ void R_AddSingleModel( viewEntity_t * vEntity ) {
 		drawSurf_t * baseDrawSurf = NULL;
 		if ( surfaceDirectlyVisible ) {
 			// make sure we have an ambient cache and all necessary normals / tangents
-			if ( !vertexCache.CacheIsCurrent( tri->indexCache ) ) {
-				tri->indexCache = vertexCache.AllocIndex( tri->indexes, ALIGN( tri->numIndexes * sizeof( triIndex_t ), INDEX_CACHE_ALIGN ) );
+			if ( !vertexCache->CacheIsCurrent( tri->indexCache ) ) {
+				tri->indexCache = vertexCache->AllocIndex( tri->indexes, ALIGN( tri->numIndexes * sizeof( triIndex_t ), INDEX_CACHE_ALIGN ) );
 			}
-			if ( !vertexCache.CacheIsCurrent( tri->ambientCache ) ) {
+			if ( !vertexCache->CacheIsCurrent( tri->ambientCache ) ) {
 				// we are going to use it for drawing, so make sure we have the tangents and normals
 				if ( shader->ReceivesLighting() && !tri->tangentsCalculated ) {
 					assert( tri->staticModelWithJoints == NULL );
 					R_DeriveTangents( tri );
 					assert( false );	// this should no longer be hit
 				}
-				tri->ambientCache = vertexCache.AllocVertex( tri->verts, ALIGN( tri->numVerts * sizeof( idDrawVert ), VERTEX_CACHE_ALIGN ) );
+				tri->ambientCache = vertexCache->AllocVertex( tri->verts, ALIGN( tri->numVerts * sizeof( idDrawVert ), VERTEX_CACHE_ALIGN ) );
 			}
 
 			// add the surface for drawing
@@ -628,11 +628,11 @@ void R_AddSingleModel( viewEntity_t * vEntity ) {
 			// However, particles are rendered in conjunction with the source surface.
 			if ( shaderDeform == DFRM_NONE || shaderDeform == DFRM_PARTICLE || shaderDeform == DFRM_PARTICLE2 ) {
 				// copy verts and indexes to this frame's hardware memory if they aren't already there
-				if ( !vertexCache.CacheIsCurrent( tri->ambientCache ) ) {
-					tri->ambientCache = vertexCache.AllocVertex( tri->verts, ALIGN( tri->numVerts * sizeof( tri->verts[0] ), VERTEX_CACHE_ALIGN ) );
+				if ( !vertexCache->CacheIsCurrent( tri->ambientCache ) ) {
+					tri->ambientCache = vertexCache->AllocVertex( tri->verts, ALIGN( tri->numVerts * sizeof( tri->verts[0] ), VERTEX_CACHE_ALIGN ) );
 				}
-				if ( !vertexCache.CacheIsCurrent( tri->indexCache ) ) {
-					tri->indexCache = vertexCache.AllocIndex( tri->indexes, ALIGN( tri->numIndexes * sizeof( tri->indexes[0] ), INDEX_CACHE_ALIGN ) );
+				if ( !vertexCache->CacheIsCurrent( tri->indexCache ) ) {
+					tri->indexCache = vertexCache->AllocIndex( tri->indexes, ALIGN( tri->numIndexes * sizeof( tri->indexes[0] ), INDEX_CACHE_ALIGN ) );
 				}
 
 				R_SetupDrawSurfJoints( baseDrawSurf, tri, shader );
@@ -704,8 +704,8 @@ void R_AddSingleModel( viewEntity_t * vEntity ) {
 						// optionally cull the triangles to the light volume
 						if ( r_cullDynamicLightTriangles.GetBool() ) {
 
-							vertCacheHandle_t lightIndexCache = vertexCache.AllocIndex( NULL, ALIGN( lightDrawSurf->numIndexes * sizeof( triIndex_t ), INDEX_CACHE_ALIGN ) );
-							if ( vertexCache.CacheIsCurrent( lightIndexCache ) ) {
+							vertCacheHandle_t lightIndexCache = vertexCache->AllocIndex( NULL, ALIGN( lightDrawSurf->numIndexes * sizeof( triIndex_t ), INDEX_CACHE_ALIGN ) );
+							if ( vertexCache->CacheIsCurrent( lightIndexCache ) ) {
 								lightDrawSurf->indexCache = lightIndexCache;
 
 								dynamicShadowParms = (dynamicShadowVolumeParms_t *)R_FrameAlloc( sizeof( dynamicShadowParms[0] ), FRAME_ALLOC_SHADOW_VOLUME_PARMS );
@@ -737,7 +737,7 @@ void R_AddSingleModel( viewEntity_t * vEntity ) {
 								dynamicShadowParms->shadowIndices = NULL;
 								dynamicShadowParms->maxShadowIndices = 0;
 								dynamicShadowParms->numShadowIndices = NULL;
-								dynamicShadowParms->lightIndices = (triIndex_t *)vertexCache.MappedIndexBuffer( lightIndexCache );
+								dynamicShadowParms->lightIndices = (triIndex_t *)vertexCache->MappedIndexBuffer( lightIndexCache );
 								dynamicShadowParms->maxLightIndices = lightDrawSurf->numIndexes;
 								dynamicShadowParms->numLightIndices = &lightDrawSurf->numIndexes;
 								dynamicShadowParms->renderZFail = NULL;
@@ -863,27 +863,27 @@ void R_AddSingleModel( viewEntity_t * vEntity ) {
 
 			} else {
 				// When CPU skinning the dynamic shadow verts of a dynamic model may not have been copied to buffer memory yet.
-				if ( !vertexCache.CacheIsCurrent( tri->shadowCache ) ) {
+				if ( !vertexCache->CacheIsCurrent( tri->shadowCache ) ) {
 					assert( !gpuSkinned );	// the shadow cache should be static when using GPU skinning
 					// Extracts just the xyz values from a set of full size drawverts, and
 					// duplicates them with w set to 0 and 1 for the vertex program to project.
 					// This is constant for any number of lights, the vertex program takes care
 					// of projecting the verts to infinity for a particular light.
-					tri->shadowCache = vertexCache.AllocVertex( NULL, ALIGN( tri->numVerts * 2 * sizeof( idShadowVert ), VERTEX_CACHE_ALIGN ) );
-					idShadowVert * shadowVerts = (idShadowVert *)vertexCache.MappedVertexBuffer( tri->shadowCache );
+					tri->shadowCache = vertexCache->AllocVertex( NULL, ALIGN( tri->numVerts * 2 * sizeof( idShadowVert ), VERTEX_CACHE_ALIGN ) );
+					idShadowVert * shadowVerts = (idShadowVert *)vertexCache->MappedVertexBuffer( tri->shadowCache );
 					idShadowVert::CreateShadowCache( shadowVerts, tri->verts, tri->numVerts );
 				}
 
 				const int maxShadowVolumeIndexes = tri->numSilEdges * 6 + tri->numIndexes * 2;
 
 				shadowDrawSurf->numIndexes = 0;
-				shadowDrawSurf->indexCache = vertexCache.AllocIndex( NULL, ALIGN( maxShadowVolumeIndexes * sizeof( triIndex_t ), INDEX_CACHE_ALIGN ) );
+				shadowDrawSurf->indexCache = vertexCache->AllocIndex( NULL, ALIGN( maxShadowVolumeIndexes * sizeof( triIndex_t ), INDEX_CACHE_ALIGN ) );
 				shadowDrawSurf->shadowCache = tri->shadowCache;
 				shadowDrawSurf->scissorRect = vLight->scissorRect;		// default to the light scissor and light depth bounds
 				shadowDrawSurf->shadowVolumeState = SHADOWVOLUME_DONE;	// assume the shadow volume is done in case the index cache allocation failed
 
 				// if the index cache was successfully allocated then setup the parms to create a shadow volume in parallel
-				if ( vertexCache.CacheIsCurrent( shadowDrawSurf->indexCache ) && !r_skipDynamicShadows.GetBool() ) {
+				if ( vertexCache->CacheIsCurrent( shadowDrawSurf->indexCache ) && !r_skipDynamicShadows.GetBool() ) {
 
 					// if the parms were not already allocated for culling interaction triangles to the light frustum
 					if ( dynamicShadowParms == NULL ) {
@@ -917,7 +917,7 @@ void R_AddSingleModel( viewEntity_t * vEntity ) {
 					dynamicShadowParms->tempCulled = NULL;
 					dynamicShadowParms->tempVerts = NULL;
 					dynamicShadowParms->indexBuffer = NULL;
-					dynamicShadowParms->shadowIndices = (triIndex_t *)vertexCache.MappedIndexBuffer( shadowDrawSurf->indexCache );
+					dynamicShadowParms->shadowIndices = (triIndex_t *)vertexCache->MappedIndexBuffer( shadowDrawSurf->indexCache );
 					dynamicShadowParms->maxShadowIndices = maxShadowVolumeIndexes;
 					dynamicShadowParms->numShadowIndices = & shadowDrawSurf->numIndexes;
 					// dynamicShadowParms->lightIndices may have already been set for the interaction surface
@@ -940,8 +940,8 @@ void R_AddSingleModel( viewEntity_t * vEntity ) {
 				}
 			}
 
-			assert( vertexCache.CacheIsCurrent( shadowDrawSurf->shadowCache ) );
-			assert( vertexCache.CacheIsCurrent( shadowDrawSurf->indexCache ) );
+			assert( vertexCache->CacheIsCurrent( shadowDrawSurf->shadowCache ) );
+			assert( vertexCache->CacheIsCurrent( shadowDrawSurf->indexCache ) );
 
 			shadowDrawSurf->ambientCache = 0;
 			shadowDrawSurf->frontEndGeo = NULL;

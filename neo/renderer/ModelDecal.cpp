@@ -722,11 +722,11 @@ drawSurf_t * idRenderModelDecal::CreateDecalDrawSurf( const viewEntity_t *space,
 	newTri->numVerts = maxVerts;
 	newTri->numIndexes = maxIndexes;
 
-	newTri->ambientCache = vertexCache.AllocVertex( NULL, ALIGN( maxVerts * sizeof( idDrawVert ), VERTEX_CACHE_ALIGN ) );
-	newTri->indexCache = vertexCache.AllocIndex( NULL, ALIGN( maxIndexes * sizeof( triIndex_t ), INDEX_CACHE_ALIGN ) );
+	newTri->ambientCache = vertexCache->AllocVertex( NULL, ALIGN( maxVerts * sizeof( idDrawVert ), VERTEX_CACHE_ALIGN ) );
+	newTri->indexCache = vertexCache->AllocIndex( NULL, ALIGN( maxIndexes * sizeof( triIndex_t ), INDEX_CACHE_ALIGN ) );
 
-	idDrawVert * mappedVerts = (idDrawVert *)vertexCache.MappedVertexBuffer( newTri->ambientCache );
-	triIndex_t * mappedIndexes = (triIndex_t *)vertexCache.MappedIndexBuffer( newTri->indexCache );
+	idDrawVert * mappedVerts = (idDrawVert *)vertexCache->MappedVertexBuffer( newTri->ambientCache );
+	triIndex_t * mappedIndexes = (triIndex_t *)vertexCache->MappedIndexBuffer( newTri->indexCache );
 
 	const decalInfo_t decalInfo = material->GetDecalInfo();
 	const int maxTime = decalInfo.stayTime + decalInfo.fadeTime;

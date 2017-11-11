@@ -386,8 +386,8 @@ static void R_AddSingleLight( viewLight_t * vLight ) {
 		}
 
 		// prelight models should always have static data that never gets purged
-		assert( vertexCache.CacheIsCurrent( tri->shadowCache ) );
-		assert( vertexCache.CacheIsCurrent( tri->indexCache ) );
+		assert( vertexCache->CacheIsCurrent( tri->shadowCache ) );
+		assert( vertexCache->CacheIsCurrent( tri->indexCache ) );
 
 		drawSurf_t * shadowDrawSurf = (drawSurf_t *)R_FrameAlloc( sizeof( *shadowDrawSurf ), FRAME_ALLOC_DRAW_SURFACE );
 
