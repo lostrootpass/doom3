@@ -33,7 +33,7 @@ If you have questions concerning this license or the applicable additional terms
 
 
 
-idRenderProgManager renderProgManager;
+idRenderProgManager* renderProgManager;
 
 /*
 ================================================================================================
@@ -57,8 +57,8 @@ R_ReloadShaders
 ================================================================================================
 */
 static void R_ReloadShaders( const idCmdArgs &args ) {	
-	renderProgManager.KillAllShaders();
-	renderProgManager.LoadAllShaders();
+	renderProgManager->KillAllShaders();
+	renderProgManager->LoadAllShaders();
 }
 
 /*
@@ -123,15 +123,15 @@ void idRenderProgManager::Init() {
 		builtinShaders[builtins[i].index] = i;
 		LoadVertexShader( i );
 		LoadFragmentShader( i );
-		LoadGLSLProgram( i, i, i );
+		LoadProgram( i, i, i );
 	}
 
 	// Special case handling for fastZ shaders
 	builtinShaders[BUILTIN_SHADOW] = FindVertexShader( "shadow.vp" );
 	builtinShaders[BUILTIN_SHADOW_SKINNED] = FindVertexShader( "shadow_skinned.vp" );
 
-	FindGLSLProgram( "shadow.vp", builtinShaders[BUILTIN_SHADOW], -1 );
-	FindGLSLProgram( "shadow_skinned.vp", builtinShaders[BUILTIN_SHADOW_SKINNED], -1 );
+	FindProgram( "shadow.vp", builtinShaders[BUILTIN_SHADOW], -1 );
+	FindProgram( "shadow_skinned.vp", builtinShaders[BUILTIN_SHADOW_SKINNED], -1 );
 
 	glslUniforms.SetNum( RENDERPARM_USER + MAX_GLSL_USER_PARMS, vec4_zero );
 
@@ -162,34 +162,7 @@ void idRenderProgManager::LoadAllShaders() {
 	}
 
 	for ( int i = 0; i < glslPrograms.Num(); ++i ) {
-		LoadGLSLProgram( i, glslPrograms[i].vertexShaderIndex, glslPrograms[i].fragmentShaderIndex );
-	}
-}
-
-/*
-================================================================================================
-idRenderProgManager::KillAllShaders()
-================================================================================================
-*/
-void idRenderProgManager::KillAllShaders() {
-	Unbind();
-	for ( int i = 0; i < vertexShaders.Num(); i++ ) {
-		if ( vertexShaders[i].progId != INVALID_PROGID ) {
-			qglDeleteShader( vertexShaders[i].progId );
-			vertexShaders[i].progId = INVALID_PROGID;
-		}
-	}
-	for ( int i = 0; i < fragmentShaders.Num(); i++ ) {
-		if ( fragmentShaders[i].progId != INVALID_PROGID ) {
-			qglDeleteShader( fragmentShaders[i].progId );
-			fragmentShaders[i].progId = INVALID_PROGID;
-		}
-	}
-	for ( int i = 0; i < glslPrograms.Num(); ++i ) {
-		if ( glslPrograms[i].progId != INVALID_PROGID ) {
-			qglDeleteProgram( glslPrograms[i].progId );
-			glslPrograms[i].progId = INVALID_PROGID;
-		}
+		LoadProgram( i, glslPrograms[i].vertexShaderIndex, glslPrograms[i].fragmentShaderIndex );
 	}
 }
 
@@ -252,143 +225,6 @@ int idRenderProgManager::FindFragmentShader( const char * name ) {
 	return index;
 }
 
-
-
-
-/*
-================================================================================================
-idRenderProgManager::LoadVertexShader
-================================================================================================
-*/
-void idRenderProgManager::LoadVertexShader( int index ) {
-	if ( vertexShaders[index].progId != INVALID_PROGID ) {
-		return; // Already loaded
-	}
-	vertexShaders[index].progId = ( GLuint ) LoadGLSLShader( GL_VERTEX_SHADER, vertexShaders[index].name, vertexShaders[index].uniforms );
-}
-
-/*
-================================================================================================
-idRenderProgManager::LoadFragmentShader
-================================================================================================
-*/
-void idRenderProgManager::LoadFragmentShader( int index ) {
-	if ( fragmentShaders[index].progId != INVALID_PROGID ) {
-		return; // Already loaded
-	}
-	fragmentShaders[index].progId = ( GLuint ) LoadGLSLShader( GL_FRAGMENT_SHADER, fragmentShaders[index].name, fragmentShaders[index].uniforms );
-}
-
-/*
-================================================================================================
-idRenderProgManager::LoadShader
-================================================================================================
-*/
-GLuint idRenderProgManager::LoadShader( GLenum target, const char * name, const char * startToken ) {
-
-	idStr fullPath = "renderprogs\\gl\\";
-	fullPath += name;
-
-	common->Printf( "%s", fullPath.c_str() );
-
-	char * fileBuffer = NULL;
-	fileSystem->ReadFile( fullPath.c_str(), (void **)&fileBuffer, NULL );
-	if ( fileBuffer == NULL ) {
-		common->Printf( ": File not found\n" );
-		return INVALID_PROGID;
-	}
-	if ( !R_IsInitialized() ) {
-		common->Printf( ": Renderer not initialized\n" );
-		fileSystem->FreeFile( fileBuffer );
-		return INVALID_PROGID;
-	}
-
-	// vertex and fragment shaders are both be present in a single file, so
-	// scan for the proper header to be the start point, and stamp a 0 in after the end
-	char * start = strstr( (char *)fileBuffer, startToken );
-	if ( start == NULL ) {
-		common->Printf( ": %s not found\n", startToken );
-		fileSystem->FreeFile( fileBuffer );
-		return INVALID_PROGID;
-	}
-	char * end = strstr( start, "END" );
-	if ( end == NULL ) {
-		common->Printf( ": END not found for %s\n", startToken );
-		fileSystem->FreeFile( fileBuffer );
-		return INVALID_PROGID;
-	}
-	end[3] = 0;
-
-	idStr program = start;
-	program.Replace( "vertex.normal", "vertex.attrib[11]" );
-	program.Replace( "vertex.texcoord[0]", "vertex.attrib[8]" );
-	program.Replace( "vertex.texcoord", "vertex.attrib[8]" );
-
-	GLuint progId;
-	qglGenProgramsARB( 1, &progId );
-
-	qglBindProgramARB( target, progId );
-	qglGetError();
-
-	qglProgramStringARB( target, GL_PROGRAM_FORMAT_ASCII_ARB, program.Length(), program.c_str() );
-	GLenum err = qglGetError();
-
-	GLint ofs = -1;
-	qglGetIntegerv( GL_PROGRAM_ERROR_POSITION_ARB, &ofs );
-	if ( ( err == GL_INVALID_OPERATION ) || ( ofs != -1 ) ) {
-		if ( err == GL_INVALID_OPERATION ) {
-			const GLubyte * str = qglGetString( GL_PROGRAM_ERROR_STRING_ARB );
-			common->Printf( "\nGL_PROGRAM_ERROR_STRING_ARB: %s\n", str );
-		} else {
-			common->Printf( "\nUNKNOWN ERROR\n" );
-		}
-		if ( ofs < 0 ) {
-			common->Printf( "GL_PROGRAM_ERROR_POSITION_ARB < 0\n" );
-		} else if ( ofs >= program.Length() ) {
-			common->Printf( "error at end of shader\n" );
-		} else {
-			common->Printf( "error at %i:\n%s", ofs, program.c_str() + ofs );
-		}
-		qglDeleteProgramsARB( 1, &progId );
-		fileSystem->FreeFile( fileBuffer );
-		return INVALID_PROGID;
-	}
-	common->Printf( "\n" );
-	fileSystem->FreeFile( fileBuffer );
-	return progId;
-}
-
-/*
-================================================================================================
-idRenderProgManager::BindShader
-================================================================================================
-*/
-void idRenderProgManager::BindShader( int vIndex, int fIndex ) {
-	if ( currentVertexShader == vIndex && currentFragmentShader == fIndex ) {
-		return;
-	}
-	currentVertexShader = vIndex;
-	currentFragmentShader = fIndex;
-	// vIndex denotes the GLSL program
-	if ( vIndex >= 0 && vIndex < glslPrograms.Num() ) {
-		currentRenderProgram = vIndex;
-		RENDERLOG_PRINTF( "Binding GLSL Program %s\n", glslPrograms[vIndex].name.c_str() );
-		qglUseProgram( glslPrograms[vIndex].progId );
-	}
-}
-
-/*
-================================================================================================
-idRenderProgManager::Unbind
-================================================================================================
-*/
-void idRenderProgManager::Unbind() {
-	currentVertexShader = -1;
-	currentFragmentShader = -1;
-
-	qglUseProgram( 0 );
-}
-
 /*
 ================================================================================================
 idRenderProgManager::SetRenderParms
@@ -408,4 +244,3 @@ idRenderProgManager::SetRenderParm
 void idRenderProgManager::SetRenderParm( renderParm_t rp, const float * value ) {
 	SetUniformValue( rp, value );
 }
-

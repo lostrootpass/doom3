@@ -289,7 +289,7 @@ static void R_ColorByStencilBuffer() {
 	qglStencilOp( GL_KEEP, GL_KEEP, GL_KEEP );
 	for ( i = 0; i < 6; i++ ) {
 		GL_Color( colors[i] );
-		renderProgManager.BindShader_Color();
+		renderProgManager->BindShader_Color();
 		qglStencilFunc( GL_EQUAL, i, 255 );
 		RB_PolygonClear();
 	}
@@ -792,7 +792,7 @@ static void RB_ShowTris( drawSurf_t **drawSurfs, int numDrawSurfs ) {
 	}
 
 	GL_Color( color );
-	renderProgManager.BindShader_Color();
+	renderProgManager->BindShader_Color();
 
 	RB_RenderDrawSurfListWithFunction( drawSurfs, numDrawSurfs, RB_DrawElementsWithCounters );
 
@@ -871,7 +871,7 @@ static void RB_ShowViewEntitys( viewEntity_t *vModels ) {
 
 	globalImages->BindNull();
 
-	renderProgManager.BindShader_Color();
+	renderProgManager->BindShader_Color();
 
 	GL_Color( 1, 1, 1 );
 	GL_State( GLS_DEPTHFUNC_ALWAYS | GLS_POLYMODE_LINE );
@@ -1583,7 +1583,7 @@ static void RB_ShowLights() {
 
 	globalImages->BindNull();
 
-	renderProgManager.BindShader_Color();
+	renderProgManager->BindShader_Color();
 
 	GL_Cull( CT_TWO_SIDED );
 
@@ -1641,7 +1641,7 @@ static void RB_ShowPortals() {
 	RB_SimpleWorldSetup();
 
 	globalImages->BindNull();
-	renderProgManager.BindShader_Color();
+	renderProgManager->BindShader_Color();
 	GL_State( GLS_DEPTHFUNC_ALWAYS );
 
 	((idRenderWorldLocal *)backEnd.viewDef->renderWorld)->ShowPortals();
@@ -1754,7 +1754,7 @@ RB_DrawText
 ================
 */
 static void RB_DrawText( const char *text, const idVec3 &origin, float scale, const idVec4 &color, const idMat3 &viewAxis, const int align ) {
-	renderProgManager.BindShader_Color();
+	renderProgManager->BindShader_Color();
 
 
 
@@ -2359,11 +2359,11 @@ void RB_TestImage() {
 	// Set Parms
 	float texS[4] = { 1.0f, 0.0f, 0.0f, 0.0f };
 	float texT[4] = { 0.0f, 1.0f, 0.0f, 0.0f };
-	renderProgManager.SetRenderParm( RENDERPARM_TEXTUREMATRIX_S, texS );
-	renderProgManager.SetRenderParm( RENDERPARM_TEXTUREMATRIX_T, texT );
+	renderProgManager->SetRenderParm( RENDERPARM_TEXTUREMATRIX_S, texS );
+	renderProgManager->SetRenderParm( RENDERPARM_TEXTUREMATRIX_T, texT );
 
 	float texGenEnabled[4] = { 0, 0, 0, 0 };
-	renderProgManager.SetRenderParm( RENDERPARM_TEXGEN_0_ENABLED, texGenEnabled );
+	renderProgManager->SetRenderParm( RENDERPARM_TEXGEN_0_ENABLED, texGenEnabled );
 
 	// not really necessary but just for clarity
 	const float screenWidth = 1.0f;
@@ -2393,7 +2393,7 @@ void RB_TestImage() {
 
 	float projMatrixTranspose[16];
 	R_MatrixTranspose( finalOrtho, projMatrixTranspose );
-	renderProgManager.SetRenderParms( RENDERPARM_MVPMATRIX_X, projMatrixTranspose, 4 );
+	renderProgManager->SetRenderParms( RENDERPARM_MVPMATRIX_X, projMatrixTranspose, 4 );
 	qglMatrixMode( GL_PROJECTION );
 	qglLoadMatrixf( finalOrtho );
 	qglMatrixMode( GL_MODELVIEW );
@@ -2410,12 +2410,12 @@ void RB_TestImage() {
 		imageCr->Bind();
 		GL_SelectTexture( 2 );
 		imageCb->Bind();
-		renderProgManager.BindShader_Bink();
+		renderProgManager->BindShader_Bink();
 	} else {
 		GL_SelectTexture( 0 );
 		image->Bind();
 		// Set Shader
-		renderProgManager.BindShader_Texture();
+		renderProgManager->BindShader_Texture();
 	}
 	
 	// Draw!

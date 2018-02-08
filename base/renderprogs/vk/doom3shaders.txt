@@ -1,0 +1,3535 @@
+----- Initializing Render Shaders -----
+
+renderprogs\gui.vertex
+----------------
+#version 150
+#define PC
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+
+
+uniform vec4 _va_[4];
+
+float dot4 (vec4 a , vec4 b ) {return dot ( a , b ) ; }
+float dot4 (vec2 a , vec4 b ) {return dot ( vec4 ( a , 0 , 1 ) , b ) ; }
+vec4 swizzleColor (vec4 c ) {return c ; }
+
+in vec4 in_Position;
+in vec2 in_TexCoord;
+in vec4 in_Normal;
+in vec4 in_Tangent;
+in vec4 in_Color;
+in vec4 in_Color2;
+
+out vec4 gl_Position;
+out vec2 vofi_TexCoord0;
+out vec4 vofi_TexCoord1;
+out vec4 gl_FrontColor;
+
+void main() {
+	gl_Position . x = dot4 ( in_Position , _va_[0 /* rpMVPmatrixX */] ) ;
+	gl_Position . y = dot4 ( in_Position , _va_[1 /* rpMVPmatrixY */] ) ;
+	gl_Position . z = dot4 ( in_Position , _va_[2 /* rpMVPmatrixZ */] ) ;
+	gl_Position . w = dot4 ( in_Position , _va_[3 /* rpMVPmatrixW */] ) ;
+	vofi_TexCoord0 . xy = in_TexCoord . xy ;
+	vofi_TexCoord1 = ( swizzleColor ( in_Color2 ) * 2 ) - 1 ;
+	gl_FrontColor = swizzleColor ( in_Color ) ;
+}
+----------------
+
+renderprogs\gui.pixel
+----------------
+#version 150
+#define PC
+
+void clip( float v ) { if ( v < 0.0 ) { discard; } }
+void clip( vec2 v ) { if ( any( lessThan( v, vec2( 0.0 ) ) ) ) { discard; } }
+void clip( vec3 v ) { if ( any( lessThan( v, vec3( 0.0 ) ) ) ) { discard; } }
+void clip( vec4 v ) { if ( any( lessThan( v, vec4( 0.0 ) ) ) ) { discard; } }
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord ) { return texture( sampler, texcoord.xy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord ) { return vec4( texture( sampler, texcoord.xyz ) ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord, vec2 dx, vec2 dy ) { return textureGrad( sampler, texcoord.xy, dx, dy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord, vec2 dx, vec2 dy ) { return vec4( textureGrad( sampler, texcoord.xyz, dx, dy ) ); }
+
+vec4 texCUBE( samplerCube sampler, vec3 texcoord ) { return texture( sampler, texcoord.xyz ); }
+vec4 texCUBE( samplerCubeShadow sampler, vec4 texcoord ) { return vec4( texture( sampler, texcoord.xyzw ) ); }
+
+vec4 tex1Dproj( sampler1D sampler, vec2 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex2Dproj( sampler2D sampler, vec3 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex3Dproj( sampler3D sampler, vec4 texcoord ) { return textureProj( sampler, texcoord ); }
+
+vec4 tex1Dbias( sampler1D sampler, vec4 texcoord ) { return texture( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dbias( sampler2D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dbias( sampler3D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBEbias( samplerCube sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+
+vec4 tex1Dlod( sampler1D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dlod( sampler3D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBElod( samplerCube sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+
+uniform sampler2D samp0;
+
+in vec4 gl_FragCoord;
+in vec2 vofi_TexCoord0;
+in vec4 vofi_TexCoord1;
+in vec4 gl_Color;
+
+out vec4 gl_FragColor;
+
+void main() {
+	vec4 color = ( tex2D ( samp0 , vofi_TexCoord0 ) * gl_Color ) + vofi_TexCoord1 ;
+	gl_FragColor . xyz = color. xyz * color. w ;
+	gl_FragColor . w = color. w ;
+}
+----------------
+
+renderprogs\color.vertex
+----------------
+#version 150
+#define PC
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+
+
+uniform vec4 _va_[4];
+
+float dot4 (vec4 a , vec4 b ) {return dot ( a , b ) ; }
+float dot4 (vec2 a , vec4 b ) {return dot ( vec4 ( a , 0 , 1 ) , b ) ; }
+
+in vec4 in_Position;
+in vec2 in_TexCoord;
+in vec4 in_Normal;
+in vec4 in_Tangent;
+in vec4 in_Color;
+
+out vec4 gl_Position;
+
+void main() {
+	gl_Position . x = dot4 ( in_Position , _va_[0 /* rpMVPmatrixX */] ) ;
+	gl_Position . y = dot4 ( in_Position , _va_[1 /* rpMVPmatrixY */] ) ;
+	gl_Position . z = dot4 ( in_Position , _va_[2 /* rpMVPmatrixZ */] ) ;
+	gl_Position . w = dot4 ( in_Position , _va_[3 /* rpMVPmatrixW */] ) ;
+}
+----------------
+
+renderprogs\color.pixel
+----------------
+#version 150
+#define PC
+
+void clip( float v ) { if ( v < 0.0 ) { discard; } }
+void clip( vec2 v ) { if ( any( lessThan( v, vec2( 0.0 ) ) ) ) { discard; } }
+void clip( vec3 v ) { if ( any( lessThan( v, vec3( 0.0 ) ) ) ) { discard; } }
+void clip( vec4 v ) { if ( any( lessThan( v, vec4( 0.0 ) ) ) ) { discard; } }
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord ) { return texture( sampler, texcoord.xy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord ) { return vec4( texture( sampler, texcoord.xyz ) ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord, vec2 dx, vec2 dy ) { return textureGrad( sampler, texcoord.xy, dx, dy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord, vec2 dx, vec2 dy ) { return vec4( textureGrad( sampler, texcoord.xyz, dx, dy ) ); }
+
+vec4 texCUBE( samplerCube sampler, vec3 texcoord ) { return texture( sampler, texcoord.xyz ); }
+vec4 texCUBE( samplerCubeShadow sampler, vec4 texcoord ) { return vec4( texture( sampler, texcoord.xyzw ) ); }
+
+vec4 tex1Dproj( sampler1D sampler, vec2 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex2Dproj( sampler2D sampler, vec3 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex3Dproj( sampler3D sampler, vec4 texcoord ) { return textureProj( sampler, texcoord ); }
+
+vec4 tex1Dbias( sampler1D sampler, vec4 texcoord ) { return texture( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dbias( sampler2D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dbias( sampler3D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBEbias( samplerCube sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+
+vec4 tex1Dlod( sampler1D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dlod( sampler3D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBElod( samplerCube sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+
+
+uniform vec4 _fa_[1];
+
+out vec4 gl_FragColor;
+
+void main() {
+	gl_FragColor = _fa_[0 /* rpColor */] ;
+}
+----------------
+
+renderprogs\simpleshade.vertex
+----------------
+#version 150
+#define PC
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+
+
+uniform vec4 _va_[4];
+
+float dot4 (vec4 a , vec4 b ) {return dot ( a , b ) ; }
+float dot4 (vec2 a , vec4 b ) {return dot ( vec4 ( a , 0 , 1 ) , b ) ; }
+
+in vec4 in_Position;
+in vec2 in_TexCoord;
+in vec4 in_Normal;
+in vec4 in_Tangent;
+in vec4 in_Color;
+
+out vec4 gl_Position;
+out vec4 vofi_TexCoord0;
+
+void main() {
+	vec4 position ;
+	position. x = dot4 ( in_Position , _va_[0 /* rpMVPmatrixX */] ) ;
+	position. y = dot4 ( in_Position , _va_[1 /* rpMVPmatrixY */] ) ;
+	position. z = dot4 ( in_Position , _va_[2 /* rpMVPmatrixZ */] ) ;
+	position. w = dot4 ( in_Position , _va_[3 /* rpMVPmatrixW */] ) ;
+	gl_Position = position ;
+	vofi_TexCoord0 = position ;
+}
+----------------
+
+renderprogs\simpleshade.pixel
+----------------
+#version 150
+#define PC
+
+void clip( float v ) { if ( v < 0.0 ) { discard; } }
+void clip( vec2 v ) { if ( any( lessThan( v, vec2( 0.0 ) ) ) ) { discard; } }
+void clip( vec3 v ) { if ( any( lessThan( v, vec3( 0.0 ) ) ) ) { discard; } }
+void clip( vec4 v ) { if ( any( lessThan( v, vec4( 0.0 ) ) ) ) { discard; } }
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord ) { return texture( sampler, texcoord.xy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord ) { return vec4( texture( sampler, texcoord.xyz ) ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord, vec2 dx, vec2 dy ) { return textureGrad( sampler, texcoord.xy, dx, dy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord, vec2 dx, vec2 dy ) { return vec4( textureGrad( sampler, texcoord.xyz, dx, dy ) ); }
+
+vec4 texCUBE( samplerCube sampler, vec3 texcoord ) { return texture( sampler, texcoord.xyz ); }
+vec4 texCUBE( samplerCubeShadow sampler, vec4 texcoord ) { return vec4( texture( sampler, texcoord.xyzw ) ); }
+
+vec4 tex1Dproj( sampler1D sampler, vec2 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex2Dproj( sampler2D sampler, vec3 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex3Dproj( sampler3D sampler, vec4 texcoord ) { return textureProj( sampler, texcoord ); }
+
+vec4 tex1Dbias( sampler1D sampler, vec4 texcoord ) { return texture( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dbias( sampler2D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dbias( sampler3D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBEbias( samplerCube sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+
+vec4 tex1Dlod( sampler1D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dlod( sampler3D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBElod( samplerCube sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+
+float dot3 (vec3 a , vec3 b ) {return dot ( a , b ) ; }
+float dot3 (vec3 a , vec4 b ) {return dot ( a , b. xyz ) ; }
+float dot3 (vec4 a , vec3 b ) {return dot ( a. xyz , b ) ; }
+float dot3 (vec4 a , vec4 b ) {return dot ( a. xyz , b. xyz ) ; }
+
+in vec4 gl_FragCoord;
+in vec4 vofi_TexCoord0;
+
+out vec4 gl_FragColor;
+
+vec2 screenPosToTexcoord (vec2 pos , vec4 bias_scale ) {return ( pos * bias_scale. zw + bias_scale. xy ) ; }
+void main() {
+	float renderWidth = 1280.0 ;
+	float renderHeight = 720.0 ;
+	vec4 positionToViewTexture = vec4 ( 0.5 / renderWidth , 0.5 / renderHeight , 1.0 / renderWidth , 1.0 / renderHeight ) ;
+	float interpolatedZOverW = ( 1.0 - ( vofi_TexCoord0 . z / vofi_TexCoord0 . w ) ) ;
+	vec3 pos ;
+	pos. z = 1.0 / interpolatedZOverW ;
+	pos. xy = pos. z * ( 2.0 * screenPosToTexcoord ( gl_FragCoord . xy , positionToViewTexture ) - 1.0 ) ;
+	vec3 normal = normalize ( cross ( dFdy ( pos ) , dFdx ( pos ) ) ) ;
+	vec3 L = normalize ( vec3 ( 1.0 , 1.0 , 0.0 ) - pos ) ;
+	gl_FragColor . xyz = vec3 ( dot3 ( normal , L ) * 0.75 ) ;
+	gl_FragColor . w = 1.0 ;
+}
+----------------
+
+renderprogs\texture.vertex
+----------------
+#version 150
+#define PC
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+
+
+uniform vec4 _va_[9];
+
+float dot4 (vec4 a , vec4 b ) {return dot ( a , b ) ; }
+float dot4 (vec2 a , vec4 b ) {return dot ( vec4 ( a , 0 , 1 ) , b ) ; }
+
+in vec4 in_Position;
+in vec2 in_TexCoord;
+in vec4 in_Normal;
+in vec4 in_Tangent;
+in vec4 in_Color;
+
+out vec4 gl_Position;
+out vec2 vofi_TexCoord0;
+
+void main() {
+	gl_Position . x = dot4 ( in_Position , _va_[0 /* rpMVPmatrixX */] ) ;
+	gl_Position . y = dot4 ( in_Position , _va_[1 /* rpMVPmatrixY */] ) ;
+	gl_Position . z = dot4 ( in_Position , _va_[2 /* rpMVPmatrixZ */] ) ;
+	gl_Position . w = dot4 ( in_Position , _va_[3 /* rpMVPmatrixW */] ) ; if ( _va_[8 /* rpTexGen0Enabled */] . x > 0.0 ) {
+		vofi_TexCoord0 . x = dot4 ( in_Position , _va_[6 /* rpTexGen0S */] ) ;
+		vofi_TexCoord0 . y = dot4 ( in_Position , _va_[7 /* rpTexGen0T */] ) ;
+	} else {
+		vofi_TexCoord0 . x = dot4 ( in_TexCoord . xy , _va_[4 /* rpTextureMatrixS */] ) ;
+		vofi_TexCoord0 . y = dot4 ( in_TexCoord . xy , _va_[5 /* rpTextureMatrixT */] ) ;
+	}
+}
+----------------
+
+renderprogs\texture.pixel
+----------------
+#version 150
+#define PC
+
+void clip( float v ) { if ( v < 0.0 ) { discard; } }
+void clip( vec2 v ) { if ( any( lessThan( v, vec2( 0.0 ) ) ) ) { discard; } }
+void clip( vec3 v ) { if ( any( lessThan( v, vec3( 0.0 ) ) ) ) { discard; } }
+void clip( vec4 v ) { if ( any( lessThan( v, vec4( 0.0 ) ) ) ) { discard; } }
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord ) { return texture( sampler, texcoord.xy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord ) { return vec4( texture( sampler, texcoord.xyz ) ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord, vec2 dx, vec2 dy ) { return textureGrad( sampler, texcoord.xy, dx, dy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord, vec2 dx, vec2 dy ) { return vec4( textureGrad( sampler, texcoord.xyz, dx, dy ) ); }
+
+vec4 texCUBE( samplerCube sampler, vec3 texcoord ) { return texture( sampler, texcoord.xyz ); }
+vec4 texCUBE( samplerCubeShadow sampler, vec4 texcoord ) { return vec4( texture( sampler, texcoord.xyzw ) ); }
+
+vec4 tex1Dproj( sampler1D sampler, vec2 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex2Dproj( sampler2D sampler, vec3 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex3Dproj( sampler3D sampler, vec4 texcoord ) { return textureProj( sampler, texcoord ); }
+
+vec4 tex1Dbias( sampler1D sampler, vec4 texcoord ) { return texture( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dbias( sampler2D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dbias( sampler3D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBEbias( samplerCube sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+
+vec4 tex1Dlod( sampler1D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dlod( sampler3D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBElod( samplerCube sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+
+
+uniform vec4 _fa_[1];
+
+uniform sampler2D samp0;
+
+in vec4 gl_FragCoord;
+in vec2 vofi_TexCoord0;
+
+out vec4 gl_FragColor;
+
+void main() {
+	gl_FragColor = tex2D ( samp0 , vofi_TexCoord0 ) * _fa_[0 /* rpColor */] ;
+}
+----------------
+
+renderprogs\texture_color.vertex
+----------------
+#version 150
+#define PC
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+
+
+uniform vec4 _va_[12];
+
+float dot4 (vec4 a , vec4 b ) {return dot ( a , b ) ; }
+float dot4 (vec2 a , vec4 b ) {return dot ( vec4 ( a , 0 , 1 ) , b ) ; }
+vec4 swizzleColor (vec4 c ) {return c ; }
+
+in vec4 in_Position;
+in vec2 in_TexCoord;
+in vec4 in_Normal;
+in vec4 in_Tangent;
+in vec4 in_Color;
+
+out vec4 gl_Position;
+out vec2 vofi_TexCoord0;
+out vec4 gl_FrontColor;
+
+void main() {
+	gl_Position . x = dot4 ( in_Position , _va_[3 /* rpMVPmatrixX */] ) ;
+	gl_Position . y = dot4 ( in_Position , _va_[4 /* rpMVPmatrixY */] ) ;
+	gl_Position . z = dot4 ( in_Position , _va_[5 /* rpMVPmatrixZ */] ) ;
+	gl_Position . w = dot4 ( in_Position , _va_[6 /* rpMVPmatrixW */] ) ; if ( _va_[11 /* rpTexGen0Enabled */] . x > 0.0 ) {
+		vofi_TexCoord0 . x = dot4 ( in_Position , _va_[9 /* rpTexGen0S */] ) ;
+		vofi_TexCoord0 . y = dot4 ( in_Position , _va_[10 /* rpTexGen0T */] ) ;
+	} else {
+		vofi_TexCoord0 . x = dot4 ( in_TexCoord . xy , _va_[7 /* rpTextureMatrixS */] ) ;
+		vofi_TexCoord0 . y = dot4 ( in_TexCoord . xy , _va_[8 /* rpTextureMatrixT */] ) ;
+	}
+	vec4 vertexColor = ( swizzleColor ( in_Color ) * _va_[0 /* rpVertexColorModulate */] ) + _va_[1 /* rpVertexColorAdd */] ;
+	gl_FrontColor = vertexColor * _va_[2 /* rpColor */] ;
+}
+----------------
+
+renderprogs\texture_color.pixel
+----------------
+#version 150
+#define PC
+
+void clip( float v ) { if ( v < 0.0 ) { discard; } }
+void clip( vec2 v ) { if ( any( lessThan( v, vec2( 0.0 ) ) ) ) { discard; } }
+void clip( vec3 v ) { if ( any( lessThan( v, vec3( 0.0 ) ) ) ) { discard; } }
+void clip( vec4 v ) { if ( any( lessThan( v, vec4( 0.0 ) ) ) ) { discard; } }
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord ) { return texture( sampler, texcoord.xy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord ) { return vec4( texture( sampler, texcoord.xyz ) ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord, vec2 dx, vec2 dy ) { return textureGrad( sampler, texcoord.xy, dx, dy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord, vec2 dx, vec2 dy ) { return vec4( textureGrad( sampler, texcoord.xyz, dx, dy ) ); }
+
+vec4 texCUBE( samplerCube sampler, vec3 texcoord ) { return texture( sampler, texcoord.xyz ); }
+vec4 texCUBE( samplerCubeShadow sampler, vec4 texcoord ) { return vec4( texture( sampler, texcoord.xyzw ) ); }
+
+vec4 tex1Dproj( sampler1D sampler, vec2 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex2Dproj( sampler2D sampler, vec3 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex3Dproj( sampler3D sampler, vec4 texcoord ) { return textureProj( sampler, texcoord ); }
+
+vec4 tex1Dbias( sampler1D sampler, vec4 texcoord ) { return texture( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dbias( sampler2D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dbias( sampler3D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBEbias( samplerCube sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+
+vec4 tex1Dlod( sampler1D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dlod( sampler3D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBElod( samplerCube sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+
+
+uniform vec4 _fa_[1];
+
+uniform sampler2D samp0;
+
+in vec4 gl_FragCoord;
+in vec2 vofi_TexCoord0;
+in vec4 gl_Color;
+
+out vec4 gl_FragColor;
+
+void main() {
+	vec4 color = tex2D ( samp0 , vofi_TexCoord0 ) * gl_Color ;
+	clip ( color. a - _fa_[0 /* rpAlphaTest */] . x ) ;
+	gl_FragColor = color ;
+}
+----------------
+
+renderprogs\texture_color_skinned.vertex
+----------------
+#version 150
+#define PC
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+
+
+uniform vec4 _va_[12];
+
+float dot4 (vec4 a , vec4 b ) {return dot ( a , b ) ; }
+float dot4 (vec2 a , vec4 b ) {return dot ( vec4 ( a , 0 , 1 ) , b ) ; }
+vec4 swizzleColor (vec4 c ) {return c ; }
+uniform matrices_ubo {vec4 matrices [ 408 ] ; } ;
+
+in vec4 in_Position;
+in vec2 in_TexCoord;
+in vec4 in_Color;
+in vec4 in_Color2;
+
+out vec4 gl_Position;
+out vec2 vofi_TexCoord0;
+out vec4 gl_FrontColor;
+
+void main() {
+	float w0 = in_Color2 . x ;
+	float w1 = in_Color2 . y ;
+	float w2 = in_Color2 . z ;
+	float w3 = in_Color2 . w ;
+	vec4 matX , matY , matZ ;
+	float joint = in_Color . x * 255.1 * 3 ;
+	matX = matrices [ int ( joint + 0 ) ] * w0 ;
+	matY = matrices [ int ( joint + 1 ) ] * w0 ;
+	matZ = matrices [ int ( joint + 2 ) ] * w0 ;
+	joint = in_Color . y * 255.1 * 3 ;
+	matX += matrices [ int ( joint + 0 ) ] * w1 ;
+	matY += matrices [ int ( joint + 1 ) ] * w1 ;
+	matZ += matrices [ int ( joint + 2 ) ] * w1 ;
+	joint = in_Color . z * 255.1 * 3 ;
+	matX += matrices [ int ( joint + 0 ) ] * w2 ;
+	matY += matrices [ int ( joint + 1 ) ] * w2 ;
+	matZ += matrices [ int ( joint + 2 ) ] * w2 ;
+	joint = in_Color . w * 255.1 * 3 ;
+	matX += matrices [ int ( joint + 0 ) ] * w3 ;
+	matY += matrices [ int ( joint + 1 ) ] * w3 ;
+	matZ += matrices [ int ( joint + 2 ) ] * w3 ;
+	vec4 modelPosition ;
+	modelPosition. x = dot4 ( matX , in_Position ) ;
+	modelPosition. y = dot4 ( matY , in_Position ) ;
+	modelPosition. z = dot4 ( matZ , in_Position ) ;
+	modelPosition. w = 1.0 ;
+	gl_Position . x = dot4 ( modelPosition , _va_[3 /* rpMVPmatrixX */] ) ;
+	gl_Position . y = dot4 ( modelPosition , _va_[4 /* rpMVPmatrixY */] ) ;
+	gl_Position . z = dot4 ( modelPosition , _va_[5 /* rpMVPmatrixZ */] ) ;
+	gl_Position . w = dot4 ( modelPosition , _va_[6 /* rpMVPmatrixW */] ) ; if ( _va_[11 /* rpTexGen0Enabled */] . x > 0.0 ) {
+		vofi_TexCoord0 . x = dot4 ( modelPosition , _va_[9 /* rpTexGen0S */] ) ;
+		vofi_TexCoord0 . y = dot4 ( modelPosition , _va_[10 /* rpTexGen0T */] ) ;
+	} else {
+		vofi_TexCoord0 . x = dot4 ( in_TexCoord . xy , _va_[7 /* rpTextureMatrixS */] ) ;
+		vofi_TexCoord0 . y = dot4 ( in_TexCoord . xy , _va_[8 /* rpTextureMatrixT */] ) ;
+	}
+	vec4 vertexColor = ( swizzleColor ( in_Color ) * _va_[0 /* rpVertexColorModulate */] ) + _va_[1 /* rpVertexColorAdd */] ;
+	gl_FrontColor = vertexColor * _va_[2 /* rpColor */] ;
+}
+----------------
+
+renderprogs\texture_color_skinned.pixel
+----------------
+#version 150
+#define PC
+
+void clip( float v ) { if ( v < 0.0 ) { discard; } }
+void clip( vec2 v ) { if ( any( lessThan( v, vec2( 0.0 ) ) ) ) { discard; } }
+void clip( vec3 v ) { if ( any( lessThan( v, vec3( 0.0 ) ) ) ) { discard; } }
+void clip( vec4 v ) { if ( any( lessThan( v, vec4( 0.0 ) ) ) ) { discard; } }
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord ) { return texture( sampler, texcoord.xy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord ) { return vec4( texture( sampler, texcoord.xyz ) ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord, vec2 dx, vec2 dy ) { return textureGrad( sampler, texcoord.xy, dx, dy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord, vec2 dx, vec2 dy ) { return vec4( textureGrad( sampler, texcoord.xyz, dx, dy ) ); }
+
+vec4 texCUBE( samplerCube sampler, vec3 texcoord ) { return texture( sampler, texcoord.xyz ); }
+vec4 texCUBE( samplerCubeShadow sampler, vec4 texcoord ) { return vec4( texture( sampler, texcoord.xyzw ) ); }
+
+vec4 tex1Dproj( sampler1D sampler, vec2 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex2Dproj( sampler2D sampler, vec3 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex3Dproj( sampler3D sampler, vec4 texcoord ) { return textureProj( sampler, texcoord ); }
+
+vec4 tex1Dbias( sampler1D sampler, vec4 texcoord ) { return texture( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dbias( sampler2D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dbias( sampler3D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBEbias( samplerCube sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+
+vec4 tex1Dlod( sampler1D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dlod( sampler3D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBElod( samplerCube sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+
+
+uniform vec4 _fa_[1];
+
+uniform sampler2D samp0;
+
+in vec4 gl_FragCoord;
+in vec2 vofi_TexCoord0;
+in vec4 gl_Color;
+
+out vec4 gl_FragColor;
+
+void main() {
+	vec4 color = tex2D ( samp0 , vofi_TexCoord0 ) * gl_Color ;
+	clip ( color. a - _fa_[0 /* rpAlphaTest */] . x ) ;
+	gl_FragColor = color ;
+}
+----------------
+
+renderprogs\texture_color_texgen.vertex
+----------------
+#version 150
+#define PC
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+
+
+uniform vec4 _va_[12];
+
+float dot4 (vec4 a , vec4 b ) {return dot ( a , b ) ; }
+float dot4 (vec2 a , vec4 b ) {return dot ( vec4 ( a , 0 , 1 ) , b ) ; }
+vec4 swizzleColor (vec4 c ) {return c ; }
+
+in vec4 in_Position;
+in vec2 in_TexCoord;
+in vec4 in_Normal;
+in vec4 in_Tangent;
+in vec4 in_Color;
+
+out vec4 gl_Position;
+out vec4 vofi_TexCoord0;
+out vec4 gl_FrontColor;
+
+void main() {
+	gl_Position . x = dot4 ( in_Position , _va_[3 /* rpMVPmatrixX */] ) ;
+	gl_Position . y = dot4 ( in_Position , _va_[4 /* rpMVPmatrixY */] ) ;
+	gl_Position . z = dot4 ( in_Position , _va_[5 /* rpMVPmatrixZ */] ) ;
+	gl_Position . w = dot4 ( in_Position , _va_[6 /* rpMVPmatrixW */] ) ;
+	vec4 tc0 ;
+	tc0. x = dot4 ( in_Position , _va_[9 /* rpTexGen0S */] ) ;
+	tc0. y = dot4 ( in_Position , _va_[10 /* rpTexGen0T */] ) ;
+	tc0. z = 0.0 ;
+	tc0. w = dot4 ( in_Position , _va_[11 /* rpTexGen0Q */] ) ;
+	vofi_TexCoord0 . x = dot4 ( tc0 , _va_[7 /* rpTextureMatrixS */] ) ;
+	vofi_TexCoord0 . y = dot4 ( tc0 , _va_[8 /* rpTextureMatrixT */] ) ;
+	vofi_TexCoord0 . zw = tc0. zw ;
+	vec4 vertexColor = ( swizzleColor ( in_Color ) * _va_[0 /* rpVertexColorModulate */] ) + _va_[1 /* rpVertexColorAdd */] ;
+	gl_FrontColor = vertexColor * _va_[2 /* rpColor */] ;
+}
+----------------
+
+renderprogs\texture_color_texgen.pixel
+----------------
+#version 150
+#define PC
+
+void clip( float v ) { if ( v < 0.0 ) { discard; } }
+void clip( vec2 v ) { if ( any( lessThan( v, vec2( 0.0 ) ) ) ) { discard; } }
+void clip( vec3 v ) { if ( any( lessThan( v, vec3( 0.0 ) ) ) ) { discard; } }
+void clip( vec4 v ) { if ( any( lessThan( v, vec4( 0.0 ) ) ) ) { discard; } }
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord ) { return texture( sampler, texcoord.xy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord ) { return vec4( texture( sampler, texcoord.xyz ) ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord, vec2 dx, vec2 dy ) { return textureGrad( sampler, texcoord.xy, dx, dy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord, vec2 dx, vec2 dy ) { return vec4( textureGrad( sampler, texcoord.xyz, dx, dy ) ); }
+
+vec4 texCUBE( samplerCube sampler, vec3 texcoord ) { return texture( sampler, texcoord.xyz ); }
+vec4 texCUBE( samplerCubeShadow sampler, vec4 texcoord ) { return vec4( texture( sampler, texcoord.xyzw ) ); }
+
+vec4 tex1Dproj( sampler1D sampler, vec2 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex2Dproj( sampler2D sampler, vec3 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex3Dproj( sampler3D sampler, vec4 texcoord ) { return textureProj( sampler, texcoord ); }
+
+vec4 tex1Dbias( sampler1D sampler, vec4 texcoord ) { return texture( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dbias( sampler2D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dbias( sampler3D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBEbias( samplerCube sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+
+vec4 tex1Dlod( sampler1D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dlod( sampler3D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBElod( samplerCube sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+
+vec4 idtex2Dproj (sampler2D samp , vec4 texCoords ) {return tex2Dproj ( samp , texCoords. xyw ) ; }
+uniform sampler2D samp0;
+
+in vec4 gl_FragCoord;
+in vec4 vofi_TexCoord0;
+in vec4 gl_Color;
+
+out vec4 gl_FragColor;
+
+void main() {
+	vec4 texSample = idtex2Dproj ( samp0 , vofi_TexCoord0 ) ;
+	gl_FragColor = texSample * gl_Color ;
+}
+----------------
+
+renderprogs\interaction.vertex
+----------------
+#version 150
+#define PC
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+
+
+uniform vec4 _va_[18];
+
+float dot3 (vec3 a , vec3 b ) {return dot ( a , b ) ; }
+float dot3 (vec3 a , vec4 b ) {return dot ( a , b. xyz ) ; }
+float dot3 (vec4 a , vec3 b ) {return dot ( a. xyz , b ) ; }
+float dot3 (vec4 a , vec4 b ) {return dot ( a. xyz , b. xyz ) ; }
+float dot4 (vec4 a , vec4 b ) {return dot ( a , b ) ; }
+float dot4 (vec2 a , vec4 b ) {return dot ( vec4 ( a , 0 , 1 ) , b ) ; }
+vec4 swizzleColor (vec4 c ) {return c ; }
+
+in vec4 in_Position;
+in vec2 in_TexCoord;
+in vec4 in_Normal;
+in vec4 in_Tangent;
+in vec4 in_Color;
+
+out vec4 gl_Position;
+out vec4 vofi_TexCoord0;
+out vec4 vofi_TexCoord1;
+out vec4 vofi_TexCoord2;
+out vec4 vofi_TexCoord3;
+out vec4 vofi_TexCoord4;
+out vec4 vofi_TexCoord5;
+out vec4 vofi_TexCoord6;
+out vec4 gl_FrontColor;
+
+void main() {
+	vec3 vNormal = in_Normal . xyz * 2.0 - 1.0 ;
+	vec4 vTangent = in_Tangent * 2.0 - 1.0 ;
+	vec3 vBinormal = cross ( vNormal. xyz , vTangent. xyz ) * vTangent. w ;
+	gl_Position . x = dot4 ( in_Position , _va_[14 /* rpMVPmatrixX */] ) ;
+	gl_Position . y = dot4 ( in_Position , _va_[15 /* rpMVPmatrixY */] ) ;
+	gl_Position . z = dot4 ( in_Position , _va_[16 /* rpMVPmatrixZ */] ) ;
+	gl_Position . w = dot4 ( in_Position , _va_[17 /* rpMVPmatrixW */] ) ;
+	vec4 defaultTexCoord = vec4 ( 0.0 , 0.5 , 0.0 , 1.0 ) ;
+	vec4 toLight = _va_[0 /* rpLocalLightOrigin */] - in_Position ;
+	vofi_TexCoord0 . x = dot3 ( vTangent. xyz , toLight ) ;
+	vofi_TexCoord0 . y = dot3 ( vBinormal , toLight ) ;
+	vofi_TexCoord0 . z = dot3 ( vNormal , toLight ) ;
+	vofi_TexCoord0 . w = 1.0 ;
+	vofi_TexCoord1 = defaultTexCoord ;
+	vofi_TexCoord1 . x = dot4 ( in_TexCoord . xy , _va_[6 /* rpBumpMatrixS */] ) ;
+	vofi_TexCoord1 . y = dot4 ( in_TexCoord . xy , _va_[7 /* rpBumpMatrixT */] ) ;
+	vofi_TexCoord2 = defaultTexCoord ;
+	vofi_TexCoord2 . x = dot4 ( in_Position , _va_[5 /* rpLightFalloffS */] ) ;
+	vofi_TexCoord3 . x = dot4 ( in_Position , _va_[2 /* rpLightProjectionS */] ) ;
+	vofi_TexCoord3 . y = dot4 ( in_Position , _va_[3 /* rpLightProjectionT */] ) ;
+	vofi_TexCoord3 . z = 0.0 ;
+	vofi_TexCoord3 . w = dot4 ( in_Position , _va_[4 /* rpLightProjectionQ */] ) ;
+	vofi_TexCoord4 = defaultTexCoord ;
+	vofi_TexCoord4 . x = dot4 ( in_TexCoord . xy , _va_[8 /* rpDiffuseMatrixS */] ) ;
+	vofi_TexCoord4 . y = dot4 ( in_TexCoord . xy , _va_[9 /* rpDiffuseMatrixT */] ) ;
+	vofi_TexCoord5 = defaultTexCoord ;
+	vofi_TexCoord5 . x = dot4 ( in_TexCoord . xy , _va_[10 /* rpSpecularMatrixS */] ) ;
+	vofi_TexCoord5 . y = dot4 ( in_TexCoord . xy , _va_[11 /* rpSpecularMatrixT */] ) ;
+	toLight = normalize ( toLight ) ;
+	vec4 toView = normalize ( _va_[1 /* rpLocalViewOrigin */] - in_Position ) ;
+	vec4 halfAngleVector = toLight + toView ;
+	vofi_TexCoord6 . x = dot3 ( vTangent. xyz , halfAngleVector ) ;
+	vofi_TexCoord6 . y = dot3 ( vBinormal , halfAngleVector ) ;
+	vofi_TexCoord6 . z = dot3 ( vNormal , halfAngleVector ) ;
+	vofi_TexCoord6 . w = 1.0 ;
+	gl_FrontColor = ( swizzleColor ( in_Color ) * _va_[12 /* rpVertexColorModulate */] ) + _va_[13 /* rpVertexColorAdd */] ;
+}
+----------------
+
+renderprogs\interaction.pixel
+----------------
+idCommon::VPrintf: truncated to 4094 characters
+#version 150
+#define PC
+
+void clip( float v ) { if ( v < 0.0 ) { discard; } }
+void clip( vec2 v ) { if ( any( lessThan( v, vec2( 0.0 ) ) ) ) { discard; } }
+void clip( vec3 v ) { if ( any( lessThan( v, vec3( 0.0 ) ) ) ) { discard; } }
+void clip( vec4 v ) { if ( any( lessThan( v, vec4( 0.0 ) ) ) ) { discard; } }
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord ) { return texture( sampler, texcoord.xy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord ) { return vec4( texture( sampler, texcoord.xyz ) ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord, vec2 dx, vec2 dy ) { return textureGrad( sampler, texcoord.xy, dx, dy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord, vec2 dx, vec2 dy ) { return vec4( textureGrad( sampler, texcoord.xyz, dx, dy ) ); }
+
+vec4 texCUBE( samplerCube sampler, vec3 texcoord ) { return texture( sampler, texcoord.xyz ); }
+vec4 texCUBE( samplerCubeShadow sampler, vec4 texcoord ) { return vec4( texture( sampler, texcoord.xyzw ) ); }
+
+vec4 tex1Dproj( sampler1D sampler, vec2 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex2Dproj( sampler2D sampler, vec3 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex3Dproj( sampler3D sampler, vec4 texcoord ) { return textureProj( sampler, texcoord ); }
+
+vec4 tex1Dbias( sampler1D sampler, vec4 texcoord ) { return texture( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dbias( sampler2D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dbias( sampler3D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBEbias( samplerCube sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+
+vec4 tex1Dlod( sampler1D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dlod( sampler3D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBElod( samplerCube sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+
+
+uniform vec4 _fa_[2];
+
+float dot3 (vec3 a , vec3 b ) {return dot ( a , b ) ; }
+float dot3 (vec3 a , vec4 b ) {return dot ( a , b. xyz ) ; }
+float dot3 (vec4 a , vec3 b ) {return dot ( a. xyz , b ) ; }
+float dot3 (vec4 a , vec4 b ) {return dot ( a. xyz , b. xyz ) ; }
+float dot4 (vec4 a , vec4 b ) {return dot ( a , b ) ; }
+float dot4 (vec2 a , vec4 b ) {return dot ( vec4 ( a , 0 , 1 ) , b ) ; }
+const vec4 matrixCoCg1YtoRGB1X = vec4( 1.0, -1.0, 0.0, 1.0 );
+const vec4 matrixCoCg1YtoRGB1Y = vec4( 0.0, 1.0, -0.50196078, 1.0 );
+const vec4 matrixCoCg1YtoRGB1Z = vec4( -1.0, -1.0, 1.00392156, 1.0 );
+vec3 ConvertYCoCgToRGB (vec4 YCoCg ) {
+	vec3 rgbColor ;
+	YCoCg. z = ( YCoCg. z * 31.875 ) + 1.0 ;
+	YCoCg. z = 1.0 / YCoCg. z ;
+	YCoCg. xy *= YCoCg. z ;
+	rgbColor. x = dot4 ( YCoCg , matrixCoCg1YtoRGB1X ) ;
+	rgbColor. y = dot4 ( YCoCg , matrixCoCg1YtoRGB1Y ) ;
+	rgbColor. z = dot4 ( YCoCg , matrixCoCg1YtoRGB1Z ) ;
+	return rgbColor ;
+}
+vec4 idtex2Dproj (sampler2D samp , vec4 texCoords ) {return tex2Dproj ( samp , texCoords. xyw ) ; }
+uniform sampler2D samp0;
+uniform sampler2D samp1;
+uniform sampler2D samp2;
+uniform sampler2D samp3;
+uniform sampler2D samp4;
+
+in vec4 gl_FragCoord;
+in vec4 vofi_TexCoord0;
+in vec4 vofi_TexCoord1;
+in vec4 vofi_TexCoord2;
+in vec4 vofi_TexCoord3;
+in vec4 vofi_TexCoord4;
+in vec4 vofi_TexCoord5;
+in vec4 vofi_TexCoord6;
+in vec4 gl_Color;
+
+out vec4 gl_FragColor;
+
+void main() {
+	vec4 bumpMap = tex2D ( samp0 , vofi_TexCoord1 . xy ) ;
+	vec4 lightFalloff = idtex2Dproj ( samp1 , vofi_TexCoord2 ) ;
+	vec4 lightProj = idtex2Dproj ( samp2 , vofi_TexCoord3 ) ;
+	vec4 YCoCG = tex2D ( samp3 , vofi_TexCoord4 . xy ) ;
+	v----------------
+
+renderprogs\interaction_skinned.vertex
+----------------
+idCommon::VPrintf: truncated to 4094 characters
+#version 150
+#define PC
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+
+
+uniform vec4 _va_[16];
+
+float dot3 (vec3 a , vec3 b ) {return dot ( a , b ) ; }
+float dot3 (vec3 a , vec4 b ) {return dot ( a , b. xyz ) ; }
+float dot3 (vec4 a , vec3 b ) {return dot ( a. xyz , b ) ; }
+float dot3 (vec4 a , vec4 b ) {return dot ( a. xyz , b. xyz ) ; }
+float dot4 (vec4 a , vec4 b ) {return dot ( a , b ) ; }
+float dot4 (vec2 a , vec4 b ) {return dot ( vec4 ( a , 0 , 1 ) , b ) ; }
+uniform matrices_ubo {vec4 matrices [ 408 ] ; } ;
+
+in vec4 in_Position;
+in vec2 in_TexCoord;
+in vec4 in_Normal;
+in vec4 in_Tangent;
+in vec4 in_Color;
+in vec4 in_Color2;
+
+out vec4 gl_Position;
+out vec4 vofi_TexCoord0;
+out vec4 vofi_TexCoord1;
+out vec4 vofi_TexCoord2;
+out vec4 vofi_TexCoord3;
+out vec4 vofi_TexCoord4;
+out vec4 vofi_TexCoord5;
+out vec4 vofi_TexCoord6;
+out vec4 gl_FrontColor;
+
+void main() {
+	vec4 vNormal = in_Normal * 2.0 - 1.0 ;
+	vec4 vTangent = in_Tangent * 2.0 - 1.0 ;
+	vec3 vBinormal = cross ( vNormal. xyz , vTangent. xyz ) * vTangent. w ;
+	float w0 = in_Color2 . x ;
+	float w1 = in_Color2 . y ;
+	float w2 = in_Color2 . z ;
+	float w3 = in_Color2 . w ;
+	vec4 matX , matY , matZ ;
+	float joint = in_Color . x * 255.1 * 3 ;
+	matX = matrices [ int ( joint + 0 ) ] * w0 ;
+	matY = matrices [ int ( joint + 1 ) ] * w0 ;
+	matZ = matrices [ int ( joint + 2 ) ] * w0 ;
+	joint = in_Color . y * 255.1 * 3 ;
+	matX += matrices [ int ( joint + 0 ) ] * w1 ;
+	matY += matrices [ int ( joint + 1 ) ] * w1 ;
+	matZ += matrices [ int ( joint + 2 ) ] * w1 ;
+	joint = in_Color . z * 255.1 * 3 ;
+	matX += matrices [ int ( joint + 0 ) ] * w2 ;
+	matY += matrices [ int ( joint + 1 ) ] * w2 ;
+	matZ += matrices [ int ( joint + 2 ) ] * w2 ;
+	joint = in_Color . w * 255.1 * 3 ;
+	matX += matrices [ int ( joint + 0 ) ] * w3 ;
+	matY += matrices [ int ( joint + 1 ) ] * w3 ;
+	matZ += matrices [ int ( joint + 2 ) ] * w3 ;
+	vec3 normal ;
+	normal. x = dot3 ( matX , vNormal ) ;
+	normal. y = dot3 ( matY , vNormal ) ;
+	normal. z = dot3 ( matZ , vNormal ) ;
+	normal = normalize ( normal ) ;
+	vec3 tangent ;
+	tangent. x = dot3 ( matX , vTangent ) ;
+	tangent. y = dot3 ( matY , vTangent ) ;
+	tangent. z = dot3 ( matZ , vTangent ) ;
+	tangent = normalize ( tangent ) ;
+	vec3 binormal ;
+	binormal. x = dot3 ( matX , vBinormal ) ;
+	binormal. y = dot3 ( matY , vBinormal ) ;
+	binormal. z = dot3 ( matZ , vBinormal ) ;
+	binormal = normalize ( binormal ) ;
+	vec4 modelPosition ;
+	modelPosition. x = dot4 ( matX , in_Position ) ;
+	modelPosition. y = dot4 ( matY , in_Position ) ;
+	modelPosition. z = dot4 ( matZ , in_Position ) ;
+	modelPosition. w = 1.0 ;
+	gl_Position . x = dot4 ( modelPosition , _va_[12 /* rpMVPmatrixX */] ) ;
+	gl_Position . y = dot4 ( modelPosition , _va_[13 /* rpMVPmatrixY */] ) ;
+	gl_Position . z = dot4 ( modelPosition , _va_[14 /* rpMVPmatrixZ */] ) ;
+	gl_Position . w = dot4 ( modelPosition , _va_[15 /* rpMVPmatrixW */] ) ;
+	vec4 defaultTexCoord = vec4 ( 0.0 , 0.5 , 0.0 , 1.0 ) ;
+	vec4 toLight = _va_[0 /* rpLocalLightOrigin */] - modelPosition ;
+	vofi_TexCoord0 . x = dot3 ( tangent , toLight ) ;
+	vofi_TexCoord0 . y = dot3 ( binormal , toLight ) ;
+	vofi_TexCoord0 . z = dot3 ( normal , toLight ) ;
+	vofi_TexCoord0 . w = 1.0 ;
+	vofi_TexCoord1 = defaultTexCoord ;
+	vofi_TexCoord1 . x = dot4 ( in_TexCoord . xy , _va_[6 /* rpBumpMatrixS */] ) ;
+	vofi_TexCoord1 . y = dot4 ( in_TexCoord . xy , _va_[7 /* rpBumpMatrixT */] ) ;
+	vofi_TexCoord2 = defaultTexCoord ;
+	vofi_TexCoord2 . x = dot4 ( modelPosition , _va_[5 /* rpLightFalloffS */] ) ;
+	vofi_TexCoord3 . x = dot4 ( modelPosition , _va_[2 /* rpLightProjectionS */] ) ;
+	vofi_TexCoord3 . y = dot4 ( modelPosition , _va_[3 /* rpLightProjectionT */] ) ;
+	vofi_TexCoord3 . z = 0.0----------------
+
+renderprogs\interaction_skinned.pixel
+----------------
+idCommon::VPrintf: truncated to 4094 characters
+#version 150
+#define PC
+
+void clip( float v ) { if ( v < 0.0 ) { discard; } }
+void clip( vec2 v ) { if ( any( lessThan( v, vec2( 0.0 ) ) ) ) { discard; } }
+void clip( vec3 v ) { if ( any( lessThan( v, vec3( 0.0 ) ) ) ) { discard; } }
+void clip( vec4 v ) { if ( any( lessThan( v, vec4( 0.0 ) ) ) ) { discard; } }
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord ) { return texture( sampler, texcoord.xy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord ) { return vec4( texture( sampler, texcoord.xyz ) ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord, vec2 dx, vec2 dy ) { return textureGrad( sampler, texcoord.xy, dx, dy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord, vec2 dx, vec2 dy ) { return vec4( textureGrad( sampler, texcoord.xyz, dx, dy ) ); }
+
+vec4 texCUBE( samplerCube sampler, vec3 texcoord ) { return texture( sampler, texcoord.xyz ); }
+vec4 texCUBE( samplerCubeShadow sampler, vec4 texcoord ) { return vec4( texture( sampler, texcoord.xyzw ) ); }
+
+vec4 tex1Dproj( sampler1D sampler, vec2 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex2Dproj( sampler2D sampler, vec3 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex3Dproj( sampler3D sampler, vec4 texcoord ) { return textureProj( sampler, texcoord ); }
+
+vec4 tex1Dbias( sampler1D sampler, vec4 texcoord ) { return texture( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dbias( sampler2D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dbias( sampler3D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBEbias( samplerCube sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+
+vec4 tex1Dlod( sampler1D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dlod( sampler3D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBElod( samplerCube sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+
+
+uniform vec4 _fa_[2];
+
+float dot3 (vec3 a , vec3 b ) {return dot ( a , b ) ; }
+float dot3 (vec3 a , vec4 b ) {return dot ( a , b. xyz ) ; }
+float dot3 (vec4 a , vec3 b ) {return dot ( a. xyz , b ) ; }
+float dot3 (vec4 a , vec4 b ) {return dot ( a. xyz , b. xyz ) ; }
+float dot4 (vec4 a , vec4 b ) {return dot ( a , b ) ; }
+float dot4 (vec2 a , vec4 b ) {return dot ( vec4 ( a , 0 , 1 ) , b ) ; }
+const vec4 matrixCoCg1YtoRGB1X = vec4( 1.0, -1.0, 0.0, 1.0 );
+const vec4 matrixCoCg1YtoRGB1Y = vec4( 0.0, 1.0, -0.50196078, 1.0 );
+const vec4 matrixCoCg1YtoRGB1Z = vec4( -1.0, -1.0, 1.00392156, 1.0 );
+vec3 ConvertYCoCgToRGB (vec4 YCoCg ) {
+	vec3 rgbColor ;
+	YCoCg. z = ( YCoCg. z * 31.875 ) + 1.0 ;
+	YCoCg. z = 1.0 / YCoCg. z ;
+	YCoCg. xy *= YCoCg. z ;
+	rgbColor. x = dot4 ( YCoCg , matrixCoCg1YtoRGB1X ) ;
+	rgbColor. y = dot4 ( YCoCg , matrixCoCg1YtoRGB1Y ) ;
+	rgbColor. z = dot4 ( YCoCg , matrixCoCg1YtoRGB1Z ) ;
+	return rgbColor ;
+}
+vec4 idtex2Dproj (sampler2D samp , vec4 texCoords ) {return tex2Dproj ( samp , texCoords. xyw ) ; }
+uniform sampler2D samp0;
+uniform sampler2D samp1;
+uniform sampler2D samp2;
+uniform sampler2D samp3;
+uniform sampler2D samp4;
+
+in vec4 gl_FragCoord;
+in vec4 vofi_TexCoord0;
+in vec4 vofi_TexCoord1;
+in vec4 vofi_TexCoord2;
+in vec4 vofi_TexCoord3;
+in vec4 vofi_TexCoord4;
+in vec4 vofi_TexCoord5;
+in vec4 vofi_TexCoord6;
+in vec4 gl_Color;
+
+out vec4 gl_FragColor;
+
+void main() {
+	vec4 bumpMap = tex2D ( samp0 , vofi_TexCoord1 . xy ) ;
+	vec4 lightFalloff = idtex2Dproj ( samp1 , vofi_TexCoord2 ) ;
+	vec4 lightProj = idtex2Dproj ( samp2 , vofi_TexCoord3 ) ;
+	vec4 YCoCG = tex2D ( samp3 , vofi_TexCoord4 . xy ) ;
+	v----------------
+
+renderprogs\interactionAmbient.vertex
+----------------
+#version 150
+#define PC
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+
+
+uniform vec4 _va_[18];
+
+float dot3 (vec3 a , vec3 b ) {return dot ( a , b ) ; }
+float dot3 (vec3 a , vec4 b ) {return dot ( a , b. xyz ) ; }
+float dot3 (vec4 a , vec3 b ) {return dot ( a. xyz , b ) ; }
+float dot3 (vec4 a , vec4 b ) {return dot ( a. xyz , b. xyz ) ; }
+float dot4 (vec4 a , vec4 b ) {return dot ( a , b ) ; }
+float dot4 (vec2 a , vec4 b ) {return dot ( vec4 ( a , 0 , 1 ) , b ) ; }
+vec4 swizzleColor (vec4 c ) {return c ; }
+
+in vec4 in_Position;
+in vec2 in_TexCoord;
+in vec4 in_Normal;
+in vec4 in_Tangent;
+in vec4 in_Color;
+
+out vec4 gl_Position;
+out vec4 vofi_TexCoord1;
+out vec4 vofi_TexCoord2;
+out vec4 vofi_TexCoord3;
+out vec4 vofi_TexCoord4;
+out vec4 vofi_TexCoord5;
+out vec4 vofi_TexCoord6;
+out vec4 gl_FrontColor;
+
+void main() {
+	vec4 normal = in_Normal * 2.0 - 1.0 ;
+	vec4 tangent = in_Tangent * 2.0 - 1.0 ;
+	vec3 binormal = cross ( normal. xyz , tangent. xyz ) * tangent. w ;
+	gl_Position . x = dot4 ( in_Position , _va_[14 /* rpMVPmatrixX */] ) ;
+	gl_Position . y = dot4 ( in_Position , _va_[15 /* rpMVPmatrixY */] ) ;
+	gl_Position . z = dot4 ( in_Position , _va_[16 /* rpMVPmatrixZ */] ) ;
+	gl_Position . w = dot4 ( in_Position , _va_[17 /* rpMVPmatrixW */] ) ;
+	vec4 defaultTexCoord = vec4 ( 0.0 , 0.5 , 0.0 , 1.0 ) ;
+	vec4 toLight = _va_[0 /* rpLocalLightOrigin */] - in_Position ;
+	vofi_TexCoord1 = defaultTexCoord ;
+	vofi_TexCoord1 . x = dot4 ( in_TexCoord . xy , _va_[6 /* rpBumpMatrixS */] ) ;
+	vofi_TexCoord1 . y = dot4 ( in_TexCoord . xy , _va_[7 /* rpBumpMatrixT */] ) ;
+	vofi_TexCoord2 = defaultTexCoord ;
+	vofi_TexCoord2 . x = dot4 ( in_Position , _va_[5 /* rpLightFalloffS */] ) ;
+	vofi_TexCoord3 . x = dot4 ( in_Position , _va_[2 /* rpLightProjectionS */] ) ;
+	vofi_TexCoord3 . y = dot4 ( in_Position , _va_[3 /* rpLightProjectionT */] ) ;
+	vofi_TexCoord3 . z = 0.0 ;
+	vofi_TexCoord3 . w = dot4 ( in_Position , _va_[4 /* rpLightProjectionQ */] ) ;
+	vofi_TexCoord4 = defaultTexCoord ;
+	vofi_TexCoord4 . x = dot4 ( in_TexCoord . xy , _va_[8 /* rpDiffuseMatrixS */] ) ;
+	vofi_TexCoord4 . y = dot4 ( in_TexCoord . xy , _va_[9 /* rpDiffuseMatrixT */] ) ;
+	vofi_TexCoord5 = defaultTexCoord ;
+	vofi_TexCoord5 . x = dot4 ( in_TexCoord . xy , _va_[10 /* rpSpecularMatrixS */] ) ;
+	vofi_TexCoord5 . y = dot4 ( in_TexCoord . xy , _va_[11 /* rpSpecularMatrixT */] ) ;
+	toLight = normalize ( toLight ) ;
+	vec4 toView = normalize ( _va_[1 /* rpLocalViewOrigin */] - in_Position ) ;
+	vec4 halfAngleVector = toLight + toView ;
+	vofi_TexCoord6 . x = dot3 ( tangent , halfAngleVector ) ;
+	vofi_TexCoord6 . y = dot3 ( binormal , halfAngleVector ) ;
+	vofi_TexCoord6 . z = dot3 ( normal , halfAngleVector ) ;
+	vofi_TexCoord6 . w = 1.0 ;
+	gl_FrontColor = ( swizzleColor ( in_Color ) * _va_[12 /* rpVertexColorModulate */] ) + _va_[13 /* rpVertexColorAdd */] ;
+}
+----------------
+
+renderprogs\interactionAmbient.pixel
+----------------
+idCommon::VPrintf: truncated to 4094 characters
+#version 150
+#define PC
+
+void clip( float v ) { if ( v < 0.0 ) { discard; } }
+void clip( vec2 v ) { if ( any( lessThan( v, vec2( 0.0 ) ) ) ) { discard; } }
+void clip( vec3 v ) { if ( any( lessThan( v, vec3( 0.0 ) ) ) ) { discard; } }
+void clip( vec4 v ) { if ( any( lessThan( v, vec4( 0.0 ) ) ) ) { discard; } }
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord ) { return texture( sampler, texcoord.xy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord ) { return vec4( texture( sampler, texcoord.xyz ) ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord, vec2 dx, vec2 dy ) { return textureGrad( sampler, texcoord.xy, dx, dy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord, vec2 dx, vec2 dy ) { return vec4( textureGrad( sampler, texcoord.xyz, dx, dy ) ); }
+
+vec4 texCUBE( samplerCube sampler, vec3 texcoord ) { return texture( sampler, texcoord.xyz ); }
+vec4 texCUBE( samplerCubeShadow sampler, vec4 texcoord ) { return vec4( texture( sampler, texcoord.xyzw ) ); }
+
+vec4 tex1Dproj( sampler1D sampler, vec2 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex2Dproj( sampler2D sampler, vec3 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex3Dproj( sampler3D sampler, vec4 texcoord ) { return textureProj( sampler, texcoord ); }
+
+vec4 tex1Dbias( sampler1D sampler, vec4 texcoord ) { return texture( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dbias( sampler2D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dbias( sampler3D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBEbias( samplerCube sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+
+vec4 tex1Dlod( sampler1D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dlod( sampler3D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBElod( samplerCube sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+
+
+uniform vec4 _fa_[2];
+
+float dot3 (vec3 a , vec3 b ) {return dot ( a , b ) ; }
+float dot3 (vec3 a , vec4 b ) {return dot ( a , b. xyz ) ; }
+float dot3 (vec4 a , vec3 b ) {return dot ( a. xyz , b ) ; }
+float dot3 (vec4 a , vec4 b ) {return dot ( a. xyz , b. xyz ) ; }
+float dot4 (vec4 a , vec4 b ) {return dot ( a , b ) ; }
+float dot4 (vec2 a , vec4 b ) {return dot ( vec4 ( a , 0 , 1 ) , b ) ; }
+const vec4 matrixCoCg1YtoRGB1X = vec4( 1.0, -1.0, 0.0, 1.0 );
+const vec4 matrixCoCg1YtoRGB1Y = vec4( 0.0, 1.0, -0.50196078, 1.0 );
+const vec4 matrixCoCg1YtoRGB1Z = vec4( -1.0, -1.0, 1.00392156, 1.0 );
+vec3 ConvertYCoCgToRGB (vec4 YCoCg ) {
+	vec3 rgbColor ;
+	YCoCg. z = ( YCoCg. z * 31.875 ) + 1.0 ;
+	YCoCg. z = 1.0 / YCoCg. z ;
+	YCoCg. xy *= YCoCg. z ;
+	rgbColor. x = dot4 ( YCoCg , matrixCoCg1YtoRGB1X ) ;
+	rgbColor. y = dot4 ( YCoCg , matrixCoCg1YtoRGB1Y ) ;
+	rgbColor. z = dot4 ( YCoCg , matrixCoCg1YtoRGB1Z ) ;
+	return rgbColor ;
+}
+vec4 idtex2Dproj (sampler2D samp , vec4 texCoords ) {return tex2Dproj ( samp , texCoords. xyw ) ; }
+uniform sampler2D samp0;
+uniform sampler2D samp1;
+uniform sampler2D samp2;
+uniform sampler2D samp3;
+uniform sampler2D samp4;
+
+in vec4 gl_FragCoord;
+in vec4 vofi_TexCoord1;
+in vec4 vofi_TexCoord2;
+in vec4 vofi_TexCoord3;
+in vec4 vofi_TexCoord4;
+in vec4 vofi_TexCoord5;
+in vec4 vofi_TexCoord6;
+in vec4 gl_Color;
+
+out vec4 gl_FragColor;
+
+void main() {
+	vec4 bumpMap = tex2D ( samp0 , vofi_TexCoord1 . xy ) ;
+	vec4 lightFalloff = idtex2Dproj ( samp1 , vofi_TexCoord2 ) ;
+	vec4 lightProj = idtex2Dproj ( samp2 , vofi_TexCoord3 ) ;
+	vec4 YCoCG = tex2D ( samp3 , vofi_TexCoord4 . xy ) ;
+	vec4 specMap = tex2D ( sam----------------
+
+renderprogs\interactionAmbient_skinned.vertex
+----------------
+idCommon::VPrintf: truncated to 4094 characters
+#version 150
+#define PC
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+
+
+uniform vec4 _va_[18];
+
+float dot3 (vec3 a , vec3 b ) {return dot ( a , b ) ; }
+float dot3 (vec3 a , vec4 b ) {return dot ( a , b. xyz ) ; }
+float dot3 (vec4 a , vec3 b ) {return dot ( a. xyz , b ) ; }
+float dot3 (vec4 a , vec4 b ) {return dot ( a. xyz , b. xyz ) ; }
+float dot4 (vec4 a , vec4 b ) {return dot ( a , b ) ; }
+float dot4 (vec2 a , vec4 b ) {return dot ( vec4 ( a , 0 , 1 ) , b ) ; }
+vec4 swizzleColor (vec4 c ) {return c ; }
+uniform matrices_ubo {vec4 matrices [ 408 ] ; } ;
+
+in vec4 in_Position;
+in vec2 in_TexCoord;
+in vec4 in_Normal;
+in vec4 in_Tangent;
+in vec4 in_Color;
+in vec4 in_Color2;
+
+out vec4 gl_Position;
+out vec4 vofi_TexCoord1;
+out vec4 vofi_TexCoord2;
+out vec4 vofi_TexCoord3;
+out vec4 vofi_TexCoord4;
+out vec4 vofi_TexCoord5;
+out vec4 vofi_TexCoord6;
+out vec4 gl_FrontColor;
+
+void main() {
+	vec4 vNormal = in_Normal * 2.0 - 1.0 ;
+	vec4 vTangent = in_Tangent * 2.0 - 1.0 ;
+	vec3 vBinormal = cross ( vNormal. xyz , vTangent. xyz ) * vTangent. w ;
+	float w0 = in_Color2 . x ;
+	float w1 = in_Color2 . y ;
+	float w2 = in_Color2 . z ;
+	float w3 = in_Color2 . w ;
+	vec4 matX , matY , matZ ;
+	float joint = in_Color . x * 255.1 * 3 ;
+	matX = matrices [ int ( joint + 0 ) ] * w0 ;
+	matY = matrices [ int ( joint + 1 ) ] * w0 ;
+	matZ = matrices [ int ( joint + 2 ) ] * w0 ;
+	joint = in_Color . y * 255.1 * 3 ;
+	matX += matrices [ int ( joint + 0 ) ] * w1 ;
+	matY += matrices [ int ( joint + 1 ) ] * w1 ;
+	matZ += matrices [ int ( joint + 2 ) ] * w1 ;
+	joint = in_Color . z * 255.1 * 3 ;
+	matX += matrices [ int ( joint + 0 ) ] * w2 ;
+	matY += matrices [ int ( joint + 1 ) ] * w2 ;
+	matZ += matrices [ int ( joint + 2 ) ] * w2 ;
+	joint = in_Color . w * 255.1 * 3 ;
+	matX += matrices [ int ( joint + 0 ) ] * w3 ;
+	matY += matrices [ int ( joint + 1 ) ] * w3 ;
+	matZ += matrices [ int ( joint + 2 ) ] * w3 ;
+	vec3 normal ;
+	normal. x = dot3 ( matX , vNormal ) ;
+	normal. y = dot3 ( matY , vNormal ) ;
+	normal. z = dot3 ( matZ , vNormal ) ;
+	normal = normalize ( normal ) ;
+	vec3 tangent ;
+	tangent. x = dot3 ( matX , vTangent ) ;
+	tangent. y = dot3 ( matY , vTangent ) ;
+	tangent. z = dot3 ( matZ , vTangent ) ;
+	tangent = normalize ( tangent ) ;
+	vec3 binormal ;
+	binormal. x = dot3 ( matX , vBinormal ) ;
+	binormal. y = dot3 ( matY , vBinormal ) ;
+	binormal. z = dot3 ( matZ , vBinormal ) ;
+	binormal = normalize ( binormal ) ;
+	vec4 modelPosition ;
+	modelPosition. x = dot4 ( matX , in_Position ) ;
+	modelPosition. y = dot4 ( matY , in_Position ) ;
+	modelPosition. z = dot4 ( matZ , in_Position ) ;
+	modelPosition. w = 1.0 ;
+	gl_Position . x = dot4 ( modelPosition , _va_[14 /* rpMVPmatrixX */] ) ;
+	gl_Position . y = dot4 ( modelPosition , _va_[15 /* rpMVPmatrixY */] ) ;
+	gl_Position . z = dot4 ( modelPosition , _va_[16 /* rpMVPmatrixZ */] ) ;
+	gl_Position . w = dot4 ( modelPosition , _va_[17 /* rpMVPmatrixW */] ) ;
+	vec4 defaultTexCoord = vec4 ( 0.0 , 0.5 , 0.0 , 1.0 ) ;
+	vec4 toLight = _va_[0 /* rpLocalLightOrigin */] - modelPosition ;
+	vofi_TexCoord1 = defaultTexCoord ;
+	vofi_TexCoord1 . x = dot4 ( in_TexCoord . xy , _va_[6 /* rpBumpMatrixS */] ) ;
+	vofi_TexCoord1 . y = dot4 ( in_TexCoord . xy , _va_[7 /* rpBumpMatrixT */] ) ;
+	vofi_TexCoord2 = defaultTexCoord ;
+	vofi_TexCoord2 . x = dot4 ( modelPosition , _va_[5 /* rpLightFalloffS */] ) ;
+	vofi_TexCoord3 . x = dot4 ( modelPosition , _va_[2 /* rpLightProjectionS */] ) ;
+	vofi_TexCoord3 . y = dot4 ( modelPosition , _va_[3 /* rpLightProjectionT */] ) ;
+	vofi_TexCoord3 . z = 0.0 ;
+	vofi_TexCoord3 . w = dot4 ( modelPosition , _va_[4 /* rpLightProjectionQ */] ) ;
+	vofi_TexCoord4 = defaultTexCoord ;
+	vofi_TexCoord4 . x = dot4 ( in_TexCoord . x----------------
+
+renderprogs\interactionAmbient_skinned.pixel
+----------------
+idCommon::VPrintf: truncated to 4094 characters
+#version 150
+#define PC
+
+void clip( float v ) { if ( v < 0.0 ) { discard; } }
+void clip( vec2 v ) { if ( any( lessThan( v, vec2( 0.0 ) ) ) ) { discard; } }
+void clip( vec3 v ) { if ( any( lessThan( v, vec3( 0.0 ) ) ) ) { discard; } }
+void clip( vec4 v ) { if ( any( lessThan( v, vec4( 0.0 ) ) ) ) { discard; } }
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord ) { return texture( sampler, texcoord.xy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord ) { return vec4( texture( sampler, texcoord.xyz ) ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord, vec2 dx, vec2 dy ) { return textureGrad( sampler, texcoord.xy, dx, dy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord, vec2 dx, vec2 dy ) { return vec4( textureGrad( sampler, texcoord.xyz, dx, dy ) ); }
+
+vec4 texCUBE( samplerCube sampler, vec3 texcoord ) { return texture( sampler, texcoord.xyz ); }
+vec4 texCUBE( samplerCubeShadow sampler, vec4 texcoord ) { return vec4( texture( sampler, texcoord.xyzw ) ); }
+
+vec4 tex1Dproj( sampler1D sampler, vec2 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex2Dproj( sampler2D sampler, vec3 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex3Dproj( sampler3D sampler, vec4 texcoord ) { return textureProj( sampler, texcoord ); }
+
+vec4 tex1Dbias( sampler1D sampler, vec4 texcoord ) { return texture( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dbias( sampler2D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dbias( sampler3D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBEbias( samplerCube sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+
+vec4 tex1Dlod( sampler1D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dlod( sampler3D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBElod( samplerCube sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+
+
+uniform vec4 _fa_[2];
+
+float dot3 (vec3 a , vec3 b ) {return dot ( a , b ) ; }
+float dot3 (vec3 a , vec4 b ) {return dot ( a , b. xyz ) ; }
+float dot3 (vec4 a , vec3 b ) {return dot ( a. xyz , b ) ; }
+float dot3 (vec4 a , vec4 b ) {return dot ( a. xyz , b. xyz ) ; }
+float dot4 (vec4 a , vec4 b ) {return dot ( a , b ) ; }
+float dot4 (vec2 a , vec4 b ) {return dot ( vec4 ( a , 0 , 1 ) , b ) ; }
+const vec4 matrixCoCg1YtoRGB1X = vec4( 1.0, -1.0, 0.0, 1.0 );
+const vec4 matrixCoCg1YtoRGB1Y = vec4( 0.0, 1.0, -0.50196078, 1.0 );
+const vec4 matrixCoCg1YtoRGB1Z = vec4( -1.0, -1.0, 1.00392156, 1.0 );
+vec3 ConvertYCoCgToRGB (vec4 YCoCg ) {
+	vec3 rgbColor ;
+	YCoCg. z = ( YCoCg. z * 31.875 ) + 1.0 ;
+	YCoCg. z = 1.0 / YCoCg. z ;
+	YCoCg. xy *= YCoCg. z ;
+	rgbColor. x = dot4 ( YCoCg , matrixCoCg1YtoRGB1X ) ;
+	rgbColor. y = dot4 ( YCoCg , matrixCoCg1YtoRGB1Y ) ;
+	rgbColor. z = dot4 ( YCoCg , matrixCoCg1YtoRGB1Z ) ;
+	return rgbColor ;
+}
+vec4 idtex2Dproj (sampler2D samp , vec4 texCoords ) {return tex2Dproj ( samp , texCoords. xyw ) ; }
+uniform sampler2D samp0;
+uniform sampler2D samp1;
+uniform sampler2D samp2;
+uniform sampler2D samp3;
+uniform sampler2D samp4;
+
+in vec4 gl_FragCoord;
+in vec4 vofi_TexCoord1;
+in vec4 vofi_TexCoord2;
+in vec4 vofi_TexCoord3;
+in vec4 vofi_TexCoord4;
+in vec4 vofi_TexCoord5;
+in vec4 vofi_TexCoord6;
+in vec4 gl_Color;
+
+out vec4 gl_FragColor;
+
+void main() {
+	vec4 bumpMap = tex2D ( samp0 , vofi_TexCoord1 . xy ) ;
+	vec4 lightFalloff = idtex2Dproj ( samp1 , vofi_TexCoord2 ) ;
+	vec4 lightProj = idtex2Dproj ( samp2 , vofi_TexCoord3 ) ;
+	vec4 YCoCG = tex2D ( samp3 , vofi_TexCoord4 . xy ) ;
+	vec4 specMap = tex2D ( sam----------------
+
+renderprogs\environment.vertex
+----------------
+#version 150
+#define PC
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+
+
+uniform vec4 _va_[6];
+
+float dot4 (vec4 a , vec4 b ) {return dot ( a , b ) ; }
+float dot4 (vec2 a , vec4 b ) {return dot ( vec4 ( a , 0 , 1 ) , b ) ; }
+
+in vec4 in_Position;
+in vec4 in_Normal;
+in vec4 in_Color;
+
+out vec4 gl_Position;
+out vec3 vofi_TexCoord0;
+out vec3 vofi_TexCoord1;
+out vec4 gl_FrontColor;
+
+void main() {
+	vec4 vNormal = in_Normal * 2.0 - 1.0 ;
+	gl_Position . x = dot4 ( in_Position , _va_[2 /* rpMVPmatrixX */] ) ;
+	gl_Position . y = dot4 ( in_Position , _va_[3 /* rpMVPmatrixY */] ) ;
+	gl_Position . z = dot4 ( in_Position , _va_[4 /* rpMVPmatrixZ */] ) ;
+	gl_Position . w = dot4 ( in_Position , _va_[5 /* rpMVPmatrixW */] ) ;
+	vec4 toEye = _va_[0 /* rpLocalViewOrigin */] - in_Position ;
+	vofi_TexCoord0 = toEye. xyz ;
+	vofi_TexCoord1 = vNormal. xyz ;
+	gl_FrontColor = _va_[1 /* rpColor */] ;
+}
+----------------
+
+renderprogs\environment.pixel
+----------------
+#version 150
+#define PC
+
+void clip( float v ) { if ( v < 0.0 ) { discard; } }
+void clip( vec2 v ) { if ( any( lessThan( v, vec2( 0.0 ) ) ) ) { discard; } }
+void clip( vec3 v ) { if ( any( lessThan( v, vec3( 0.0 ) ) ) ) { discard; } }
+void clip( vec4 v ) { if ( any( lessThan( v, vec4( 0.0 ) ) ) ) { discard; } }
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord ) { return texture( sampler, texcoord.xy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord ) { return vec4( texture( sampler, texcoord.xyz ) ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord, vec2 dx, vec2 dy ) { return textureGrad( sampler, texcoord.xy, dx, dy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord, vec2 dx, vec2 dy ) { return vec4( textureGrad( sampler, texcoord.xyz, dx, dy ) ); }
+
+vec4 texCUBE( samplerCube sampler, vec3 texcoord ) { return texture( sampler, texcoord.xyz ); }
+vec4 texCUBE( samplerCubeShadow sampler, vec4 texcoord ) { return vec4( texture( sampler, texcoord.xyzw ) ); }
+
+vec4 tex1Dproj( sampler1D sampler, vec2 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex2Dproj( sampler2D sampler, vec3 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex3Dproj( sampler3D sampler, vec4 texcoord ) { return textureProj( sampler, texcoord ); }
+
+vec4 tex1Dbias( sampler1D sampler, vec4 texcoord ) { return texture( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dbias( sampler2D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dbias( sampler3D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBEbias( samplerCube sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+
+vec4 tex1Dlod( sampler1D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dlod( sampler3D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBElod( samplerCube sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+
+float dot3 (vec3 a , vec3 b ) {return dot ( a , b ) ; }
+float dot3 (vec3 a , vec4 b ) {return dot ( a , b. xyz ) ; }
+float dot3 (vec4 a , vec3 b ) {return dot ( a. xyz , b ) ; }
+float dot3 (vec4 a , vec4 b ) {return dot ( a. xyz , b. xyz ) ; }
+uniform samplerCube samp0;
+
+in vec4 gl_FragCoord;
+in vec3 vofi_TexCoord0;
+in vec3 vofi_TexCoord1;
+in vec4 gl_Color;
+
+out vec4 gl_FragColor;
+
+void main() {
+	vec3 globalNormal = normalize ( vofi_TexCoord1 ) ;
+	vec3 globalEye = normalize ( vofi_TexCoord0 ) ;
+	vec3 reflectionVector = vec3 ( dot3 ( globalEye , globalNormal ) ) ;
+	reflectionVector *= globalNormal ;
+	reflectionVector = ( reflectionVector * 2.0 ) - globalEye ;
+	vec4 envMap = texCUBE ( samp0 , reflectionVector ) ;
+	gl_FragColor = vec4 ( envMap. xyz , 1.0 ) * gl_Color ;
+}
+----------------
+
+renderprogs\environment_skinned.vertex
+----------------
+#version 150
+#define PC
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+
+
+uniform vec4 _va_[6];
+
+float dot3 (vec3 a , vec3 b ) {return dot ( a , b ) ; }
+float dot3 (vec3 a , vec4 b ) {return dot ( a , b. xyz ) ; }
+float dot3 (vec4 a , vec3 b ) {return dot ( a. xyz , b ) ; }
+float dot3 (vec4 a , vec4 b ) {return dot ( a. xyz , b. xyz ) ; }
+float dot4 (vec4 a , vec4 b ) {return dot ( a , b ) ; }
+float dot4 (vec2 a , vec4 b ) {return dot ( vec4 ( a , 0 , 1 ) , b ) ; }
+uniform matrices_ubo {vec4 matrices [ 408 ] ; } ;
+
+in vec4 in_Position;
+in vec2 in_TexCoord;
+in vec4 in_Normal;
+in vec4 in_Color;
+in vec4 in_Color2;
+
+out vec4 gl_Position;
+out vec3 vofi_TexCoord0;
+out vec3 vofi_TexCoord1;
+out vec4 gl_FrontColor;
+
+void main() {
+	vec4 vNormal = in_Normal * 2.0 - 1.0 ;
+	float w0 = in_Color2 . x ;
+	float w1 = in_Color2 . y ;
+	float w2 = in_Color2 . z ;
+	float w3 = in_Color2 . w ;
+	vec4 matX , matY , matZ ;
+	float joint = in_Color . x * 255.1 * 3 ;
+	matX = matrices [ int ( joint + 0 ) ] * w0 ;
+	matY = matrices [ int ( joint + 1 ) ] * w0 ;
+	matZ = matrices [ int ( joint + 2 ) ] * w0 ;
+	joint = in_Color . y * 255.1 * 3 ;
+	matX += matrices [ int ( joint + 0 ) ] * w1 ;
+	matY += matrices [ int ( joint + 1 ) ] * w1 ;
+	matZ += matrices [ int ( joint + 2 ) ] * w1 ;
+	joint = in_Color . z * 255.1 * 3 ;
+	matX += matrices [ int ( joint + 0 ) ] * w2 ;
+	matY += matrices [ int ( joint + 1 ) ] * w2 ;
+	matZ += matrices [ int ( joint + 2 ) ] * w2 ;
+	joint = in_Color . w * 255.1 * 3 ;
+	matX += matrices [ int ( joint + 0 ) ] * w3 ;
+	matY += matrices [ int ( joint + 1 ) ] * w3 ;
+	matZ += matrices [ int ( joint + 2 ) ] * w3 ;
+	vec3 vNormalSkinned ;
+	vNormalSkinned. x = dot3 ( matX , vNormal ) ;
+	vNormalSkinned. y = dot3 ( matY , vNormal ) ;
+	vNormalSkinned. z = dot3 ( matZ , vNormal ) ;
+	vNormalSkinned = normalize ( vNormalSkinned ) ;
+	vec4 modelPosition ;
+	modelPosition. x = dot4 ( matX , in_Position ) ;
+	modelPosition. y = dot4 ( matY , in_Position ) ;
+	modelPosition. z = dot4 ( matZ , in_Position ) ;
+	modelPosition. w = 1.0 ;
+	gl_Position . x = dot4 ( modelPosition , _va_[2 /* rpMVPmatrixX */] ) ;
+	gl_Position . y = dot4 ( modelPosition , _va_[3 /* rpMVPmatrixY */] ) ;
+	gl_Position . z = dot4 ( modelPosition , _va_[4 /* rpMVPmatrixZ */] ) ;
+	gl_Position . w = dot4 ( modelPosition , _va_[5 /* rpMVPmatrixW */] ) ;
+	vec4 toEye = _va_[0 /* rpLocalViewOrigin */] - modelPosition ;
+	vofi_TexCoord0 = toEye. xyz ;
+	vofi_TexCoord1 = vNormalSkinned. xyz ;
+	gl_FrontColor = _va_[1 /* rpColor */] ;
+}
+----------------
+
+renderprogs\environment_skinned.pixel
+----------------
+#version 150
+#define PC
+
+void clip( float v ) { if ( v < 0.0 ) { discard; } }
+void clip( vec2 v ) { if ( any( lessThan( v, vec2( 0.0 ) ) ) ) { discard; } }
+void clip( vec3 v ) { if ( any( lessThan( v, vec3( 0.0 ) ) ) ) { discard; } }
+void clip( vec4 v ) { if ( any( lessThan( v, vec4( 0.0 ) ) ) ) { discard; } }
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord ) { return texture( sampler, texcoord.xy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord ) { return vec4( texture( sampler, texcoord.xyz ) ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord, vec2 dx, vec2 dy ) { return textureGrad( sampler, texcoord.xy, dx, dy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord, vec2 dx, vec2 dy ) { return vec4( textureGrad( sampler, texcoord.xyz, dx, dy ) ); }
+
+vec4 texCUBE( samplerCube sampler, vec3 texcoord ) { return texture( sampler, texcoord.xyz ); }
+vec4 texCUBE( samplerCubeShadow sampler, vec4 texcoord ) { return vec4( texture( sampler, texcoord.xyzw ) ); }
+
+vec4 tex1Dproj( sampler1D sampler, vec2 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex2Dproj( sampler2D sampler, vec3 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex3Dproj( sampler3D sampler, vec4 texcoord ) { return textureProj( sampler, texcoord ); }
+
+vec4 tex1Dbias( sampler1D sampler, vec4 texcoord ) { return texture( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dbias( sampler2D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dbias( sampler3D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBEbias( samplerCube sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+
+vec4 tex1Dlod( sampler1D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dlod( sampler3D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBElod( samplerCube sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+
+float dot3 (vec3 a , vec3 b ) {return dot ( a , b ) ; }
+float dot3 (vec3 a , vec4 b ) {return dot ( a , b. xyz ) ; }
+float dot3 (vec4 a , vec3 b ) {return dot ( a. xyz , b ) ; }
+float dot3 (vec4 a , vec4 b ) {return dot ( a. xyz , b. xyz ) ; }
+uniform samplerCube samp0;
+
+in vec4 gl_FragCoord;
+in vec3 vofi_TexCoord0;
+in vec3 vofi_TexCoord1;
+in vec4 gl_Color;
+
+out vec4 gl_FragColor;
+
+void main() {
+	vec3 globalNormal = normalize ( vofi_TexCoord1 ) ;
+	vec3 globalEye = normalize ( vofi_TexCoord0 ) ;
+	vec3 reflectionVector = vec3 ( dot3 ( globalEye , globalNormal ) ) ;
+	reflectionVector *= globalNormal ;
+	reflectionVector = ( reflectionVector * 2.0 ) - globalEye ;
+	vec4 envMap = texCUBE ( samp0 , reflectionVector ) ;
+	gl_FragColor = vec4 ( envMap. xyz , 1.0 ) * gl_Color ;
+}
+----------------
+
+renderprogs\bumpyEnvironment.vertex
+----------------
+#version 150
+#define PC
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+
+
+uniform vec4 _va_[9];
+
+float dot3 (vec3 a , vec3 b ) {return dot ( a , b ) ; }
+float dot3 (vec3 a , vec4 b ) {return dot ( a , b. xyz ) ; }
+float dot3 (vec4 a , vec3 b ) {return dot ( a. xyz , b ) ; }
+float dot3 (vec4 a , vec4 b ) {return dot ( a. xyz , b. xyz ) ; }
+float dot4 (vec4 a , vec4 b ) {return dot ( a , b ) ; }
+float dot4 (vec2 a , vec4 b ) {return dot ( vec4 ( a , 0 , 1 ) , b ) ; }
+
+in vec4 in_Position;
+in vec2 in_TexCoord;
+in vec4 in_Normal;
+in vec4 in_Tangent;
+in vec4 in_Color;
+
+out vec4 gl_Position;
+out vec2 vofi_TexCoord0;
+out vec3 vofi_TexCoord1;
+out vec3 vofi_TexCoord2;
+out vec3 vofi_TexCoord3;
+out vec3 vofi_TexCoord4;
+out vec4 gl_FrontColor;
+
+void main() {
+	vec4 normal = in_Normal * 2.0 - 1.0 ;
+	vec4 tangent = in_Tangent * 2.0 - 1.0 ;
+	vec3 binormal = cross ( normal. xyz , tangent. xyz ) * tangent. w ;
+	gl_Position . x = dot4 ( in_Position , _va_[2 /* rpMVPmatrixX */] ) ;
+	gl_Position . y = dot4 ( in_Position , _va_[3 /* rpMVPmatrixY */] ) ;
+	gl_Position . z = dot4 ( in_Position , _va_[4 /* rpMVPmatrixZ */] ) ;
+	gl_Position . w = dot4 ( in_Position , _va_[5 /* rpMVPmatrixW */] ) ;
+	vofi_TexCoord0 = in_TexCoord . xy ;
+	vec4 toEye = _va_[0 /* rpLocalViewOrigin */] - in_Position ;
+	vofi_TexCoord1 . x = dot3 ( toEye , _va_[6 /* rpModelMatrixX */] ) ;
+	vofi_TexCoord1 . y = dot3 ( toEye , _va_[7 /* rpModelMatrixY */] ) ;
+	vofi_TexCoord1 . z = dot3 ( toEye , _va_[8 /* rpModelMatrixZ */] ) ;
+	vofi_TexCoord2 . x = dot3 ( tangent , _va_[6 /* rpModelMatrixX */] ) ;
+	vofi_TexCoord3 . x = dot3 ( tangent , _va_[7 /* rpModelMatrixY */] ) ;
+	vofi_TexCoord4 . x = dot3 ( tangent , _va_[8 /* rpModelMatrixZ */] ) ;
+	vofi_TexCoord2 . y = dot3 ( binormal , _va_[6 /* rpModelMatrixX */] ) ;
+	vofi_TexCoord3 . y = dot3 ( binormal , _va_[7 /* rpModelMatrixY */] ) ;
+	vofi_TexCoord4 . y = dot3 ( binormal , _va_[8 /* rpModelMatrixZ */] ) ;
+	vofi_TexCoord2 . z = dot3 ( normal , _va_[6 /* rpModelMatrixX */] ) ;
+	vofi_TexCoord3 . z = dot3 ( normal , _va_[7 /* rpModelMatrixY */] ) ;
+	vofi_TexCoord4 . z = dot3 ( normal , _va_[8 /* rpModelMatrixZ */] ) ;
+	gl_FrontColor = _va_[1 /* rpColor */] ;
+}
+----------------
+
+renderprogs\bumpyEnvironment.pixel
+----------------
+#version 150
+#define PC
+
+void clip( float v ) { if ( v < 0.0 ) { discard; } }
+void clip( vec2 v ) { if ( any( lessThan( v, vec2( 0.0 ) ) ) ) { discard; } }
+void clip( vec3 v ) { if ( any( lessThan( v, vec3( 0.0 ) ) ) ) { discard; } }
+void clip( vec4 v ) { if ( any( lessThan( v, vec4( 0.0 ) ) ) ) { discard; } }
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord ) { return texture( sampler, texcoord.xy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord ) { return vec4( texture( sampler, texcoord.xyz ) ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord, vec2 dx, vec2 dy ) { return textureGrad( sampler, texcoord.xy, dx, dy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord, vec2 dx, vec2 dy ) { return vec4( textureGrad( sampler, texcoord.xyz, dx, dy ) ); }
+
+vec4 texCUBE( samplerCube sampler, vec3 texcoord ) { return texture( sampler, texcoord.xyz ); }
+vec4 texCUBE( samplerCubeShadow sampler, vec4 texcoord ) { return vec4( texture( sampler, texcoord.xyzw ) ); }
+
+vec4 tex1Dproj( sampler1D sampler, vec2 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex2Dproj( sampler2D sampler, vec3 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex3Dproj( sampler3D sampler, vec4 texcoord ) { return textureProj( sampler, texcoord ); }
+
+vec4 tex1Dbias( sampler1D sampler, vec4 texcoord ) { return texture( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dbias( sampler2D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dbias( sampler3D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBEbias( samplerCube sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+
+vec4 tex1Dlod( sampler1D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dlod( sampler3D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBElod( samplerCube sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+
+float dot3 (vec3 a , vec3 b ) {return dot ( a , b ) ; }
+float dot3 (vec3 a , vec4 b ) {return dot ( a , b. xyz ) ; }
+float dot3 (vec4 a , vec3 b ) {return dot ( a. xyz , b ) ; }
+float dot3 (vec4 a , vec4 b ) {return dot ( a. xyz , b. xyz ) ; }
+uniform samplerCube samp0;
+uniform sampler2D samp1;
+
+in vec4 gl_FragCoord;
+in vec2 vofi_TexCoord0;
+in vec3 vofi_TexCoord1;
+in vec3 vofi_TexCoord2;
+in vec3 vofi_TexCoord3;
+in vec3 vofi_TexCoord4;
+in vec4 gl_Color;
+
+out vec4 gl_FragColor;
+
+void main() {
+	vec4 bump = tex2D ( samp1 , vofi_TexCoord0 ) * 2.0 - 1.0 ;
+	vec3 localNormal = vec3 ( bump. wy , 0.0 ) ;
+	localNormal. z = sqrt ( 1.0 - dot3 ( localNormal , localNormal ) ) ;
+	vec3 globalNormal ;
+	globalNormal. x = dot3 ( localNormal , vofi_TexCoord2 ) ;
+	globalNormal. y = dot3 ( localNormal , vofi_TexCoord3 ) ;
+	globalNormal. z = dot3 ( localNormal , vofi_TexCoord4 ) ;
+	vec3 globalEye = normalize ( vofi_TexCoord1 ) ;
+	vec3 reflectionVector = globalNormal * dot3 ( globalEye , globalNormal ) ;
+	reflectionVector = ( reflectionVector * 2.0 ) - globalEye ;
+	vec4 envMap = texCUBE ( samp0 , reflectionVector ) ;
+	gl_FragColor = vec4 ( envMap. xyz , 1.0 ) * gl_Color ;
+}
+----------------
+
+renderprogs\bumpyEnvironment_skinned.vertex
+----------------
+idCommon::VPrintf: truncated to 4094 characters
+#version 150
+#define PC
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+
+
+uniform vec4 _va_[9];
+
+float dot3 (vec3 a , vec3 b ) {return dot ( a , b ) ; }
+float dot3 (vec3 a , vec4 b ) {return dot ( a , b. xyz ) ; }
+float dot3 (vec4 a , vec3 b ) {return dot ( a. xyz , b ) ; }
+float dot3 (vec4 a , vec4 b ) {return dot ( a. xyz , b. xyz ) ; }
+float dot4 (vec4 a , vec4 b ) {return dot ( a , b ) ; }
+float dot4 (vec2 a , vec4 b ) {return dot ( vec4 ( a , 0 , 1 ) , b ) ; }
+uniform matrices_ubo {vec4 matrices [ 408 ] ; } ;
+
+in vec4 in_Position;
+in vec2 in_TexCoord;
+in vec4 in_Normal;
+in vec4 in_Tangent;
+in vec4 in_Color;
+in vec4 in_Color2;
+
+out vec4 gl_Position;
+out vec2 vofi_TexCoord0;
+out vec3 vofi_TexCoord1;
+out vec3 vofi_TexCoord2;
+out vec3 vofi_TexCoord3;
+out vec3 vofi_TexCoord4;
+out vec4 gl_FrontColor;
+
+void main() {
+	vec4 vNormal = in_Normal * 2.0 - 1.0 ;
+	vec4 vTangent = in_Tangent * 2.0 - 1.0 ;
+	vec3 vBinormal = cross ( vNormal. xyz , vTangent. xyz ) * vTangent. w ;
+	float w0 = in_Color2 . x ;
+	float w1 = in_Color2 . y ;
+	float w2 = in_Color2 . z ;
+	float w3 = in_Color2 . w ;
+	vec4 matX , matY , matZ ;
+	float joint = in_Color . x * 255.1 * 3 ;
+	matX = matrices [ int ( joint + 0 ) ] * w0 ;
+	matY = matrices [ int ( joint + 1 ) ] * w0 ;
+	matZ = matrices [ int ( joint + 2 ) ] * w0 ;
+	joint = in_Color . y * 255.1 * 3 ;
+	matX += matrices [ int ( joint + 0 ) ] * w1 ;
+	matY += matrices [ int ( joint + 1 ) ] * w1 ;
+	matZ += matrices [ int ( joint + 2 ) ] * w1 ;
+	joint = in_Color . z * 255.1 * 3 ;
+	matX += matrices [ int ( joint + 0 ) ] * w2 ;
+	matY += matrices [ int ( joint + 1 ) ] * w2 ;
+	matZ += matrices [ int ( joint + 2 ) ] * w2 ;
+	joint = in_Color . w * 255.1 * 3 ;
+	matX += matrices [ int ( joint + 0 ) ] * w3 ;
+	matY += matrices [ int ( joint + 1 ) ] * w3 ;
+	matZ += matrices [ int ( joint + 2 ) ] * w3 ;
+	vec3 normal ;
+	normal. x = dot3 ( matX , vNormal ) ;
+	normal. y = dot3 ( matY , vNormal ) ;
+	normal. z = dot3 ( matZ , vNormal ) ;
+	normal = normalize ( normal ) ;
+	vec3 tangent ;
+	tangent. x = dot3 ( matX , vTangent ) ;
+	tangent. y = dot3 ( matY , vTangent ) ;
+	tangent. z = dot3 ( matZ , vTangent ) ;
+	tangent = normalize ( tangent ) ;
+	vec3 binormal ;
+	binormal. x = dot3 ( matX , vBinormal ) ;
+	binormal. y = dot3 ( matY , vBinormal ) ;
+	binormal. z = dot3 ( matZ , vBinormal ) ;
+	binormal = normalize ( binormal ) ;
+	vec4 modelPosition ;
+	modelPosition. x = dot4 ( matX , in_Position ) ;
+	modelPosition. y = dot4 ( matY , in_Position ) ;
+	modelPosition. z = dot4 ( matZ , in_Position ) ;
+	modelPosition. w = 1.0 ;
+	gl_Position . x = dot4 ( modelPosition , _va_[2 /* rpMVPmatrixX */] ) ;
+	gl_Position . y = dot4 ( modelPosition , _va_[3 /* rpMVPmatrixY */] ) ;
+	gl_Position . z = dot4 ( modelPosition , _va_[4 /* rpMVPmatrixZ */] ) ;
+	gl_Position . w = dot4 ( modelPosition , _va_[5 /* rpMVPmatrixW */] ) ;
+	vofi_TexCoord0 = in_TexCoord . xy ;
+	vec4 toEye = _va_[0 /* rpLocalViewOrigin */] - modelPosition ;
+	vofi_TexCoord1 . x = dot3 ( toEye , _va_[6 /* rpModelMatrixX */] ) ;
+	vofi_TexCoord1 . y = dot3 ( toEye , _va_[7 /* rpModelMatrixY */] ) ;
+	vofi_TexCoord1 . z = dot3 ( toEye , _va_[8 /* rpModelMatrixZ */] ) ;
+	vofi_TexCoord2 . x = dot3 ( tangent , _va_[6 /* rpModelMatrixX */] ) ;
+	vofi_TexCoord3 . x = dot3 ( tangent , _va_[7 /* rpModelMatrixY */] ) ;
+	vofi_TexCoord4 . x = dot3 ( tangent , _va_[8 /* rpModelMatrixZ */] ) ;
+	vofi_TexCoord2 . y = dot3 ( binormal , _va_[6 /* rpModelMatrixX */] ) ;
+	vofi_TexCoord3 . y = dot3 ( binormal , _va_[7 /* rpModelMatrixY */] ) ;
+	vofi_TexCoord4 . y = dot3 ( binormal , _va_[8 /* rpModelMatrixZ */] ) ;
+	vofi_TexCoord2 . z = dot3 ( normal , _va_[6 /* rpModelMatrixX */] ) ;
+	vofi_TexCoord3 . z = dot3 ( normal , _va_[7 /----------------
+
+renderprogs\bumpyEnvironment_skinned.pixel
+----------------
+#version 150
+#define PC
+
+void clip( float v ) { if ( v < 0.0 ) { discard; } }
+void clip( vec2 v ) { if ( any( lessThan( v, vec2( 0.0 ) ) ) ) { discard; } }
+void clip( vec3 v ) { if ( any( lessThan( v, vec3( 0.0 ) ) ) ) { discard; } }
+void clip( vec4 v ) { if ( any( lessThan( v, vec4( 0.0 ) ) ) ) { discard; } }
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord ) { return texture( sampler, texcoord.xy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord ) { return vec4( texture( sampler, texcoord.xyz ) ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord, vec2 dx, vec2 dy ) { return textureGrad( sampler, texcoord.xy, dx, dy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord, vec2 dx, vec2 dy ) { return vec4( textureGrad( sampler, texcoord.xyz, dx, dy ) ); }
+
+vec4 texCUBE( samplerCube sampler, vec3 texcoord ) { return texture( sampler, texcoord.xyz ); }
+vec4 texCUBE( samplerCubeShadow sampler, vec4 texcoord ) { return vec4( texture( sampler, texcoord.xyzw ) ); }
+
+vec4 tex1Dproj( sampler1D sampler, vec2 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex2Dproj( sampler2D sampler, vec3 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex3Dproj( sampler3D sampler, vec4 texcoord ) { return textureProj( sampler, texcoord ); }
+
+vec4 tex1Dbias( sampler1D sampler, vec4 texcoord ) { return texture( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dbias( sampler2D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dbias( sampler3D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBEbias( samplerCube sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+
+vec4 tex1Dlod( sampler1D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dlod( sampler3D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBElod( samplerCube sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+
+float dot3 (vec3 a , vec3 b ) {return dot ( a , b ) ; }
+float dot3 (vec3 a , vec4 b ) {return dot ( a , b. xyz ) ; }
+float dot3 (vec4 a , vec3 b ) {return dot ( a. xyz , b ) ; }
+float dot3 (vec4 a , vec4 b ) {return dot ( a. xyz , b. xyz ) ; }
+uniform samplerCube samp0;
+uniform sampler2D samp1;
+
+in vec4 gl_FragCoord;
+in vec2 vofi_TexCoord0;
+in vec3 vofi_TexCoord1;
+in vec3 vofi_TexCoord2;
+in vec3 vofi_TexCoord3;
+in vec3 vofi_TexCoord4;
+in vec4 gl_Color;
+
+out vec4 gl_FragColor;
+
+void main() {
+	vec4 bump = tex2D ( samp1 , vofi_TexCoord0 ) * 2.0 - 1.0 ;
+	vec3 localNormal = vec3 ( bump. wy , 0.0 ) ;
+	localNormal. z = sqrt ( 1.0 - dot3 ( localNormal , localNormal ) ) ;
+	vec3 globalNormal ;
+	globalNormal. x = dot3 ( localNormal , vofi_TexCoord2 ) ;
+	globalNormal. y = dot3 ( localNormal , vofi_TexCoord3 ) ;
+	globalNormal. z = dot3 ( localNormal , vofi_TexCoord4 ) ;
+	vec3 globalEye = normalize ( vofi_TexCoord1 ) ;
+	vec3 reflectionVector = globalNormal * dot3 ( globalEye , globalNormal ) ;
+	reflectionVector = ( reflectionVector * 2.0 ) - globalEye ;
+	vec4 envMap = texCUBE ( samp0 , reflectionVector ) ;
+	gl_FragColor = vec4 ( envMap. xyz , 1.0 ) * gl_Color ;
+}
+----------------
+
+renderprogs\depth.vertex
+----------------
+#version 150
+#define PC
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+
+
+uniform vec4 _va_[4];
+
+float dot4 (vec4 a , vec4 b ) {return dot ( a , b ) ; }
+float dot4 (vec2 a , vec4 b ) {return dot ( vec4 ( a , 0 , 1 ) , b ) ; }
+
+in vec4 in_Position;
+
+out vec4 gl_Position;
+
+void main() {
+	gl_Position . x = dot4 ( in_Position , _va_[0 /* rpMVPmatrixX */] ) ;
+	gl_Position . y = dot4 ( in_Position , _va_[1 /* rpMVPmatrixY */] ) ;
+	gl_Position . z = dot4 ( in_Position , _va_[2 /* rpMVPmatrixZ */] ) ;
+	gl_Position . w = dot4 ( in_Position , _va_[3 /* rpMVPmatrixW */] ) ;
+}
+----------------
+
+renderprogs\depth.pixel
+----------------
+#version 150
+#define PC
+
+void clip( float v ) { if ( v < 0.0 ) { discard; } }
+void clip( vec2 v ) { if ( any( lessThan( v, vec2( 0.0 ) ) ) ) { discard; } }
+void clip( vec3 v ) { if ( any( lessThan( v, vec3( 0.0 ) ) ) ) { discard; } }
+void clip( vec4 v ) { if ( any( lessThan( v, vec4( 0.0 ) ) ) ) { discard; } }
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord ) { return texture( sampler, texcoord.xy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord ) { return vec4( texture( sampler, texcoord.xyz ) ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord, vec2 dx, vec2 dy ) { return textureGrad( sampler, texcoord.xy, dx, dy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord, vec2 dx, vec2 dy ) { return vec4( textureGrad( sampler, texcoord.xyz, dx, dy ) ); }
+
+vec4 texCUBE( samplerCube sampler, vec3 texcoord ) { return texture( sampler, texcoord.xyz ); }
+vec4 texCUBE( samplerCubeShadow sampler, vec4 texcoord ) { return vec4( texture( sampler, texcoord.xyzw ) ); }
+
+vec4 tex1Dproj( sampler1D sampler, vec2 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex2Dproj( sampler2D sampler, vec3 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex3Dproj( sampler3D sampler, vec4 texcoord ) { return textureProj( sampler, texcoord ); }
+
+vec4 tex1Dbias( sampler1D sampler, vec4 texcoord ) { return texture( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dbias( sampler2D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dbias( sampler3D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBEbias( samplerCube sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+
+vec4 tex1Dlod( sampler1D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dlod( sampler3D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBElod( samplerCube sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+
+
+out vec4 gl_FragColor;
+
+void main() {
+	gl_FragColor = vec4 ( 0.0 , 0.0 , 0.0 , 1.0 ) ;
+}
+----------------
+
+renderprogs\depth_skinned.vertex
+----------------
+#version 150
+#define PC
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+
+
+uniform vec4 _va_[4];
+
+float dot4 (vec4 a , vec4 b ) {return dot ( a , b ) ; }
+float dot4 (vec2 a , vec4 b ) {return dot ( vec4 ( a , 0 , 1 ) , b ) ; }
+uniform matrices_ubo {vec4 matrices [ 408 ] ; } ;
+
+in vec4 in_Position;
+in vec4 in_Color;
+in vec4 in_Color2;
+
+out vec4 gl_Position;
+
+void main() {
+	float w0 = in_Color2 . x ;
+	float w1 = in_Color2 . y ;
+	float w2 = in_Color2 . z ;
+	float w3 = in_Color2 . w ;
+	vec4 matX , matY , matZ ;
+	float joint = in_Color . x * 255.1 * 3 ;
+	matX = matrices [ int ( joint + 0 ) ] * w0 ;
+	matY = matrices [ int ( joint + 1 ) ] * w0 ;
+	matZ = matrices [ int ( joint + 2 ) ] * w0 ;
+	joint = in_Color . y * 255.1 * 3 ;
+	matX += matrices [ int ( joint + 0 ) ] * w1 ;
+	matY += matrices [ int ( joint + 1 ) ] * w1 ;
+	matZ += matrices [ int ( joint + 2 ) ] * w1 ;
+	joint = in_Color . z * 255.1 * 3 ;
+	matX += matrices [ int ( joint + 0 ) ] * w2 ;
+	matY += matrices [ int ( joint + 1 ) ] * w2 ;
+	matZ += matrices [ int ( joint + 2 ) ] * w2 ;
+	joint = in_Color . w * 255.1 * 3 ;
+	matX += matrices [ int ( joint + 0 ) ] * w3 ;
+	matY += matrices [ int ( joint + 1 ) ] * w3 ;
+	matZ += matrices [ int ( joint + 2 ) ] * w3 ;
+	vec4 modelPosition ;
+	modelPosition. x = dot4 ( matX , in_Position ) ;
+	modelPosition. y = dot4 ( matY , in_Position ) ;
+	modelPosition. z = dot4 ( matZ , in_Position ) ;
+	modelPosition. w = 1.0 ;
+	gl_Position . x = dot4 ( modelPosition , _va_[0 /* rpMVPmatrixX */] ) ;
+	gl_Position . y = dot4 ( modelPosition , _va_[1 /* rpMVPmatrixY */] ) ;
+	gl_Position . z = dot4 ( modelPosition , _va_[2 /* rpMVPmatrixZ */] ) ;
+	gl_Position . w = dot4 ( modelPosition , _va_[3 /* rpMVPmatrixW */] ) ;
+}
+----------------
+
+renderprogs\depth_skinned.pixel
+----------------
+#version 150
+#define PC
+
+void clip( float v ) { if ( v < 0.0 ) { discard; } }
+void clip( vec2 v ) { if ( any( lessThan( v, vec2( 0.0 ) ) ) ) { discard; } }
+void clip( vec3 v ) { if ( any( lessThan( v, vec3( 0.0 ) ) ) ) { discard; } }
+void clip( vec4 v ) { if ( any( lessThan( v, vec4( 0.0 ) ) ) ) { discard; } }
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord ) { return texture( sampler, texcoord.xy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord ) { return vec4( texture( sampler, texcoord.xyz ) ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord, vec2 dx, vec2 dy ) { return textureGrad( sampler, texcoord.xy, dx, dy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord, vec2 dx, vec2 dy ) { return vec4( textureGrad( sampler, texcoord.xyz, dx, dy ) ); }
+
+vec4 texCUBE( samplerCube sampler, vec3 texcoord ) { return texture( sampler, texcoord.xyz ); }
+vec4 texCUBE( samplerCubeShadow sampler, vec4 texcoord ) { return vec4( texture( sampler, texcoord.xyzw ) ); }
+
+vec4 tex1Dproj( sampler1D sampler, vec2 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex2Dproj( sampler2D sampler, vec3 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex3Dproj( sampler3D sampler, vec4 texcoord ) { return textureProj( sampler, texcoord ); }
+
+vec4 tex1Dbias( sampler1D sampler, vec4 texcoord ) { return texture( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dbias( sampler2D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dbias( sampler3D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBEbias( samplerCube sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+
+vec4 tex1Dlod( sampler1D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dlod( sampler3D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBElod( samplerCube sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+
+
+out vec4 gl_FragColor;
+
+void main() {
+	gl_FragColor = vec4 ( 0.0 , 0.0 , 0.0 , 1.0 ) ;
+}
+----------------
+
+renderprogs\shadowDebug.vertex
+----------------
+#version 150
+#define PC
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+
+
+uniform vec4 _va_[5];
+
+float dot4 (vec4 a , vec4 b ) {return dot ( a , b ) ; }
+float dot4 (vec2 a , vec4 b ) {return dot ( vec4 ( a , 0 , 1 ) , b ) ; }
+
+in vec4 in_Position;
+
+out vec4 gl_Position;
+
+void main() {
+	vec4 vPos = in_Position - _va_[0 /* rpLocalLightOrigin */] ;
+	vPos = ( vPos. wwww * _va_[0 /* rpLocalLightOrigin */] ) + vPos ;
+	gl_Position . x = dot4 ( vPos , _va_[1 /* rpMVPmatrixX */] ) ;
+	gl_Position . y = dot4 ( vPos , _va_[2 /* rpMVPmatrixY */] ) ;
+	gl_Position . z = dot4 ( vPos , _va_[3 /* rpMVPmatrixZ */] ) ;
+	gl_Position . w = dot4 ( vPos , _va_[4 /* rpMVPmatrixW */] ) ;
+}
+----------------
+
+renderprogs\shadowDebug.pixel
+----------------
+#version 150
+#define PC
+
+void clip( float v ) { if ( v < 0.0 ) { discard; } }
+void clip( vec2 v ) { if ( any( lessThan( v, vec2( 0.0 ) ) ) ) { discard; } }
+void clip( vec3 v ) { if ( any( lessThan( v, vec3( 0.0 ) ) ) ) { discard; } }
+void clip( vec4 v ) { if ( any( lessThan( v, vec4( 0.0 ) ) ) ) { discard; } }
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord ) { return texture( sampler, texcoord.xy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord ) { return vec4( texture( sampler, texcoord.xyz ) ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord, vec2 dx, vec2 dy ) { return textureGrad( sampler, texcoord.xy, dx, dy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord, vec2 dx, vec2 dy ) { return vec4( textureGrad( sampler, texcoord.xyz, dx, dy ) ); }
+
+vec4 texCUBE( samplerCube sampler, vec3 texcoord ) { return texture( sampler, texcoord.xyz ); }
+vec4 texCUBE( samplerCubeShadow sampler, vec4 texcoord ) { return vec4( texture( sampler, texcoord.xyzw ) ); }
+
+vec4 tex1Dproj( sampler1D sampler, vec2 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex2Dproj( sampler2D sampler, vec3 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex3Dproj( sampler3D sampler, vec4 texcoord ) { return textureProj( sampler, texcoord ); }
+
+vec4 tex1Dbias( sampler1D sampler, vec4 texcoord ) { return texture( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dbias( sampler2D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dbias( sampler3D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBEbias( samplerCube sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+
+vec4 tex1Dlod( sampler1D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dlod( sampler3D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBElod( samplerCube sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+
+
+uniform vec4 _fa_[1];
+
+out vec4 gl_FragColor;
+
+void main() {
+	gl_FragColor = _fa_[0 /* rpColor */] ;
+}
+----------------
+
+renderprogs\shadowDebug_skinned.vertex
+----------------
+#version 150
+#define PC
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+
+
+uniform vec4 _va_[5];
+
+float dot4 (vec4 a , vec4 b ) {return dot ( a , b ) ; }
+float dot4 (vec2 a , vec4 b ) {return dot ( vec4 ( a , 0 , 1 ) , b ) ; }
+uniform matrices_ubo {vec4 matrices [ 408 ] ; } ;
+
+in vec4 in_Position;
+in vec4 in_Color;
+in vec4 in_Color2;
+
+out vec4 gl_Position;
+
+void main() {
+	float w0 = in_Color2 . x ;
+	float w1 = in_Color2 . y ;
+	float w2 = in_Color2 . z ;
+	float w3 = in_Color2 . w ;
+	vec4 matX , matY , matZ ;
+	float joint = in_Color . x * 255.1 * 3 ;
+	matX = matrices [ int ( joint + 0 ) ] * w0 ;
+	matY = matrices [ int ( joint + 1 ) ] * w0 ;
+	matZ = matrices [ int ( joint + 2 ) ] * w0 ;
+	joint = in_Color . y * 255.1 * 3 ;
+	matX += matrices [ int ( joint + 0 ) ] * w1 ;
+	matY += matrices [ int ( joint + 1 ) ] * w1 ;
+	matZ += matrices [ int ( joint + 2 ) ] * w1 ;
+	joint = in_Color . z * 255.1 * 3 ;
+	matX += matrices [ int ( joint + 0 ) ] * w2 ;
+	matY += matrices [ int ( joint + 1 ) ] * w2 ;
+	matZ += matrices [ int ( joint + 2 ) ] * w2 ;
+	joint = in_Color . w * 255.1 * 3 ;
+	matX += matrices [ int ( joint + 0 ) ] * w3 ;
+	matY += matrices [ int ( joint + 1 ) ] * w3 ;
+	matZ += matrices [ int ( joint + 2 ) ] * w3 ;
+	vec4 vertexPosition = in_Position ;
+	vertexPosition. w = 1.0 ;
+	vec4 modelPosition ;
+	modelPosition. x = dot4 ( matX , vertexPosition ) ;
+	modelPosition. y = dot4 ( matY , vertexPosition ) ;
+	modelPosition. z = dot4 ( matZ , vertexPosition ) ;
+	modelPosition. w = in_Position . w ;
+	vec4 vPos = modelPosition - _va_[0 /* rpLocalLightOrigin */] ;
+	vPos = ( vPos. wwww * _va_[0 /* rpLocalLightOrigin */] ) + vPos ;
+	gl_Position . x = dot4 ( vPos , _va_[1 /* rpMVPmatrixX */] ) ;
+	gl_Position . y = dot4 ( vPos , _va_[2 /* rpMVPmatrixY */] ) ;
+	gl_Position . z = dot4 ( vPos , _va_[3 /* rpMVPmatrixZ */] ) ;
+	gl_Position . w = dot4 ( vPos , _va_[4 /* rpMVPmatrixW */] ) ;
+}
+----------------
+
+renderprogs\shadowDebug_skinned.pixel
+----------------
+#version 150
+#define PC
+
+void clip( float v ) { if ( v < 0.0 ) { discard; } }
+void clip( vec2 v ) { if ( any( lessThan( v, vec2( 0.0 ) ) ) ) { discard; } }
+void clip( vec3 v ) { if ( any( lessThan( v, vec3( 0.0 ) ) ) ) { discard; } }
+void clip( vec4 v ) { if ( any( lessThan( v, vec4( 0.0 ) ) ) ) { discard; } }
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord ) { return texture( sampler, texcoord.xy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord ) { return vec4( texture( sampler, texcoord.xyz ) ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord, vec2 dx, vec2 dy ) { return textureGrad( sampler, texcoord.xy, dx, dy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord, vec2 dx, vec2 dy ) { return vec4( textureGrad( sampler, texcoord.xyz, dx, dy ) ); }
+
+vec4 texCUBE( samplerCube sampler, vec3 texcoord ) { return texture( sampler, texcoord.xyz ); }
+vec4 texCUBE( samplerCubeShadow sampler, vec4 texcoord ) { return vec4( texture( sampler, texcoord.xyzw ) ); }
+
+vec4 tex1Dproj( sampler1D sampler, vec2 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex2Dproj( sampler2D sampler, vec3 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex3Dproj( sampler3D sampler, vec4 texcoord ) { return textureProj( sampler, texcoord ); }
+
+vec4 tex1Dbias( sampler1D sampler, vec4 texcoord ) { return texture( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dbias( sampler2D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dbias( sampler3D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBEbias( samplerCube sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+
+vec4 tex1Dlod( sampler1D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dlod( sampler3D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBElod( samplerCube sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+
+
+uniform vec4 _fa_[1];
+
+out vec4 gl_FragColor;
+
+void main() {
+	gl_FragColor = _fa_[0 /* rpColor */] ;
+}
+----------------
+
+renderprogs\blendlight.vertex
+----------------
+#version 150
+#define PC
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+
+
+uniform vec4 _va_[8];
+
+float dot4 (vec4 a , vec4 b ) {return dot ( a , b ) ; }
+float dot4 (vec2 a , vec4 b ) {return dot ( vec4 ( a , 0 , 1 ) , b ) ; }
+
+in vec4 in_Position;
+in vec2 in_TexCoord;
+in vec4 in_Normal;
+in vec4 in_Tangent;
+in vec4 BINORMAL;
+in vec4 in_Color;
+
+out vec4 gl_Position;
+out vec4 vofi_TexCoord0;
+out vec2 vofi_TexCoord1;
+
+void main() {
+	gl_Position . x = dot4 ( in_Position , _va_[0 /* rpMVPmatrixX */] ) ;
+	gl_Position . y = dot4 ( in_Position , _va_[1 /* rpMVPmatrixY */] ) ;
+	gl_Position . z = dot4 ( in_Position , _va_[2 /* rpMVPmatrixZ */] ) ;
+	gl_Position . w = dot4 ( in_Position , _va_[3 /* rpMVPmatrixW */] ) ;
+	vofi_TexCoord0 . x = dot4 ( in_Position , _va_[4 /* rpTexGen0S */] ) ;
+	vofi_TexCoord0 . y = dot4 ( in_Position , _va_[5 /* rpTexGen0T */] ) ;
+	vofi_TexCoord0 . z = 0.0 ;
+	vofi_TexCoord0 . w = dot4 ( in_Position , _va_[6 /* rpTexGen0Q */] ) ;
+	vofi_TexCoord1 . x = dot4 ( in_Position , _va_[7 /* rpTexGen1S */] ) ;
+	vofi_TexCoord1 . y = 0.5 ;
+}
+----------------
+
+renderprogs\blendlight.pixel
+----------------
+#version 150
+#define PC
+
+void clip( float v ) { if ( v < 0.0 ) { discard; } }
+void clip( vec2 v ) { if ( any( lessThan( v, vec2( 0.0 ) ) ) ) { discard; } }
+void clip( vec3 v ) { if ( any( lessThan( v, vec3( 0.0 ) ) ) ) { discard; } }
+void clip( vec4 v ) { if ( any( lessThan( v, vec4( 0.0 ) ) ) ) { discard; } }
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord ) { return texture( sampler, texcoord.xy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord ) { return vec4( texture( sampler, texcoord.xyz ) ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord, vec2 dx, vec2 dy ) { return textureGrad( sampler, texcoord.xy, dx, dy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord, vec2 dx, vec2 dy ) { return vec4( textureGrad( sampler, texcoord.xyz, dx, dy ) ); }
+
+vec4 texCUBE( samplerCube sampler, vec3 texcoord ) { return texture( sampler, texcoord.xyz ); }
+vec4 texCUBE( samplerCubeShadow sampler, vec4 texcoord ) { return vec4( texture( sampler, texcoord.xyzw ) ); }
+
+vec4 tex1Dproj( sampler1D sampler, vec2 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex2Dproj( sampler2D sampler, vec3 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex3Dproj( sampler3D sampler, vec4 texcoord ) { return textureProj( sampler, texcoord ); }
+
+vec4 tex1Dbias( sampler1D sampler, vec4 texcoord ) { return texture( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dbias( sampler2D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dbias( sampler3D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBEbias( samplerCube sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+
+vec4 tex1Dlod( sampler1D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dlod( sampler3D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBElod( samplerCube sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+
+
+uniform vec4 _fa_[1];
+
+vec4 idtex2Dproj (sampler2D samp , vec4 texCoords ) {return tex2Dproj ( samp , texCoords. xyw ) ; }
+uniform sampler2D samp0;
+uniform sampler2D samp1;
+
+in vec4 gl_FragCoord;
+in vec4 vofi_TexCoord0;
+in vec2 vofi_TexCoord1;
+
+out vec4 gl_FragColor;
+
+void main() {
+	gl_FragColor = idtex2Dproj ( samp0 , vofi_TexCoord0 ) * tex2D ( samp1 , vofi_TexCoord1 ) * _fa_[0 /* rpColor */] ;
+}
+----------------
+
+renderprogs\fog.vertex
+----------------
+#version 150
+#define PC
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+
+
+uniform vec4 _va_[8];
+
+float dot4 (vec4 a , vec4 b ) {return dot ( a , b ) ; }
+float dot4 (vec2 a , vec4 b ) {return dot ( vec4 ( a , 0 , 1 ) , b ) ; }
+
+in vec4 in_Position;
+in vec2 in_TexCoord;
+in vec4 in_Normal;
+in vec4 in_Tangent;
+in vec4 in_Color;
+
+out vec4 gl_Position;
+out vec2 vofi_TexCoord0;
+out vec2 vofi_TexCoord1;
+
+void main() {
+	gl_Position . x = dot4 ( in_Position , _va_[0 /* rpMVPmatrixX */] ) ;
+	gl_Position . y = dot4 ( in_Position , _va_[1 /* rpMVPmatrixY */] ) ;
+	gl_Position . z = dot4 ( in_Position , _va_[2 /* rpMVPmatrixZ */] ) ;
+	gl_Position . w = dot4 ( in_Position , _va_[3 /* rpMVPmatrixW */] ) ;
+	vofi_TexCoord0 . x = dot4 ( in_Position , _va_[4 /* rpTexGen0S */] ) ;
+	vofi_TexCoord0 . y = dot4 ( in_Position , _va_[5 /* rpTexGen0T */] ) ;
+	vofi_TexCoord1 . x = dot4 ( in_Position , _va_[6 /* rpTexGen1S */] ) ;
+	vofi_TexCoord1 . y = dot4 ( in_Position , _va_[7 /* rpTexGen1T */] ) ;
+}
+----------------
+
+renderprogs\fog.pixel
+----------------
+#version 150
+#define PC
+
+void clip( float v ) { if ( v < 0.0 ) { discard; } }
+void clip( vec2 v ) { if ( any( lessThan( v, vec2( 0.0 ) ) ) ) { discard; } }
+void clip( vec3 v ) { if ( any( lessThan( v, vec3( 0.0 ) ) ) ) { discard; } }
+void clip( vec4 v ) { if ( any( lessThan( v, vec4( 0.0 ) ) ) ) { discard; } }
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord ) { return texture( sampler, texcoord.xy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord ) { return vec4( texture( sampler, texcoord.xyz ) ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord, vec2 dx, vec2 dy ) { return textureGrad( sampler, texcoord.xy, dx, dy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord, vec2 dx, vec2 dy ) { return vec4( textureGrad( sampler, texcoord.xyz, dx, dy ) ); }
+
+vec4 texCUBE( samplerCube sampler, vec3 texcoord ) { return texture( sampler, texcoord.xyz ); }
+vec4 texCUBE( samplerCubeShadow sampler, vec4 texcoord ) { return vec4( texture( sampler, texcoord.xyzw ) ); }
+
+vec4 tex1Dproj( sampler1D sampler, vec2 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex2Dproj( sampler2D sampler, vec3 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex3Dproj( sampler3D sampler, vec4 texcoord ) { return textureProj( sampler, texcoord ); }
+
+vec4 tex1Dbias( sampler1D sampler, vec4 texcoord ) { return texture( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dbias( sampler2D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dbias( sampler3D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBEbias( samplerCube sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+
+vec4 tex1Dlod( sampler1D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dlod( sampler3D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBElod( samplerCube sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+
+
+uniform vec4 _fa_[1];
+
+uniform sampler2D samp0;
+uniform sampler2D samp1;
+
+in vec4 gl_FragCoord;
+in vec2 vofi_TexCoord0;
+in vec2 vofi_TexCoord1;
+
+out vec4 gl_FragColor;
+
+void main() {
+	gl_FragColor = tex2D ( samp0 , vofi_TexCoord0 ) * tex2D ( samp1 , vofi_TexCoord1 ) * _fa_[0 /* rpColor */] ;
+}
+----------------
+
+renderprogs\fog_skinned.vertex
+----------------
+#version 150
+#define PC
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+
+
+uniform vec4 _va_[8];
+
+float dot4 (vec4 a , vec4 b ) {return dot ( a , b ) ; }
+float dot4 (vec2 a , vec4 b ) {return dot ( vec4 ( a , 0 , 1 ) , b ) ; }
+uniform matrices_ubo {vec4 matrices [ 408 ] ; } ;
+
+in vec4 in_Position;
+in vec2 in_TexCoord;
+in vec4 in_Color;
+in vec4 in_Color2;
+
+out vec4 gl_Position;
+out vec2 vofi_TexCoord0;
+out vec2 vofi_TexCoord1;
+
+void main() {
+	float w0 = in_Color2 . x ;
+	float w1 = in_Color2 . y ;
+	float w2 = in_Color2 . z ;
+	float w3 = in_Color2 . w ;
+	vec4 matX , matY , matZ ;
+	float joint = in_Color . x * 255.1 * 3 ;
+	matX = matrices [ int ( joint + 0 ) ] * w0 ;
+	matY = matrices [ int ( joint + 1 ) ] * w0 ;
+	matZ = matrices [ int ( joint + 2 ) ] * w0 ;
+	joint = in_Color . y * 255.1 * 3 ;
+	matX += matrices [ int ( joint + 0 ) ] * w1 ;
+	matY += matrices [ int ( joint + 1 ) ] * w1 ;
+	matZ += matrices [ int ( joint + 2 ) ] * w1 ;
+	joint = in_Color . z * 255.1 * 3 ;
+	matX += matrices [ int ( joint + 0 ) ] * w2 ;
+	matY += matrices [ int ( joint + 1 ) ] * w2 ;
+	matZ += matrices [ int ( joint + 2 ) ] * w2 ;
+	joint = in_Color . w * 255.1 * 3 ;
+	matX += matrices [ int ( joint + 0 ) ] * w3 ;
+	matY += matrices [ int ( joint + 1 ) ] * w3 ;
+	matZ += matrices [ int ( joint + 2 ) ] * w3 ;
+	vec4 modelPosition ;
+	modelPosition. x = dot4 ( matX , in_Position ) ;
+	modelPosition. y = dot4 ( matY , in_Position ) ;
+	modelPosition. z = dot4 ( matZ , in_Position ) ;
+	modelPosition. w = 1.0 ;
+	gl_Position . x = dot4 ( modelPosition , _va_[0 /* rpMVPmatrixX */] ) ;
+	gl_Position . y = dot4 ( modelPosition , _va_[1 /* rpMVPmatrixY */] ) ;
+	gl_Position . z = dot4 ( modelPosition , _va_[2 /* rpMVPmatrixZ */] ) ;
+	gl_Position . w = dot4 ( modelPosition , _va_[3 /* rpMVPmatrixW */] ) ;
+	vofi_TexCoord0 . x = dot4 ( modelPosition , _va_[4 /* rpTexGen0S */] ) ;
+	vofi_TexCoord0 . y = dot4 ( modelPosition , _va_[5 /* rpTexGen0T */] ) ;
+	vofi_TexCoord1 . x = dot4 ( modelPosition , _va_[6 /* rpTexGen1S */] ) ;
+	vofi_TexCoord1 . y = dot4 ( modelPosition , _va_[7 /* rpTexGen1T */] ) ;
+}
+----------------
+
+renderprogs\fog_skinned.pixel
+----------------
+#version 150
+#define PC
+
+void clip( float v ) { if ( v < 0.0 ) { discard; } }
+void clip( vec2 v ) { if ( any( lessThan( v, vec2( 0.0 ) ) ) ) { discard; } }
+void clip( vec3 v ) { if ( any( lessThan( v, vec3( 0.0 ) ) ) ) { discard; } }
+void clip( vec4 v ) { if ( any( lessThan( v, vec4( 0.0 ) ) ) ) { discard; } }
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord ) { return texture( sampler, texcoord.xy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord ) { return vec4( texture( sampler, texcoord.xyz ) ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord, vec2 dx, vec2 dy ) { return textureGrad( sampler, texcoord.xy, dx, dy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord, vec2 dx, vec2 dy ) { return vec4( textureGrad( sampler, texcoord.xyz, dx, dy ) ); }
+
+vec4 texCUBE( samplerCube sampler, vec3 texcoord ) { return texture( sampler, texcoord.xyz ); }
+vec4 texCUBE( samplerCubeShadow sampler, vec4 texcoord ) { return vec4( texture( sampler, texcoord.xyzw ) ); }
+
+vec4 tex1Dproj( sampler1D sampler, vec2 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex2Dproj( sampler2D sampler, vec3 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex3Dproj( sampler3D sampler, vec4 texcoord ) { return textureProj( sampler, texcoord ); }
+
+vec4 tex1Dbias( sampler1D sampler, vec4 texcoord ) { return texture( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dbias( sampler2D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dbias( sampler3D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBEbias( samplerCube sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+
+vec4 tex1Dlod( sampler1D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dlod( sampler3D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBElod( samplerCube sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+
+
+uniform vec4 _fa_[1];
+
+uniform sampler2D samp0;
+uniform sampler2D samp1;
+
+in vec4 gl_FragCoord;
+in vec2 vofi_TexCoord0;
+in vec2 vofi_TexCoord1;
+
+out vec4 gl_FragColor;
+
+void main() {
+	gl_FragColor = tex2D ( samp0 , vofi_TexCoord0 ) * tex2D ( samp1 , vofi_TexCoord1 ) * _fa_[0 /* rpColor */] ;
+}
+----------------
+
+renderprogs\skybox.vertex
+----------------
+#version 150
+#define PC
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+
+
+uniform vec4 _va_[7];
+
+float dot4 (vec4 a , vec4 b ) {return dot ( a , b ) ; }
+float dot4 (vec2 a , vec4 b ) {return dot ( vec4 ( a , 0 , 1 ) , b ) ; }
+vec4 swizzleColor (vec4 c ) {return c ; }
+
+in vec4 in_Position;
+in vec2 in_TexCoord;
+in vec4 in_Normal;
+in vec4 in_Tangent;
+in vec4 in_Color;
+
+out vec4 gl_Position;
+out vec3 vofi_TexCoord0;
+out vec4 gl_FrontColor;
+
+void main() {
+	gl_Position . x = dot4 ( in_Position , _va_[3 /* rpMVPmatrixX */] ) ;
+	gl_Position . y = dot4 ( in_Position , _va_[4 /* rpMVPmatrixY */] ) ;
+	gl_Position . z = dot4 ( in_Position , _va_[5 /* rpMVPmatrixZ */] ) ;
+	gl_Position . w = dot4 ( in_Position , _va_[6 /* rpMVPmatrixW */] ) ;
+	vofi_TexCoord0 = in_Position . xyz - _va_[0 /* rpLocalViewOrigin */] . xyz ;
+	gl_FrontColor = ( swizzleColor ( in_Color ) * _va_[1 /* rpVertexColorModulate */] ) + _va_[2 /* rpVertexColorAdd */] ;
+}
+----------------
+
+renderprogs\skybox.pixel
+----------------
+#version 150
+#define PC
+
+void clip( float v ) { if ( v < 0.0 ) { discard; } }
+void clip( vec2 v ) { if ( any( lessThan( v, vec2( 0.0 ) ) ) ) { discard; } }
+void clip( vec3 v ) { if ( any( lessThan( v, vec3( 0.0 ) ) ) ) { discard; } }
+void clip( vec4 v ) { if ( any( lessThan( v, vec4( 0.0 ) ) ) ) { discard; } }
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord ) { return texture( sampler, texcoord.xy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord ) { return vec4( texture( sampler, texcoord.xyz ) ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord, vec2 dx, vec2 dy ) { return textureGrad( sampler, texcoord.xy, dx, dy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord, vec2 dx, vec2 dy ) { return vec4( textureGrad( sampler, texcoord.xyz, dx, dy ) ); }
+
+vec4 texCUBE( samplerCube sampler, vec3 texcoord ) { return texture( sampler, texcoord.xyz ); }
+vec4 texCUBE( samplerCubeShadow sampler, vec4 texcoord ) { return vec4( texture( sampler, texcoord.xyzw ) ); }
+
+vec4 tex1Dproj( sampler1D sampler, vec2 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex2Dproj( sampler2D sampler, vec3 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex3Dproj( sampler3D sampler, vec4 texcoord ) { return textureProj( sampler, texcoord ); }
+
+vec4 tex1Dbias( sampler1D sampler, vec4 texcoord ) { return texture( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dbias( sampler2D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dbias( sampler3D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBEbias( samplerCube sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+
+vec4 tex1Dlod( sampler1D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dlod( sampler3D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBElod( samplerCube sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+
+uniform samplerCube samp0;
+
+in vec4 gl_FragCoord;
+in vec3 vofi_TexCoord0;
+in vec4 gl_Color;
+
+out vec4 gl_FragColor;
+
+void main() {
+	gl_FragColor = texCUBE ( samp0 , vofi_TexCoord0 ) * gl_Color ;
+}
+----------------
+
+renderprogs\wobblesky.vertex
+----------------
+#version 150
+#define PC
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+
+
+uniform vec4 _va_[10];
+
+float dot3 (vec3 a , vec3 b ) {return dot ( a , b ) ; }
+float dot3 (vec3 a , vec4 b ) {return dot ( a , b. xyz ) ; }
+float dot3 (vec4 a , vec3 b ) {return dot ( a. xyz , b ) ; }
+float dot3 (vec4 a , vec4 b ) {return dot ( a. xyz , b. xyz ) ; }
+float dot4 (vec4 a , vec4 b ) {return dot ( a , b ) ; }
+float dot4 (vec2 a , vec4 b ) {return dot ( vec4 ( a , 0 , 1 ) , b ) ; }
+vec4 swizzleColor (vec4 c ) {return c ; }
+
+in vec4 in_Position;
+in vec2 in_TexCoord;
+in vec4 in_Normal;
+in vec4 in_Tangent;
+in vec4 in_Color;
+
+out vec4 gl_Position;
+out vec3 vofi_TexCoord0;
+out vec4 gl_FrontColor;
+
+void main() {
+	gl_Position . x = dot4 ( in_Position , _va_[3 /* rpMVPmatrixX */] ) ;
+	gl_Position . y = dot4 ( in_Position , _va_[4 /* rpMVPmatrixY */] ) ;
+	gl_Position . z = dot4 ( in_Position , _va_[5 /* rpMVPmatrixZ */] ) ;
+	gl_Position . w = dot4 ( in_Position , _va_[6 /* rpMVPmatrixW */] ) ;
+	vec3 t0 = in_Position . xyz - _va_[0 /* rpLocalViewOrigin */] . xyz ;
+	vofi_TexCoord0 . x = dot3 ( t0 , _va_[7 /* rpWobbleSkyX */] ) ;
+	vofi_TexCoord0 . y = dot3 ( t0 , _va_[8 /* rpWobbleSkyY */] ) ;
+	vofi_TexCoord0 . z = dot3 ( t0 , _va_[9 /* rpWobbleSkyZ */] ) ;
+	gl_FrontColor = ( swizzleColor ( in_Color ) * _va_[1 /* rpVertexColorModulate */] ) + _va_[2 /* rpVertexColorAdd */] ;
+}
+----------------
+
+renderprogs\wobblesky.pixel
+----------------
+#version 150
+#define PC
+
+void clip( float v ) { if ( v < 0.0 ) { discard; } }
+void clip( vec2 v ) { if ( any( lessThan( v, vec2( 0.0 ) ) ) ) { discard; } }
+void clip( vec3 v ) { if ( any( lessThan( v, vec3( 0.0 ) ) ) ) { discard; } }
+void clip( vec4 v ) { if ( any( lessThan( v, vec4( 0.0 ) ) ) ) { discard; } }
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord ) { return texture( sampler, texcoord.xy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord ) { return vec4( texture( sampler, texcoord.xyz ) ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord, vec2 dx, vec2 dy ) { return textureGrad( sampler, texcoord.xy, dx, dy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord, vec2 dx, vec2 dy ) { return vec4( textureGrad( sampler, texcoord.xyz, dx, dy ) ); }
+
+vec4 texCUBE( samplerCube sampler, vec3 texcoord ) { return texture( sampler, texcoord.xyz ); }
+vec4 texCUBE( samplerCubeShadow sampler, vec4 texcoord ) { return vec4( texture( sampler, texcoord.xyzw ) ); }
+
+vec4 tex1Dproj( sampler1D sampler, vec2 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex2Dproj( sampler2D sampler, vec3 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex3Dproj( sampler3D sampler, vec4 texcoord ) { return textureProj( sampler, texcoord ); }
+
+vec4 tex1Dbias( sampler1D sampler, vec4 texcoord ) { return texture( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dbias( sampler2D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dbias( sampler3D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBEbias( samplerCube sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+
+vec4 tex1Dlod( sampler1D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dlod( sampler3D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBElod( samplerCube sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+
+uniform samplerCube samp0;
+
+in vec4 gl_FragCoord;
+in vec3 vofi_TexCoord0;
+in vec4 gl_Color;
+
+out vec4 gl_FragColor;
+
+void main() {
+	gl_FragColor = texCUBE ( samp0 , vofi_TexCoord0 ) * gl_Color ;
+}
+----------------
+
+renderprogs\postprocess.vertex
+----------------
+#version 150
+#define PC
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+
+
+
+in vec4 in_Position;
+in vec2 in_TexCoord;
+in vec4 in_Normal;
+in vec4 in_Tangent;
+in vec4 in_Color;
+
+out vec4 gl_Position;
+out vec2 vofi_TexCoord0;
+
+void main() {
+	gl_Position = in_Position ;
+	vofi_TexCoord0 = in_TexCoord ;
+}
+----------------
+
+renderprogs\postprocess.pixel
+----------------
+#version 150
+#define PC
+
+void clip( float v ) { if ( v < 0.0 ) { discard; } }
+void clip( vec2 v ) { if ( any( lessThan( v, vec2( 0.0 ) ) ) ) { discard; } }
+void clip( vec3 v ) { if ( any( lessThan( v, vec3( 0.0 ) ) ) ) { discard; } }
+void clip( vec4 v ) { if ( any( lessThan( v, vec4( 0.0 ) ) ) ) { discard; } }
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord ) { return texture( sampler, texcoord.xy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord ) { return vec4( texture( sampler, texcoord.xyz ) ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord, vec2 dx, vec2 dy ) { return textureGrad( sampler, texcoord.xy, dx, dy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord, vec2 dx, vec2 dy ) { return vec4( textureGrad( sampler, texcoord.xyz, dx, dy ) ); }
+
+vec4 texCUBE( samplerCube sampler, vec3 texcoord ) { return texture( sampler, texcoord.xyz ); }
+vec4 texCUBE( samplerCubeShadow sampler, vec4 texcoord ) { return vec4( texture( sampler, texcoord.xyzw ) ); }
+
+vec4 tex1Dproj( sampler1D sampler, vec2 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex2Dproj( sampler2D sampler, vec3 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex3Dproj( sampler3D sampler, vec4 texcoord ) { return textureProj( sampler, texcoord ); }
+
+vec4 tex1Dbias( sampler1D sampler, vec4 texcoord ) { return texture( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dbias( sampler2D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dbias( sampler3D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBEbias( samplerCube sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+
+vec4 tex1Dlod( sampler1D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dlod( sampler3D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBElod( samplerCube sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+
+uniform sampler2D samp0;
+
+in vec4 gl_FragCoord;
+in vec2 vofi_TexCoord0;
+
+out vec4 gl_FragColor;
+
+void main() {
+	vec2 tCoords = vofi_TexCoord0 ;
+	gl_FragColor = tex2D ( samp0 , tCoords ) ;
+}
+----------------
+
+renderprogs\stereoDeGhost.vertex
+----------------
+#version 150
+#define PC
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+
+
+uniform vec4 _va_[4];
+
+float dot4 (vec4 a , vec4 b ) {return dot ( a , b ) ; }
+float dot4 (vec2 a , vec4 b ) {return dot ( vec4 ( a , 0 , 1 ) , b ) ; }
+
+in vec4 in_Position;
+in vec2 in_TexCoord;
+in vec4 in_Normal;
+in vec4 in_Tangent;
+in vec4 in_Color;
+
+out vec4 gl_Position;
+
+void main() {
+	gl_Position . x = dot4 ( in_Position , _va_[0 /* rpMVPmatrixX */] ) ;
+	gl_Position . y = dot4 ( in_Position , _va_[1 /* rpMVPmatrixY */] ) ;
+	gl_Position . z = dot4 ( in_Position , _va_[2 /* rpMVPmatrixZ */] ) ;
+	gl_Position . w = dot4 ( in_Position , _va_[3 /* rpMVPmatrixW */] ) ;
+}
+----------------
+
+renderprogs\stereoDeGhost.pixel
+----------------
+#version 150
+#define PC
+
+void clip( float v ) { if ( v < 0.0 ) { discard; } }
+void clip( vec2 v ) { if ( any( lessThan( v, vec2( 0.0 ) ) ) ) { discard; } }
+void clip( vec3 v ) { if ( any( lessThan( v, vec3( 0.0 ) ) ) ) { discard; } }
+void clip( vec4 v ) { if ( any( lessThan( v, vec4( 0.0 ) ) ) ) { discard; } }
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord ) { return texture( sampler, texcoord.xy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord ) { return vec4( texture( sampler, texcoord.xyz ) ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord, vec2 dx, vec2 dy ) { return textureGrad( sampler, texcoord.xy, dx, dy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord, vec2 dx, vec2 dy ) { return vec4( textureGrad( sampler, texcoord.xyz, dx, dy ) ); }
+
+vec4 texCUBE( samplerCube sampler, vec3 texcoord ) { return texture( sampler, texcoord.xyz ); }
+vec4 texCUBE( samplerCubeShadow sampler, vec4 texcoord ) { return vec4( texture( sampler, texcoord.xyzw ) ); }
+
+vec4 tex1Dproj( sampler1D sampler, vec2 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex2Dproj( sampler2D sampler, vec3 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex3Dproj( sampler3D sampler, vec4 texcoord ) { return textureProj( sampler, texcoord ); }
+
+vec4 tex1Dbias( sampler1D sampler, vec4 texcoord ) { return texture( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dbias( sampler2D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dbias( sampler3D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBEbias( samplerCube sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+
+vec4 tex1Dlod( sampler1D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dlod( sampler3D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBElod( samplerCube sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+
+
+uniform vec4 _fa_[1];
+
+out vec4 gl_FragColor;
+
+void main() {
+	gl_FragColor = _fa_[0 /* rpColor */] ;
+}
+----------------
+
+renderprogs\stereoWarp.vertex
+----------------
+#version 150
+#define PC
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+
+
+uniform vec4 _va_[4];
+
+float dot4 (vec4 a , vec4 b ) {return dot ( a , b ) ; }
+float dot4 (vec2 a , vec4 b ) {return dot ( vec4 ( a , 0 , 1 ) , b ) ; }
+
+in vec4 in_Position;
+in vec2 in_TexCoord;
+in vec4 in_Normal;
+in vec4 in_Tangent;
+in vec4 in_Color;
+
+out vec4 gl_Position;
+out vec2 vofi_TexCoord0;
+
+void main() {
+	gl_Position . x = dot4 ( in_Position , _va_[0 /* rpMVPmatrixX */] ) ;
+	gl_Position . y = dot4 ( in_Position , _va_[1 /* rpMVPmatrixY */] ) ;
+	gl_Position . z = dot4 ( in_Position , _va_[2 /* rpMVPmatrixZ */] ) ;
+	gl_Position . w = dot4 ( in_Position , _va_[3 /* rpMVPmatrixW */] ) ;
+	vofi_TexCoord0 = in_TexCoord ;
+}
+----------------
+
+renderprogs\stereoWarp.pixel
+----------------
+#version 150
+#define PC
+
+void clip( float v ) { if ( v < 0.0 ) { discard; } }
+void clip( vec2 v ) { if ( any( lessThan( v, vec2( 0.0 ) ) ) ) { discard; } }
+void clip( vec3 v ) { if ( any( lessThan( v, vec3( 0.0 ) ) ) ) { discard; } }
+void clip( vec4 v ) { if ( any( lessThan( v, vec4( 0.0 ) ) ) ) { discard; } }
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord ) { return texture( sampler, texcoord.xy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord ) { return vec4( texture( sampler, texcoord.xyz ) ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord, vec2 dx, vec2 dy ) { return textureGrad( sampler, texcoord.xy, dx, dy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord, vec2 dx, vec2 dy ) { return vec4( textureGrad( sampler, texcoord.xyz, dx, dy ) ); }
+
+vec4 texCUBE( samplerCube sampler, vec3 texcoord ) { return texture( sampler, texcoord.xyz ); }
+vec4 texCUBE( samplerCubeShadow sampler, vec4 texcoord ) { return vec4( texture( sampler, texcoord.xyzw ) ); }
+
+vec4 tex1Dproj( sampler1D sampler, vec2 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex2Dproj( sampler2D sampler, vec3 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex3Dproj( sampler3D sampler, vec4 texcoord ) { return textureProj( sampler, texcoord ); }
+
+vec4 tex1Dbias( sampler1D sampler, vec4 texcoord ) { return texture( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dbias( sampler2D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dbias( sampler3D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBEbias( samplerCube sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+
+vec4 tex1Dlod( sampler1D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dlod( sampler3D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBElod( samplerCube sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+
+uniform sampler2D samp0;
+
+in vec2 vofi_TexCoord0;
+
+out vec4 gl_FragColor;
+
+void main() {
+	float screenWarp_range = 1.05 ;
+	float screenWarp_rangeInverse = 0.95 ;
+	float screenWarp_stretch = 1.4 ;
+	vec2 tempTC = ( vofi_TexCoord0 - vec2 ( 0.5 , 0.5 ) ) * screenWarp_stretch ;
+	float radialLength = sqrt ( ( tempTC. x * tempTC. x ) + ( tempTC. y * tempTC. y ) ) ;
+	float scaledRadialLength = radialLength * screenWarp_range ;
+	float tanScaled = tan ( scaledRadialLength ) ;
+	float rescaled = tanScaled * screenWarp_rangeInverse ;
+	vec2 radialDir = normalize ( tempTC ) ;
+	vec2 warped = vec2 ( 0.5 , 0.5 ) + vec2 ( 0.5 , 0.5 ) * radialDir * rescaled ;
+	gl_FragColor = tex2D ( samp0 , warped ) ;
+}
+----------------
+
+renderprogs\zcullReconstruct.vertex
+----------------
+#version 150
+#define PC
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+
+
+
+in vec4 in_Position;
+
+out vec4 gl_Position;
+
+void main() {
+	gl_Position = in_Position ;
+	gl_Position . z = - 1.0 ;
+}
+----------------
+
+renderprogs\zcullReconstruct.pixel
+----------------
+#version 150
+#define PC
+
+void clip( float v ) { if ( v < 0.0 ) { discard; } }
+void clip( vec2 v ) { if ( any( lessThan( v, vec2( 0.0 ) ) ) ) { discard; } }
+void clip( vec3 v ) { if ( any( lessThan( v, vec3( 0.0 ) ) ) ) { discard; } }
+void clip( vec4 v ) { if ( any( lessThan( v, vec4( 0.0 ) ) ) ) { discard; } }
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord ) { return texture( sampler, texcoord.xy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord ) { return vec4( texture( sampler, texcoord.xyz ) ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord, vec2 dx, vec2 dy ) { return textureGrad( sampler, texcoord.xy, dx, dy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord, vec2 dx, vec2 dy ) { return vec4( textureGrad( sampler, texcoord.xyz, dx, dy ) ); }
+
+vec4 texCUBE( samplerCube sampler, vec3 texcoord ) { return texture( sampler, texcoord.xyz ); }
+vec4 texCUBE( samplerCubeShadow sampler, vec4 texcoord ) { return vec4( texture( sampler, texcoord.xyzw ) ); }
+
+vec4 tex1Dproj( sampler1D sampler, vec2 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex2Dproj( sampler2D sampler, vec3 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex3Dproj( sampler3D sampler, vec4 texcoord ) { return textureProj( sampler, texcoord ); }
+
+vec4 tex1Dbias( sampler1D sampler, vec4 texcoord ) { return texture( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dbias( sampler2D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dbias( sampler3D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBEbias( samplerCube sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+
+vec4 tex1Dlod( sampler1D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dlod( sampler3D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBElod( samplerCube sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+
+
+out float gl_FragDepth;
+out vec4 gl_FragColor;
+
+void main() {
+	gl_FragDepth = 1 ;
+	gl_FragColor = vec4 ( 0.0 , 0.0 , 0.0 , 0.0 ) ;
+}
+----------------
+
+renderprogs\bink.vertex
+----------------
+#version 150
+#define PC
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+
+
+uniform vec4 _va_[4];
+
+float dot4 (vec4 a , vec4 b ) {return dot ( a , b ) ; }
+float dot4 (vec2 a , vec4 b ) {return dot ( vec4 ( a , 0 , 1 ) , b ) ; }
+
+in vec4 in_Position;
+in vec2 in_TexCoord;
+in vec4 in_Normal;
+in vec4 in_Tangent;
+in vec4 in_Color;
+
+out vec4 gl_Position;
+out vec2 vofi_TexCoord0;
+
+void main() {
+	gl_Position . x = dot4 ( in_Position , _va_[0 /* rpMVPmatrixX */] ) ;
+	gl_Position . y = dot4 ( in_Position , _va_[1 /* rpMVPmatrixY */] ) ;
+	gl_Position . z = dot4 ( in_Position , _va_[2 /* rpMVPmatrixZ */] ) ;
+	gl_Position . w = dot4 ( in_Position , _va_[3 /* rpMVPmatrixW */] ) ;
+	vofi_TexCoord0 = in_TexCoord ;
+}
+----------------
+
+renderprogs\bink.pixel
+----------------
+#version 150
+#define PC
+
+void clip( float v ) { if ( v < 0.0 ) { discard; } }
+void clip( vec2 v ) { if ( any( lessThan( v, vec2( 0.0 ) ) ) ) { discard; } }
+void clip( vec3 v ) { if ( any( lessThan( v, vec3( 0.0 ) ) ) ) { discard; } }
+void clip( vec4 v ) { if ( any( lessThan( v, vec4( 0.0 ) ) ) ) { discard; } }
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord ) { return texture( sampler, texcoord.xy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord ) { return vec4( texture( sampler, texcoord.xyz ) ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord, vec2 dx, vec2 dy ) { return textureGrad( sampler, texcoord.xy, dx, dy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord, vec2 dx, vec2 dy ) { return vec4( textureGrad( sampler, texcoord.xyz, dx, dy ) ); }
+
+vec4 texCUBE( samplerCube sampler, vec3 texcoord ) { return texture( sampler, texcoord.xyz ); }
+vec4 texCUBE( samplerCubeShadow sampler, vec4 texcoord ) { return vec4( texture( sampler, texcoord.xyzw ) ); }
+
+vec4 tex1Dproj( sampler1D sampler, vec2 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex2Dproj( sampler2D sampler, vec3 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex3Dproj( sampler3D sampler, vec4 texcoord ) { return textureProj( sampler, texcoord ); }
+
+vec4 tex1Dbias( sampler1D sampler, vec4 texcoord ) { return texture( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dbias( sampler2D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dbias( sampler3D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBEbias( samplerCube sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+
+vec4 tex1Dlod( sampler1D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dlod( sampler3D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBElod( samplerCube sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+
+
+uniform vec4 _fa_[1];
+
+uniform sampler2D samp0;
+uniform sampler2D samp1;
+uniform sampler2D samp2;
+
+in vec4 gl_FragCoord;
+in vec2 vofi_TexCoord0;
+
+out vec4 gl_FragColor;
+
+void main() {
+	vec3 crc = vec3 ( 1.595794678 , - 0.813476563 , 0 ) ;
+	vec3 crb = vec3 ( 0 , - 0.391448975 , 2.017822266 ) ;
+	vec3 adj = vec3 ( - 0.87065506 , 0.529705048 , - 1.081668854 ) ;
+	vec3 YScalar = vec3 ( 1.164123535 , 1.164123535 , 1.164123535 ) ;
+	float Y = tex2D ( samp0 , vofi_TexCoord0 . xy ). x ;
+	float Cr = tex2D ( samp1 , vofi_TexCoord0 . xy ). x ;
+	float Cb = tex2D ( samp2 , vofi_TexCoord0 . xy ). x ;
+	vec3 p = ( YScalar * Y ) ;
+	p += ( crc * Cr ) + ( crb * Cb ) + adj ;
+	gl_FragColor . xyz = p ;
+	gl_FragColor . w = 1.0 ;
+	gl_FragColor *= _fa_[0 /* rpColor */] ;
+}
+----------------
+
+renderprogs\bink_gui.vertex
+----------------
+#version 150
+#define PC
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+
+
+uniform vec4 _va_[4];
+
+float dot4 (vec4 a , vec4 b ) {return dot ( a , b ) ; }
+float dot4 (vec2 a , vec4 b ) {return dot ( vec4 ( a , 0 , 1 ) , b ) ; }
+vec4 swizzleColor (vec4 c ) {return c ; }
+
+in vec4 in_Position;
+in vec2 in_TexCoord;
+in vec4 in_Normal;
+in vec4 in_Tangent;
+in vec4 in_Color;
+in vec4 in_Color2;
+
+out vec4 gl_Position;
+out vec2 vofi_TexCoord0;
+out vec4 vofi_TexCoord1;
+out vec4 gl_FrontColor;
+
+void main() {
+	gl_Position . x = dot4 ( in_Position , _va_[0 /* rpMVPmatrixX */] ) ;
+	gl_Position . y = dot4 ( in_Position , _va_[1 /* rpMVPmatrixY */] ) ;
+	gl_Position . z = dot4 ( in_Position , _va_[2 /* rpMVPmatrixZ */] ) ;
+	gl_Position . w = dot4 ( in_Position , _va_[3 /* rpMVPmatrixW */] ) ;
+	vofi_TexCoord0 . xy = in_TexCoord . xy ;
+	vofi_TexCoord1 = ( swizzleColor ( in_Color2 ) * 2 ) - 1 ;
+	gl_FrontColor = swizzleColor ( in_Color ) ;
+}
+----------------
+
+renderprogs\bink_gui.pixel
+----------------
+#version 150
+#define PC
+
+void clip( float v ) { if ( v < 0.0 ) { discard; } }
+void clip( vec2 v ) { if ( any( lessThan( v, vec2( 0.0 ) ) ) ) { discard; } }
+void clip( vec3 v ) { if ( any( lessThan( v, vec3( 0.0 ) ) ) ) { discard; } }
+void clip( vec4 v ) { if ( any( lessThan( v, vec4( 0.0 ) ) ) ) { discard; } }
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord ) { return texture( sampler, texcoord.xy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord ) { return vec4( texture( sampler, texcoord.xyz ) ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord, vec2 dx, vec2 dy ) { return textureGrad( sampler, texcoord.xy, dx, dy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord, vec2 dx, vec2 dy ) { return vec4( textureGrad( sampler, texcoord.xyz, dx, dy ) ); }
+
+vec4 texCUBE( samplerCube sampler, vec3 texcoord ) { return texture( sampler, texcoord.xyz ); }
+vec4 texCUBE( samplerCubeShadow sampler, vec4 texcoord ) { return vec4( texture( sampler, texcoord.xyzw ) ); }
+
+vec4 tex1Dproj( sampler1D sampler, vec2 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex2Dproj( sampler2D sampler, vec3 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex3Dproj( sampler3D sampler, vec4 texcoord ) { return textureProj( sampler, texcoord ); }
+
+vec4 tex1Dbias( sampler1D sampler, vec4 texcoord ) { return texture( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dbias( sampler2D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dbias( sampler3D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBEbias( samplerCube sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+
+vec4 tex1Dlod( sampler1D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dlod( sampler3D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBElod( samplerCube sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+
+uniform sampler2D samp0;
+uniform sampler2D samp1;
+uniform sampler2D samp2;
+
+in vec4 gl_FragCoord;
+in vec2 vofi_TexCoord0;
+in vec4 vofi_TexCoord1;
+in vec4 gl_Color;
+
+out vec4 gl_FragColor;
+
+void main() {
+	vec3 crc = vec3 ( 1.595794678 , - 0.813476563 , 0 ) ;
+	vec3 crb = vec3 ( 0 , - 0.391448975 , 2.017822266 ) ;
+	vec3 adj = vec3 ( - 0.87065506 , 0.529705048 , - 1.081668854 ) ;
+	vec3 YScalar = vec3 ( 1.164123535 , 1.164123535 , 1.164123535 ) ;
+	float Y = tex2D ( samp0 , vofi_TexCoord0 . xy ). x ;
+	float Cr = tex2D ( samp1 , vofi_TexCoord0 . xy ). x ;
+	float Cb = tex2D ( samp2 , vofi_TexCoord0 . xy ). x ;
+	vec3 p = ( YScalar * Y ) ;
+	p += ( crc * Cr ) + ( crb * Cb ) + adj ;
+	vec4 binkImage ;
+	binkImage. xyz = p ;
+	binkImage. w = 1.0 ;
+	vec4 color = ( binkImage * gl_Color ) + vofi_TexCoord1 ;
+	gl_FragColor . xyz = color. xyz * color. w ;
+	gl_FragColor . w = color. w ;
+}
+----------------
+
+renderprogs\stereoInterlace.vertex
+----------------
+#version 150
+#define PC
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+
+
+uniform vec4 _va_[4];
+
+float dot4 (vec4 a , vec4 b ) {return dot ( a , b ) ; }
+float dot4 (vec2 a , vec4 b ) {return dot ( vec4 ( a , 0 , 1 ) , b ) ; }
+
+in vec4 in_Position;
+in vec2 in_TexCoord;
+
+out vec4 gl_Position;
+out vec2 vofi_TexCoord0;
+
+void main() {
+	gl_Position . x = dot4 ( in_Position , _va_[0 /* rpMVPmatrixX */] ) ;
+	gl_Position . y = dot4 ( in_Position , _va_[1 /* rpMVPmatrixY */] ) ;
+	gl_Position . z = dot4 ( in_Position , _va_[2 /* rpMVPmatrixZ */] ) ;
+	gl_Position . w = dot4 ( in_Position , _va_[3 /* rpMVPmatrixW */] ) ;
+	vofi_TexCoord0 = in_TexCoord ;
+}
+----------------
+
+renderprogs\stereoInterlace.pixel
+----------------
+#version 150
+#define PC
+
+void clip( float v ) { if ( v < 0.0 ) { discard; } }
+void clip( vec2 v ) { if ( any( lessThan( v, vec2( 0.0 ) ) ) ) { discard; } }
+void clip( vec3 v ) { if ( any( lessThan( v, vec3( 0.0 ) ) ) ) { discard; } }
+void clip( vec4 v ) { if ( any( lessThan( v, vec4( 0.0 ) ) ) ) { discard; } }
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord ) { return texture( sampler, texcoord.xy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord ) { return vec4( texture( sampler, texcoord.xyz ) ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord, vec2 dx, vec2 dy ) { return textureGrad( sampler, texcoord.xy, dx, dy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord, vec2 dx, vec2 dy ) { return vec4( textureGrad( sampler, texcoord.xyz, dx, dy ) ); }
+
+vec4 texCUBE( samplerCube sampler, vec3 texcoord ) { return texture( sampler, texcoord.xyz ); }
+vec4 texCUBE( samplerCubeShadow sampler, vec4 texcoord ) { return vec4( texture( sampler, texcoord.xyzw ) ); }
+
+vec4 tex1Dproj( sampler1D sampler, vec2 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex2Dproj( sampler2D sampler, vec3 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex3Dproj( sampler3D sampler, vec4 texcoord ) { return textureProj( sampler, texcoord ); }
+
+vec4 tex1Dbias( sampler1D sampler, vec4 texcoord ) { return texture( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dbias( sampler2D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dbias( sampler3D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBEbias( samplerCube sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+
+vec4 tex1Dlod( sampler1D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dlod( sampler3D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBElod( samplerCube sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+
+uniform sampler2D samp0;
+uniform sampler2D samp1;
+
+in vec2 vofi_TexCoord0;
+
+out vec4 gl_FragColor;
+
+void main() {
+	if ( fract ( gl_FragCoord . y * 0.5 ) < 0.5 ) {
+		gl_FragColor = tex2D ( samp0 , vec2 ( vofi_TexCoord0 ) ) ;
+	} else {
+		gl_FragColor = tex2D ( samp1 , vec2 ( vofi_TexCoord0 ) ) ;
+	}
+}
+----------------
+
+renderprogs\motionBlur.vertex
+----------------
+#version 150
+#define PC
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+
+
+
+in vec4 in_Position;
+in vec2 in_TexCoord;
+
+out vec4 gl_Position;
+out vec2 vofi_TexCoord0;
+
+void main() {
+	gl_Position = in_Position ;
+	vofi_TexCoord0 = in_TexCoord ;
+}
+----------------
+
+renderprogs\motionBlur.pixel
+----------------
+#version 150
+#define PC
+
+void clip( float v ) { if ( v < 0.0 ) { discard; } }
+void clip( vec2 v ) { if ( any( lessThan( v, vec2( 0.0 ) ) ) ) { discard; } }
+void clip( vec3 v ) { if ( any( lessThan( v, vec3( 0.0 ) ) ) ) { discard; } }
+void clip( vec4 v ) { if ( any( lessThan( v, vec4( 0.0 ) ) ) ) { discard; } }
+
+float saturate( float v ) { return clamp( v, 0.0, 1.0 ); }
+vec2 saturate( vec2 v ) { return clamp( v, 0.0, 1.0 ); }
+vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
+vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord ) { return texture( sampler, texcoord.xy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord ) { return vec4( texture( sampler, texcoord.xyz ) ); }
+
+vec4 tex2D( sampler2D sampler, vec2 texcoord, vec2 dx, vec2 dy ) { return textureGrad( sampler, texcoord.xy, dx, dy ); }
+vec4 tex2D( sampler2DShadow sampler, vec3 texcoord, vec2 dx, vec2 dy ) { return vec4( textureGrad( sampler, texcoord.xyz, dx, dy ) ); }
+
+vec4 texCUBE( samplerCube sampler, vec3 texcoord ) { return texture( sampler, texcoord.xyz ); }
+vec4 texCUBE( samplerCubeShadow sampler, vec4 texcoord ) { return vec4( texture( sampler, texcoord.xyzw ) ); }
+
+vec4 tex1Dproj( sampler1D sampler, vec2 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex2Dproj( sampler2D sampler, vec3 texcoord ) { return textureProj( sampler, texcoord ); }
+vec4 tex3Dproj( sampler3D sampler, vec4 texcoord ) { return textureProj( sampler, texcoord ); }
+
+vec4 tex1Dbias( sampler1D sampler, vec4 texcoord ) { return texture( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dbias( sampler2D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dbias( sampler3D sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBEbias( samplerCube sampler, vec4 texcoord ) { return texture( sampler, texcoord.xyz, texcoord.w ); }
+
+vec4 tex1Dlod( sampler1D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.x, texcoord.w ); }
+vec4 tex2Dlod( sampler2D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xy, texcoord.w ); }
+vec4 tex3Dlod( sampler3D sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+vec4 texCUBElod( samplerCube sampler, vec4 texcoord ) { return textureLod( sampler, texcoord.xyz, texcoord.w ); }
+
+
+uniform vec4 _fa_[6];
+
+uniform sampler2D samp0;
+uniform sampler2D samp1;
+
+in vec2 vofi_TexCoord0;
+
+out vec4 gl_FragColor;
+
+void main() {
+	if ( tex2D ( samp0 , vofi_TexCoord0 ). w == 0.0 ) {
+		discard ;
+	}
+	float windowZ = tex2D ( samp1 , vofi_TexCoord0 ). x ;
+	vec3 ndc = vec3 ( vofi_TexCoord0 * 2.0 - 1.0 , windowZ * 2.0 - 1.0 ) ;
+	float clipW = - _fa_[4 /* rpProjectionMatrixZ */] . w / ( - _fa_[4 /* rpProjectionMatrixZ */] . z - ndc. z ) ;
+	vec4 clip = vec4 ( ndc * clipW , clipW ) ;
+	vec4 reClip ;
+	reClip. x = dot ( _fa_[0 /* rpMVPmatrixX */] , clip ) ;
+	reClip. y = dot ( _fa_[1 /* rpMVPmatrixY */] , clip ) ;
+	reClip. z = dot ( _fa_[2 /* rpMVPmatrixZ */] , clip ) ;
+	reClip. w = dot ( _fa_[3 /* rpMVPmatrixW */] , clip ) ;
+	vec2 prevTexCoord ;
+	prevTexCoord. x = ( reClip. x / reClip. w ) * 0.5 + 0.5 ;
+	prevTexCoord. y = ( reClip. y / reClip. w ) * 0.5 + 0.5 ;
+	vec2 texCoord = prevTexCoord ;
+	vec2 delta = ( vofi_TexCoord0 - prevTexCoord ) ;
+	vec3 sum = vec3 ( 0.0 ) ;
+	float goodSamples = 0 ;
+	float samples = _fa_[5 /* rpOverbright */] . x ;
+	for ( float i = 0 ; i < samples ; i = i + 1 ) {
+		vec2 pos = vofi_TexCoord0 + delta * ( ( i / ( samples - 1 ) ) - 0.5 ) ;
+		vec4 color = tex2D ( samp0 , pos ) ;
+		sum += color. xyz * color. w ;
+		goodSamples += color. w ;
+	}
+	float invScale = 1.0 / goodSamples ;
+	gl_FragColor = vec4 ( sum * invScale , 1.0 ) ;
+}
+----------------

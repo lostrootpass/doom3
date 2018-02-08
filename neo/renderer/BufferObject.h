@@ -125,6 +125,8 @@ public:
 
 	virtual void				Sync() override;
 
+	VkBuffer GetBuffer() const { return buffer; }
+
 protected:
 	virtual void				ClearWithoutFreeing() override;
 
@@ -133,6 +135,8 @@ protected:
 
 	VkBuffer stagingBuffer;
 	VkBuffer buffer;
+
+	VkFlags bufferCreateFlags = 0;
 
 	DISALLOW_COPY_AND_ASSIGN( idBufferObjectVk );
 };
@@ -144,7 +148,11 @@ idVertexBufferVk
 */
 class idVertexBufferVk : public idBufferObjectVk
 {
-
+public:
+	idVertexBufferVk() : idBufferObjectVk() 
+	{
+		bufferCreateFlags = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+	}
 };
 
 /*
@@ -154,7 +162,11 @@ idIndexBufferVk
 */
 class idIndexBufferVk : public idBufferObjectVk
 {
-
+public:
+	idIndexBufferVk() : idBufferObjectVk()
+	{
+		bufferCreateFlags = VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+	}
 };
 
 /*
@@ -164,6 +176,12 @@ idJointBufferVk
 */
 class idJointBufferVk : public idBufferObjectVk
 {
+public:
+	idJointBufferVk() : idBufferObjectVk()
+	{
+		bufferCreateFlags = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
+	}
+
 private:
 	int numJoints;
 };

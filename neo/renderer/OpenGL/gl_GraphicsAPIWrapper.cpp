@@ -195,7 +195,7 @@ void GL_Color( float r, float g, float b, float a ) {
 	parm[1] = idMath::ClampFloat( 0.0f, 1.0f, g );
 	parm[2] = idMath::ClampFloat( 0.0f, 1.0f, b );
 	parm[3] = idMath::ClampFloat( 0.0f, 1.0f, a );
-	renderProgManager.SetRenderParm( RENDERPARM_COLOR, parm );
+	renderProgManager->SetRenderParm( RENDERPARM_COLOR, parm );
 }
 
 /*

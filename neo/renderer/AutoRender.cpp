@@ -79,7 +79,7 @@ void idAutoRender::StartBackgroundAutoSwaps( autoRenderIconType_t iconType ) {
 
 	// unbind any shaders prior to entering the background autoswaps so we don't run 
 	// into any problems with cached vertex shader indices from the main thread
-	renderProgManager.Unbind();
+	renderProgManager->Unbind();
 
 	// unbind all texture units so we don't run into a race condition where the device is owned
 	// by the autorender thread but an image is trying to be unset from the main thread because
@@ -169,17 +169,17 @@ void idAutoRender::RenderBackground() {
 	// Set Parms
 	float texS[4] = { 1.0f, 0.0f, 0.0f, 0.0f };
 	float texT[4] = { 0.0f, 1.0f, 0.0f, 0.0f };
-	renderProgManager.SetRenderParm( RENDERPARM_TEXTUREMATRIX_S, texS );
-	renderProgManager.SetRenderParm( RENDERPARM_TEXTUREMATRIX_T, texT );
+	renderProgManager->SetRenderParm( RENDERPARM_TEXTUREMATRIX_S, texS );
+	renderProgManager->SetRenderParm( RENDERPARM_TEXTUREMATRIX_T, texT );
 
 	// disable texgen
 	float texGenEnabled[4] = { 0, 0, 0, 0 };
-	renderProgManager.SetRenderParm( RENDERPARM_TEXGEN_0_ENABLED, texGenEnabled );
+	renderProgManager->SetRenderParm( RENDERPARM_TEXGEN_0_ENABLED, texGenEnabled );
 
 	// set matrix
-	renderProgManager.SetRenderParms( RENDERPARM_MVPMATRIX_X, mvpMatrix, 4 );
+	renderProgManager->SetRenderParms( RENDERPARM_MVPMATRIX_X, mvpMatrix, 4 );
 
-	renderProgManager.BindShader_TextureVertexColor();
+	renderProgManager->BindShader_TextureVertexColor();
 
 	RB_DrawElementsWithCounters( &backEnd.unitSquareSurface );
 }
@@ -240,7 +240,7 @@ void idAutoRender::RenderLoadingIcon( float fracX, float fracY, float size, floa
 
 	float projMatrixTranspose[16];
 	R_MatrixTranspose( finalOrtho, projMatrixTranspose );
-	renderProgManager.SetRenderParms( RENDERPARM_MVPMATRIX_X, projMatrixTranspose, 4 );
+	renderProgManager->SetRenderParms( RENDERPARM_MVPMATRIX_X, projMatrixTranspose, 4 );
 
 	float a = 1.0f;
 	if ( autoRenderIcon == AUTORENDER_HELLICON ) {
@@ -262,8 +262,8 @@ void idAutoRender::RenderLoadingIcon( float fracX, float fracY, float size, floa
 	// Set Parms
 	float texS[4] = { 1.0f, 0.0f, 0.0f, 0.0f };
 	float texT[4] = { 0.0f, 1.0f, 0.0f, 0.0f };
-	renderProgManager.SetRenderParm( RENDERPARM_TEXTUREMATRIX_S, texS );
-	renderProgManager.SetRenderParm( RENDERPARM_TEXTUREMATRIX_T, texT );
+	renderProgManager->SetRenderParm( RENDERPARM_TEXTUREMATRIX_S, texS );
+	renderProgManager->SetRenderParm( RENDERPARM_TEXTUREMATRIX_T, texT );
 
 	if ( autoRenderIcon == AUTORENDER_HELLICON ) {
 		GL_Color( 1.0f, 1.0f, 1.0f, a );
@@ -271,9 +271,9 @@ void idAutoRender::RenderLoadingIcon( float fracX, float fracY, float size, floa
 
 	// disable texgen
 	float texGenEnabled[4] = { 0, 0, 0, 0 };
-	renderProgManager.SetRenderParm( RENDERPARM_TEXGEN_0_ENABLED, texGenEnabled );
+	renderProgManager->SetRenderParm( RENDERPARM_TEXGEN_0_ENABLED, texGenEnabled );
 
-	renderProgManager.BindShader_TextureVertexColor();
+	renderProgManager->BindShader_TextureVertexColor();
 
 	RB_DrawElementsWithCounters( &backEnd.unitSquareSurface );
 }

@@ -903,12 +903,72 @@ idStr ConvertCG2GLSL( const idStr & in, const char * name, bool isVertexProgram,
 	return out;
 }
 
+
+
+/**********************************************
+				OpenGL
+**********************************************/
+
 /*
 ================================================================================================
-idRenderProgManager::LoadGLSLShader
+idRenderProgManagerGL::idRenderProgManagerGL
 ================================================================================================
 */
-GLuint idRenderProgManager::LoadGLSLShader( GLenum target, const char * name, idList<int> & uniforms ) {
+idRenderProgManagerGL::idRenderProgManagerGL() : idRenderProgManager() {
+
+}
+
+/*
+================================================================================================
+idRenderProgManagerGL::~idRenderProgManagerGL
+================================================================================================
+*/
+idRenderProgManagerGL::~idRenderProgManagerGL() {
+
+}
+
+/*
+================================================================================================
+idRenderProgManagerGL::KillAllShaders()
+================================================================================================
+*/
+void idRenderProgManagerGL::KillAllShaders() {
+	Unbind();
+	for ( int i = 0; i < vertexShaders.Num(); i++ ) {
+		if ( vertexShaders[i].progId != INVALID_PROGID ) {
+			qglDeleteShader( vertexShaders[i].progId );
+			vertexShaders[i].progId = INVALID_PROGID;
+		}
+	}
+	for ( int i = 0; i < fragmentShaders.Num(); i++ ) {
+		if ( fragmentShaders[i].progId != INVALID_PROGID ) {
+			qglDeleteShader( fragmentShaders[i].progId );
+			fragmentShaders[i].progId = INVALID_PROGID;
+		}
+	}
+	for ( int i = 0; i < glslPrograms.Num(); ++i ) {
+		if ( glslPrograms[i].progId != INVALID_PROGID ) {
+			qglDeleteProgram( glslPrograms[i].progId );
+			glslPrograms[i].progId = INVALID_PROGID;
+		}
+	}
+}
+
+/*
+================================================================================================
+idRenderProgManagerVk::KillAllShaders()
+================================================================================================
+*/
+void idRenderProgManagerVk::KillAllShaders() {
+	Unbind();
+}
+
+/*
+================================================================================================
+idRenderProgManagerGL::LoadGLSLShader
+================================================================================================
+*/
+GLuint idRenderProgManagerGL::LoadGLSLShader( GLenum target, const char * name, idList<int> & uniforms ) {
 
 	idStr inFile;
 	idStr outFileHLSL;
@@ -995,13 +1055,13 @@ GLuint idRenderProgManager::LoadGLSLShader( GLenum target, const char * name, id
 		while ( src.ReadToken( &token ) ) {
 			int index = -1;
 			for ( int i = 0; i < RENDERPARM_TOTAL && index == -1; i++ ) {
-				const char * parmName = GetGLSLParmName( i );
+				const char * parmName = GetParmName( i );
 				if ( token == parmName ) {
 					index = i;
 				}
 			}
 			for ( int i = 0; i < MAX_GLSL_USER_PARMS && index == -1; i++ ) {
-				const char * parmName = GetGLSLParmName( RENDERPARM_USER + i );
+				const char * parmName = GetParmName( RENDERPARM_USER + i );
 				if ( token == parmName ) {
 					index = RENDERPARM_USER + i;
 				}
@@ -1065,16 +1125,17 @@ GLuint idRenderProgManager::LoadGLSLShader( GLenum target, const char * name, id
 
 	return shader;
 }
+
 /*
 ================================================================================================
-idRenderProgManager::FindGLSLProgram
+idRenderProgManagerGL::FindProgram
 ================================================================================================
 */
-int	 idRenderProgManager::FindGLSLProgram( const char * name, int vIndex, int fIndex ) {
+int	 idRenderProgManagerGL::FindProgram( const char * name, int vIndex, int fIndex ) {
 
 	for ( int i = 0; i < glslPrograms.Num(); ++i ) {
 		if ( ( glslPrograms[i].vertexShaderIndex == vIndex ) && ( glslPrograms[i].fragmentShaderIndex == fIndex ) ) {
-			LoadGLSLProgram( i, vIndex, fIndex );
+			LoadProgram( i, vIndex, fIndex );
 			return i;
 		}
 	}
@@ -1082,16 +1143,16 @@ int	 idRenderProgManager::FindGLSLProgram( const char * name, int vIndex, int fI
 	glslProgram_t program;
 	program.name = name;
 	int index = glslPrograms.Append( program );
-	LoadGLSLProgram( index, vIndex, fIndex );
+	LoadProgram( index, vIndex, fIndex );
 	return index;
 }
 
 /*
 ================================================================================================
-idRenderProgManager::GetGLSLParmName
+idRenderProgManagerGL::GetParmName
 ================================================================================================
 */
-const char* idRenderProgManager::GetGLSLParmName( int rp ) const {
+const char* idRenderProgManagerGL::GetParmName( int rp ) const {
 	if ( rp >= RENDERPARM_USER ) {
 		int userParmIndex = rp - RENDERPARM_USER;
 		return va("rpUser%d", userParmIndex );
@@ -1102,10 +1163,10 @@ const char* idRenderProgManager::GetGLSLParmName( int rp ) const {
 
 /*
 ================================================================================================
-idRenderProgManager::SetUniformValue
+idRenderProgManagerGL::SetUniformValue
 ================================================================================================
 */
-void idRenderProgManager::SetUniformValue( const renderParm_t rp, const float * value ) {
+void idRenderProgManagerGL::SetUniformValue( const renderParm_t rp, const float * value ) {
 	for ( int i = 0; i < 4; i++ ) {
 		glslUniforms[rp][i] = value[i];
 	}
@@ -1113,11 +1174,11 @@ void idRenderProgManager::SetUniformValue( const renderParm_t rp, const float * 
 
 /*
 ================================================================================================
-idRenderProgManager::CommitUnforms
+idRenderProgManagerGL::CommitUnforms
 ================================================================================================
 */
-void idRenderProgManager::CommitUniforms() {
-	const int progID = GetGLSLCurrentProgram();
+void idRenderProgManagerGL::CommitUniforms() {
+	const int progID = GetCurrentProgram();
 	const glslProgram_t & prog = glslPrograms[progID];
 
 	if ( r_useUniformArrays.GetBool() ) {
@@ -1157,10 +1218,10 @@ public:
 
 /*
 ================================================================================================
-idRenderProgManager::LoadGLSLProgram
+idRenderProgManagerGL::LoadProgram
 ================================================================================================
 */
-void idRenderProgManager::LoadGLSLProgram( const int programIndex, const int vertexShaderIndex, const int fragmentShaderIndex ) {
+void idRenderProgManagerGL::LoadProgram( const int programIndex, const int vertexShaderIndex, const int fragmentShaderIndex ) {
 	glslProgram_t & prog = glslPrograms[programIndex];
 
 	if ( prog.progId != INVALID_PROGID ) {
@@ -1233,7 +1294,7 @@ void idRenderProgManager::LoadGLSLProgram( const int programIndex, const int ver
 		// store the uniform locations after we have linked the GLSL program
 		prog.uniformLocations.Clear();
 		for ( int i = 0; i < RENDERPARM_TOTAL; i++ ) {
-			const char * parmName = GetGLSLParmName( i );
+			const char * parmName = GetParmName( i );
 			GLint loc = qglGetUniformLocation( program, parmName );
 			if ( loc != -1 ) {
 				glslUniformLocation_t uniformLocation;
@@ -1245,7 +1306,7 @@ void idRenderProgManager::LoadGLSLProgram( const int programIndex, const int ver
 
 		// store the USER uniform locations
 		for ( int i = 0; i < MAX_GLSL_USER_PARMS; i++ ) {
-			const char * parmName = GetGLSLParmName( RENDERPARM_USER + i );
+			const char * parmName = GetParmName( RENDERPARM_USER + i );
 			GLint loc = qglGetUniformLocation( program, parmName );
 			if ( loc != -1 ) {
 				glslUniformLocation_t uniformLocation;
@@ -1284,10 +1345,581 @@ void idRenderProgManager::LoadGLSLProgram( const int programIndex, const int ver
 
 /*
 ================================================================================================
-idRenderProgManager::ZeroUniforms
+idRenderProgManagerGL::ZeroUniforms
 ================================================================================================
 */
-void idRenderProgManager::ZeroUniforms() {
+void idRenderProgManagerGL::ZeroUniforms() {
 	memset( glslUniforms.Ptr(), 0, glslUniforms.Allocated() );
 }
 
+/*
+================================================================================================
+idRenderProgManagerGL::LoadVertexShader
+================================================================================================
+*/
+void idRenderProgManagerGL::LoadVertexShader( int index ) {
+	if ( vertexShaders[index].progId != INVALID_PROGID ) {
+		return; // Already loaded
+	}
+	vertexShaders[index].progId = ( GLuint ) LoadGLSLShader( GL_VERTEX_SHADER, vertexShaders[index].name, vertexShaders[index].uniforms );
+}
+
+/*
+================================================================================================
+idRenderProgManagerGL::LoadFragmentShader
+================================================================================================
+*/
+void idRenderProgManagerGL::LoadFragmentShader( int index ) {
+	if ( fragmentShaders[index].progId != INVALID_PROGID ) {
+		return; // Already loaded
+	}
+	fragmentShaders[index].progId = ( GLuint ) LoadGLSLShader( GL_FRAGMENT_SHADER, fragmentShaders[index].name, fragmentShaders[index].uniforms );
+}
+
+/*
+================================================================================================
+idRenderProgManagerGL::LoadShader
+================================================================================================
+*/
+GLuint idRenderProgManagerGL::LoadShader( GLenum target, const char * name, const char * startToken ) {
+
+	idStr fullPath = "renderprogs\\gl\\";
+	fullPath += name;
+
+	common->Printf( "%s", fullPath.c_str() );
+
+	char * fileBuffer = NULL;
+	fileSystem->ReadFile( fullPath.c_str(), (void **)&fileBuffer, NULL );
+	if ( fileBuffer == NULL ) {
+		common->Printf( ": File not found\n" );
+		return INVALID_PROGID;
+	}
+	if ( !R_IsInitialized() ) {
+		common->Printf( ": Renderer not initialized\n" );
+		fileSystem->FreeFile( fileBuffer );
+		return INVALID_PROGID;
+	}
+
+	// vertex and fragment shaders are both be present in a single file, so
+	// scan for the proper header to be the start point, and stamp a 0 in after the end
+	char * start = strstr( (char *)fileBuffer, startToken );
+	if ( start == NULL ) {
+		common->Printf( ": %s not found\n", startToken );
+		fileSystem->FreeFile( fileBuffer );
+		return INVALID_PROGID;
+	}
+	char * end = strstr( start, "END" );
+	if ( end == NULL ) {
+		common->Printf( ": END not found for %s\n", startToken );
+		fileSystem->FreeFile( fileBuffer );
+		return INVALID_PROGID;
+	}
+	end[3] = 0;
+
+	idStr program = start;
+	program.Replace( "vertex.normal", "vertex.attrib[11]" );
+	program.Replace( "vertex.texcoord[0]", "vertex.attrib[8]" );
+	program.Replace( "vertex.texcoord", "vertex.attrib[8]" );
+
+	GLuint progId;
+	qglGenProgramsARB( 1, &progId );
+
+	qglBindProgramARB( target, progId );
+	qglGetError();
+
+	qglProgramStringARB( target, GL_PROGRAM_FORMAT_ASCII_ARB, program.Length(), program.c_str() );
+	GLenum err = qglGetError();
+
+	GLint ofs = -1;
+	qglGetIntegerv( GL_PROGRAM_ERROR_POSITION_ARB, &ofs );
+	if ( ( err == GL_INVALID_OPERATION ) || ( ofs != -1 ) ) {
+		if ( err == GL_INVALID_OPERATION ) {
+			const GLubyte * str = qglGetString( GL_PROGRAM_ERROR_STRING_ARB );
+			common->Printf( "\nGL_PROGRAM_ERROR_STRING_ARB: %s\n", str );
+		} else {
+			common->Printf( "\nUNKNOWN ERROR\n" );
+		}
+		if ( ofs < 0 ) {
+			common->Printf( "GL_PROGRAM_ERROR_POSITION_ARB < 0\n" );
+		} else if ( ofs >= program.Length() ) {
+			common->Printf( "error at end of shader\n" );
+		} else {
+			common->Printf( "error at %i:\n%s", ofs, program.c_str() + ofs );
+		}
+		qglDeleteProgramsARB( 1, &progId );
+		fileSystem->FreeFile( fileBuffer );
+		return INVALID_PROGID;
+	}
+	common->Printf( "\n" );
+	fileSystem->FreeFile( fileBuffer );
+	return progId;
+}
+
+/*
+================================================================================================
+idRenderProgManagerGL::BindShader
+================================================================================================
+*/
+void idRenderProgManagerGL::BindShader( int vIndex, int fIndex ) {
+	if ( currentVertexShader == vIndex && currentFragmentShader == fIndex ) {
+		return;
+	}
+	currentVertexShader = vIndex;
+	currentFragmentShader = fIndex;
+	// vIndex denotes the GLSL program
+	if ( vIndex >= 0 && vIndex < glslPrograms.Num() ) {
+		currentRenderProgram = vIndex;
+		RENDERLOG_PRINTF( "Binding GLSL Program %s\n", glslPrograms[vIndex].name.c_str() );
+		qglUseProgram( glslPrograms[vIndex].progId );
+	}
+}
+
+/*
+================================================================================================
+idRenderProgManagerGL::Unbind
+================================================================================================
+*/
+void idRenderProgManagerGL::Unbind() {
+	currentVertexShader = -1;
+	currentFragmentShader = -1;
+
+	qglUseProgram( 0 );
+}
+
+
+/**********************************************
+				Vulkan
+**********************************************/
+
+VkDeviceMemory uniformStagingMemory;
+VkDeviceMemory uniformMemory;
+
+VkBuffer uniformStagingBuffer;
+VkBuffer uniformBuffer;
+
+
+/*
+================================================================================================
+idRenderProgManagerVk::idRenderProgManagerVk
+================================================================================================
+*/
+idRenderProgManagerVk::idRenderProgManagerVk() : idRenderProgManager() {
+
+}
+
+/*
+================================================================================================
+idRenderProgManagerVk::~idRenderProgManagerVk
+================================================================================================
+*/
+idRenderProgManagerVk::~idRenderProgManagerVk() {
+
+}
+
+void idRenderProgManagerVk::BindShader(int vIndex, int fIndex) {
+	if ( currentVertexShader == vIndex && currentFragmentShader == fIndex ) {
+		//return;
+	}
+	currentVertexShader = vIndex;
+	currentFragmentShader = fIndex;
+	// vIndex denotes the GLSL program
+	if ( vIndex >= 0 && vIndex < glslPrograms.Num() ) {
+		currentRenderProgram = vIndex;
+		RENDERLOG_PRINTF( "Binding GLSL Program %s\n", glslPrograms[vIndex].name.c_str() );
+		Vk_UsePipeline(glslPrograms[vIndex].progId);
+	}
+}
+
+void idRenderProgManagerVk::Unbind() {
+	currentVertexShader = -1;
+	currentFragmentShader = -1;
+
+	//
+}
+
+const char* idRenderProgManagerVk::GetParmName(int rp) const {
+	if ( rp >= RENDERPARM_USER ) {
+		int userParmIndex = rp - RENDERPARM_USER;
+		return va("rpUser%d", userParmIndex );
+	}
+	assert( rp < RENDERPARM_TOTAL );
+	return GLSLParmNames[ rp ];
+}
+
+void idRenderProgManagerVk::SetUniformValue(const renderParm_t rp, const float * value) {
+	for ( int i = 0; i < 4; i++ ) {
+		glslUniforms[rp][i] = value[i];
+	}
+}
+
+void idRenderProgManagerVk::CommitUniforms() {
+	const int progID = 4;// GetCurrentProgram();
+	const glslProgram_t & prog = glslPrograms[progID];
+
+	if ( r_useUniformArrays.GetBool() ) {
+		ALIGNTYPE16 idVec4 localVectors[RENDERPARM_USER + MAX_GLSL_USER_PARMS];
+
+		if ( prog.vertexShaderIndex >= 0 ) {
+			const idList<int> & vertexUniforms = vertexShaders[prog.vertexShaderIndex].uniforms;
+			if ( prog.vertexUniformArray != -1 && vertexUniforms.Num() > 0 ) {
+				for ( int i = 0; i < vertexUniforms.Num(); i++ ) {
+					localVectors[i] = glslUniforms[vertexUniforms[i]];
+				}
+				//qglUniform4fv( prog.vertexUniformArray, vertexUniforms.Num(), localVectors->ToFloatPtr() );
+			}
+
+			size_t size = vertexUniforms.Num() * sizeof(idVec4);
+			void* ptr = Vk_MapMemory(uniformStagingMemory, 0, size, 0);
+			memcpy(ptr, localVectors->ToFloatPtr(), size);
+			Vk_UnmapMemory(uniformStagingMemory);
+
+			VkCommandBuffer cmd = Vk_StartOneShotCommandBuffer();
+			
+			VkBufferCopy copy = {};
+			copy.size = size;
+
+			vkCmdCopyBuffer(cmd, uniformStagingBuffer, uniformBuffer, 1, &copy);
+			Vk_SubmitOneShotCommandBuffer(cmd);	
+
+			VkDescriptorBufferInfo bufferInfo = {};
+			bufferInfo.buffer = uniformBuffer;
+			bufferInfo.offset = 0;
+			bufferInfo.range = size;
+		
+			VkWriteDescriptorSet write = {};
+			write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			write.descriptorCount = 1;
+			write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			write.dstBinding = 0;
+			write.pBufferInfo = &bufferInfo;
+
+			Vk_UpdateDescriptorSet(write);
+		}
+
+		if ( prog.fragmentShaderIndex >= 0 ) {
+			const idList<int> & fragmentUniforms = fragmentShaders[prog.fragmentShaderIndex].uniforms;
+			if ( prog.fragmentUniformArray != -1 && fragmentUniforms.Num() > 0 ) {
+				for ( int i = 0; i < fragmentUniforms.Num(); i++ ) {
+					localVectors[i] = glslUniforms[fragmentUniforms[i]];
+				}
+				//qglUniform4fv( prog.fragmentUniformArray, fragmentUniforms.Num(), localVectors->ToFloatPtr() );
+			}
+
+			size_t size = fragmentUniforms.Num() * sizeof(idVec4);
+			void* ptr = Vk_MapMemory(uniformStagingMemory, 12 * sizeof(idVec4), size, 0);
+			memcpy(ptr, localVectors->ToFloatPtr(), size);
+			Vk_UnmapMemory(uniformStagingMemory);
+
+			VkCommandBuffer cmd = Vk_StartOneShotCommandBuffer();
+			
+			VkBufferCopy copy = {};
+			copy.size = size;
+
+			vkCmdCopyBuffer(cmd, uniformStagingBuffer, uniformBuffer, 1, &copy);
+			Vk_SubmitOneShotCommandBuffer(cmd);	
+
+			VkDescriptorBufferInfo bufferInfo = {};
+			bufferInfo.buffer = uniformBuffer;
+			bufferInfo.offset = 0;
+			bufferInfo.range = size;
+		
+			VkWriteDescriptorSet write = {};
+			write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			write.descriptorCount = 1;
+			write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			write.dstBinding = 1;
+			write.pBufferInfo = &bufferInfo;
+
+			Vk_UpdateDescriptorSet(write);
+		}
+	} else {
+		for ( int i = 0; i < prog.uniformLocations.Num(); i++ ) {
+			const glslUniformLocation_t & uniformLocation = prog.uniformLocations[i];
+			//qglUniform4fv( uniformLocation.uniformIndex, 1, glslUniforms[uniformLocation.parmIndex].ToFloatPtr() );
+		}
+	}
+}
+
+int idRenderProgManagerVk::FindProgram(const char* name, int vIndex, int fIndex) {
+	for ( int i = 0; i < glslPrograms.Num(); ++i ) {
+		if ( ( glslPrograms[i].vertexShaderIndex == vIndex ) && ( glslPrograms[i].fragmentShaderIndex == fIndex ) ) {
+			LoadProgram( i, vIndex, fIndex );
+			return i;
+		}
+	}
+
+	glslProgram_t program;
+	program.name = name;
+	int index = glslPrograms.Append( program );
+	LoadProgram( index, vIndex, fIndex );
+	return index;
+}
+
+void idRenderProgManagerVk::ZeroUniforms() {
+	memset( glslUniforms.Ptr(), 0, glslUniforms.Allocated() );
+}
+
+void idRenderProgManagerVk::LoadVertexShader(int index) {
+	if ( vertexShaders[index].progId != INVALID_PROGID ) {
+		return; // Already loaded
+	}
+
+	vertexShaders[index].progId = ( GLuint ) LoadGLSLShader( GL_VERTEX_SHADER, vertexShaders[index].name, vertexShaders[index].uniforms );
+}
+
+void idRenderProgManagerVk::LoadFragmentShader(int index) {
+	if ( fragmentShaders[index].progId != INVALID_PROGID ) {
+		return; // Already loaded
+	}
+
+	fragmentShaders[index].progId = ( GLuint ) LoadGLSLShader( GL_FRAGMENT_SHADER, fragmentShaders[index].name, fragmentShaders[index].uniforms );
+}
+
+GLuint idRenderProgManagerVk::LoadShader(GLenum target, const char * name, const char * startToken) {
+	idStr fullPath = "renderprogs\\vk\\";
+	fullPath += name;
+
+	common->Printf("%s", fullPath.c_str());
+
+	char* fileBuffer = nullptr;
+	fileSystem->ReadFile(fullPath.c_str(), (void**)&fileBuffer, NULL);
+	if ( fileBuffer == NULL ) {
+		common->Printf( ": File not found\n" );
+		return INVALID_PROGID;
+	}
+	if ( !R_IsInitialized() ) {
+		common->Printf( ": Renderer not initialized\n" );
+		fileSystem->FreeFile( fileBuffer );
+		return INVALID_PROGID;
+	}
+
+
+
+	return INVALID_PROGID;
+}
+
+bool idRenderProgManagerVk::Compile(GLenum target, const char * name) {
+	return false;
+}
+
+GLuint idRenderProgManagerVk::LoadGLSLShader(GLenum target, const char * name, idList<int> & uniforms) {
+	idStr vkFile, outFileUniforms, programUniforms;
+	outFileUniforms.Format( "renderprogs\\glsl\\%s", name );
+	outFileUniforms.StripFileExtension();
+	vkFile.Format("renderprogs\\vk\\spv\\%s", name);
+	vkFile.StripFileExtension();
+	if (target == GL_FRAGMENT_SHADER) {
+		vkFile += ".frag.spv";
+		outFileUniforms += "_fragment.uniforms";
+	} else {
+		vkFile += ".vert.spv";
+		outFileUniforms += "_vertex.uniforms";
+	}
+	
+	void* fileBuffer = nullptr;
+	int vkLength = fileSystem->ReadFile(vkFile.c_str(), &fileBuffer);
+
+	if (vkLength == -1)
+		return INVALID_PROGID;
+
+	VkShaderModule module = Vk_CreateShaderModule((const char*)fileBuffer, vkLength);
+
+	Mem_Free(fileBuffer);
+
+	if ( r_useUniformArrays.GetBool() ) {
+		// read in the uniform file
+		void * fileBufferUniforms = NULL;
+		int lengthUniforms = fileSystem->ReadFile( outFileUniforms.c_str(), &fileBufferUniforms );
+		if ( lengthUniforms <= 0 ) {
+			idLib::Error( "uniform file %s could not be loaded and may be corrupt", outFileUniforms.c_str() );
+		}
+		
+		programUniforms = ( const char* ) fileBufferUniforms;
+
+		Mem_Free( fileBufferUniforms );
+	}
+
+	// find the uniforms locations in either the vertex or fragment uniform array
+	if ( r_useUniformArrays.GetBool() ) {
+		uniforms.Clear();
+
+		idLexer src( programUniforms, programUniforms.Length(), "uniforms" );
+		idToken token;
+		while ( src.ReadToken( &token ) ) {
+			int index = -1;
+			for ( int i = 0; i < RENDERPARM_TOTAL && index == -1; i++ ) {
+				const char * parmName = GetParmName( i );
+				if ( token == parmName ) {
+					index = i;
+				}
+			}
+			for ( int i = 0; i < MAX_GLSL_USER_PARMS && index == -1; i++ ) {
+				const char * parmName = GetParmName( RENDERPARM_USER + i );
+				if ( token == parmName ) {
+					index = RENDERPARM_USER + i;
+				}
+			}
+			if ( index == -1 ) {
+				//idLib::Error( "couldn't find uniform %s for %s", token.c_str(), outFileGLSL.c_str() );
+			}
+			uniforms.Append( index );
+		}
+	}
+
+	return module;
+}
+
+void idRenderProgManagerVk::LoadProgram(const int programIndex, const int vertexShaderIndex, const int fragmentShaderIndex) {
+	if (vertexShaders[vertexShaderIndex].progId == INVALID_PROGID ||
+		fragmentShaders[fragmentShaderIndex].progId == INVALID_PROGID)
+		return;
+
+	VkPipeline pipeline;
+
+	VkPipelineShaderStageCreateInfo stages[2] = {};
+	stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+	stages[0].pName = "main";
+	stages[0].module = vertexShaders[vertexShaderIndex].progId;
+
+	stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+	stages[1].pName = "main";
+	stages[1].module = fragmentShaders[fragmentShaderIndex].progId;
+
+	VkPipelineColorBlendAttachmentState cba = {};
+	cba.blendEnable = VK_TRUE;
+	cba.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+
+	cba.colorBlendOp = VK_BLEND_OP_ADD;
+	cba.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+	cba.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+
+	VkPipelineColorBlendStateCreateInfo cbs = {};
+	cbs.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+	cbs.attachmentCount = 1;
+	cbs.pAttachments = &cba;
+	cbs.logicOp = VK_LOGIC_OP_COPY;
+
+	VkPipelineInputAssemblyStateCreateInfo ias = {};
+	ias.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+	ias.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+	ias.primitiveRestartEnable = VK_FALSE;
+
+	VkPipelineMultisampleStateCreateInfo mss = {};
+	mss.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+	mss.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+	VkPipelineRasterizationStateCreateInfo rs = {};
+	rs.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+	rs.cullMode = VK_CULL_MODE_NONE;
+	rs.polygonMode = VK_POLYGON_MODE_FILL;
+	rs.lineWidth = 1.0f;
+	rs.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+	rs.depthBiasEnable = VK_TRUE;
+	rs.depthBiasConstantFactor = 0.005f;
+	rs.depthBiasSlopeFactor = 0.8f;
+
+	const int VTX_ATTR_COUNT = 5;
+	const size_t sz[] = {
+		//see: idDrawVert in DrawVert.h
+		sizeof(idVec3), sizeof(halfFloat_t)*2, 4, 4, 4, 4
+	};
+
+	const VkFormat fmt[] = {
+		/*VK_FORMAT_R32G32B32A32_SFLOAT,
+		VK_FORMAT_R32G32_SFLOAT,
+		VK_FORMAT_R32G32B32A32_SFLOAT,
+		VK_FORMAT_R32G32B32A32_SFLOAT,
+		VK_FORMAT_R32G32B32A32_SFLOAT,*/
+		VK_FORMAT_R32G32B32_SFLOAT,
+		VK_FORMAT_R16G16_SFLOAT,
+		VK_FORMAT_R8G8B8A8_SINT,
+		VK_FORMAT_R8G8B8A8_SINT,
+		VK_FORMAT_R8G8B8A8_SINT,
+		VK_FORMAT_R8G8B8A8_SINT,
+	};
+
+	const size_t offsets[] = {
+		DRAWVERT_XYZ_OFFSET,
+		DRAWVERT_ST_OFFSET,
+		DRAWVERT_NORMAL_OFFSET,
+		DRAWVERT_TANGENT_OFFSET,
+		DRAWVERT_COLOR_OFFSET,
+		DRAWVERT_COLOR2_OFFSET
+	};
+
+	VkVertexInputBindingDescription vbs = {};
+	vbs.binding = 0;
+	vbs.stride = ((sz[0] + sz[1] + sz[2] + sz[3] + sz[4])) + 15 & -16;
+	vbs.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+	VkVertexInputAttributeDescription vtxAttrs[VTX_ATTR_COUNT] = {};
+	for (int i = 0; i < VTX_ATTR_COUNT; ++i) {
+		vtxAttrs[i].binding = 0;
+		vtxAttrs[i].location = i;
+		vtxAttrs[i].format = fmt[i];
+		vtxAttrs[i].offset = offsets[i];
+	}
+
+	VkPipelineVertexInputStateCreateInfo vis = {};
+	vis.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+	vis.vertexBindingDescriptionCount = 1;
+	vis.pVertexBindingDescriptions = &vbs;
+	vis.vertexAttributeDescriptionCount = VTX_ATTR_COUNT;
+	vis.pVertexAttributeDescriptions = vtxAttrs;
+
+	//Set dynamically.
+	VkRect2D sc = {};
+	VkViewport vp = {};
+
+	VkPipelineViewportStateCreateInfo vps = {};
+	vps.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+	vps.viewportCount = 1;
+	vps.scissorCount = 1;
+	vps.pViewports = &vp;
+	vps.pScissors = &sc;
+
+	VkPipelineDepthStencilStateCreateInfo dss = {};
+	dss.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+	dss.depthTestEnable = VK_TRUE;
+	dss.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+	dss.depthWriteEnable = VK_TRUE;
+
+	VkDynamicState dynStates[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+	VkPipelineDynamicStateCreateInfo dys = {};
+	dys.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+	dys.dynamicStateCount = 2;
+	dys.pDynamicStates = dynStates;
+
+	VkGraphicsPipelineCreateInfo info = {};
+	info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+	info.stageCount = 2;
+	info.subpass = 0;
+	info.pStages = stages;
+	info.pColorBlendState = &cbs;
+	info.pInputAssemblyState = &ias;
+	info.pMultisampleState = &mss;
+	info.pRasterizationState = &rs;
+	info.pVertexInputState = &vis;
+	info.pViewportState = &vps;
+	info.pDepthStencilState = &dss;
+	info.pDynamicState = &dys;
+
+	//Don't populate the layout or render pass in info before passing it in.
+	pipeline = Vk_CreatePipeline(info);
+
+	glslPrograms[vertexShaderIndex].progId = pipeline;
+	glslPrograms[vertexShaderIndex].vertexShaderIndex = vertexShaderIndex;
+	glslPrograms[vertexShaderIndex].fragmentShaderIndex = fragmentShaderIndex;
+	glslPrograms[vertexShaderIndex].vertexUniformArray = 1; //uniformBuffer;
+	glslPrograms[vertexShaderIndex].fragmentUniformArray = 1;// uniformBuffer;
+}
+
+void idRenderProgManagerVk::Init()
+{
+	idRenderProgManager::Init();
+
+	Vk_CreateUniformBuffer(uniformStagingMemory, uniformStagingBuffer, 
+		uniformMemory, uniformBuffer, 14 * 4 * sizeof(float));
+}

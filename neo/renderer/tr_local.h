@@ -1191,8 +1191,8 @@ void Vk_FlipPresent();
 
 //TODO: move these
 #ifdef DOOM3_VULKAN
-VkBuffer Vk_CreateAndBindBuffer(const VkBufferCreateInfo& info, VkMemoryPropertyFlags flags);
-VkImage Vk_AllocAndCreateImage(const VkImageCreateInfo& info);
+VkBuffer Vk_CreateAndBindBuffer(const VkBufferCreateInfo& info, VkMemoryPropertyFlags flags, VkDeviceMemory& memory);
+VkImage Vk_AllocAndCreateImage(const VkImageCreateInfo& info, VkDeviceMemory& memory);
 VkImageView Vk_CreateImageView(const VkImageViewCreateInfo& info);
 VkCommandBuffer Vk_StartOneShotCommandBuffer();
 void Vk_SubmitOneShotCommandBuffer(VkCommandBuffer cmd);
@@ -1204,6 +1204,14 @@ VkCommandBuffer Vk_ActiveCommandBuffer();
 VkCommandBuffer Vk_StartRenderPass();
 void Vk_EndRenderPass();
 uint32_t Vk_GetMemoryTypeIndex(uint32_t bits, VkMemoryPropertyFlags flags);
+VkPipeline Vk_CreatePipeline(VkGraphicsPipelineCreateInfo& info);
+VkShaderModule Vk_CreateShaderModule(const char* bytes, size_t length);
+void Vk_UsePipeline(VkPipeline p);
+void* Vk_MapMemory(VkDeviceMemory memory, VkDeviceSize offset, VkDeviceSize size, VkFlags flags);
+void Vk_UnmapMemory(VkDeviceMemory memory);
+void Vk_CreateUniformBuffer(VkDeviceMemory& stagingMemory, VkBuffer& stagingBuffer,
+	VkDeviceMemory& memory, VkBuffer& buffer, VkDeviceSize size);
+void Vk_UpdateDescriptorSet(VkWriteDescriptorSet& write);
 #endif
 
 /*
@@ -1467,6 +1475,12 @@ void RB_DrawViewInternal( const viewDef_t * viewDef, const int stereoEye );
 void RB_DrawView( const void *data, const int stereoEye );
 void RB_CopyRender( const void *data );
 void RB_PostProcess( const void *data );
+
+void RB_DrawElementsWithCountersVk( const drawSurf_t *surf );
+void RB_DrawViewInternalVk( const viewDef_t * viewDef, const int stereoEye );
+void RB_DrawViewVk( const void *data, const int stereoEye );
+void RB_CopyRenderVk( const void *data );
+void RB_PostProcessVk( const void *data );
 
 /*
 =============================================================

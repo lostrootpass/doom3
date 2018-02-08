@@ -195,6 +195,9 @@ private:
 
 #ifdef DOOM3_VULKAN
 	VkBuffer stagingBuffer;
+	VkDeviceMemory stagingMemory;
+	VkBuffer deviceBuffer;
+	VkDeviceMemory deviceMemory;
 	VkImage image;
 	VkImageView imageView;
 	VkFormat format;

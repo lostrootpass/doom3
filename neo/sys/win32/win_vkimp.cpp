@@ -16,11 +16,13 @@ VkInstance vkInstance = VK_NULL_HANDLE;
 VkSurfaceKHR vkSurface = VK_NULL_HANDLE;
 VkPhysicalDevice vkPhysicalDevice = VK_NULL_HANDLE;
 VkPhysicalDeviceProperties vkPhysicalDeviceProperties;
+VkPhysicalDeviceFeatures vkPhysicalDeviceFeatures;
 VkDevice vkDevice = VK_NULL_HANDLE;	
 VkCommandPool vkCommandPool = VK_NULL_HANDLE;
 VkSwapchainKHR vkSwapchain = VK_NULL_HANDLE;
 VkRenderPass vkRenderPass = VK_NULL_HANDLE;
 VkPipelineLayout vkPipelineLayout = VK_NULL_HANDLE;
+VkDescriptorSet vkDescriptorSet = VK_NULL_HANDLE;
 
 VkImage depthImage = VK_NULL_HANDLE;
 VkImageView depthView = VK_NULL_HANDLE;
@@ -127,6 +129,10 @@ static void Vk_PickPhysicalDevice()
 			if (vkPhysicalDeviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
 			{
 				physicalDevice = physicalDevices[i];
+				glConfig.maxTextureImageUnits = vkPhysicalDeviceProperties.limits.maxPerStageDescriptorSampledImages;
+
+				vkGetPhysicalDeviceFeatures(physicalDevice, &vkPhysicalDeviceFeatures);
+
 				break;
 			}
 		}
@@ -167,8 +173,6 @@ static void Vk_QueryDeviceQueueFamilies(VkPhysicalDevice device)
 
 static void Vk_InitDevice()
 {
-	VkPhysicalDeviceFeatures features = {};
-
 	VkDeviceQueueCreateInfo queueCreateInfo = {};
 	queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
 
@@ -178,7 +182,7 @@ static void Vk_InitDevice()
 
 	VkDeviceCreateInfo info = {};
 	info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-	info.pEnabledFeatures = &features;
+	info.pEnabledFeatures = &vkPhysicalDeviceFeatures;
 	info.ppEnabledExtensionNames = extensions.data();
 	info.enabledExtensionCount = (uint32_t)extensions.size();
 
@@ -487,7 +491,7 @@ static void Vk_RecordCommandBuffer(VkFramebuffer framebuffer, VkCommandBuffer cm
 	
 	VkClearValue clearValues[] = {
 		{ 0.0f, 0.0f, 0.5f, 1.0f }, //Clear color
-		{ 1.0f, 0.0f } //Depth stencil
+		{ 1.0f, 0 } //Depth stencil
 	};
 
 	VkExtent2D extent = surfaceCaps.currentExtent;
@@ -501,7 +505,7 @@ static void Vk_RecordCommandBuffer(VkFramebuffer framebuffer, VkCommandBuffer cm
 	info.renderArea.extent = extent;
 	info.framebuffer = framebuffer;
 
-	VkViewport viewport = { 0, 0, (float)extent.width, (float)extent.height, 0.0f, 1.0f };
+	VkViewport viewport = { 0, 0, (float)extent.width, (float)extent.height, -1.0f, 1.0f };
 	VkRect2D scissor = { 0, 0, extent.width, extent.height };
 
 	vkCmdSetViewport(cmd, 0, 1, &viewport);
@@ -565,6 +569,55 @@ static void Vk_RecordAllCommandBuffers()
 static void Vk_CreatePipelineLayout()
 {
 	std::vector<VkDescriptorSetLayout> descriptorLayouts;
+	descriptorLayouts.resize(1);
+
+	VkDescriptorSetLayoutBinding bindings[3] = {};
+	bindings[0].binding = 0;
+	bindings[0].descriptorCount = 1;
+	bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+	bindings[1].binding = 1;
+	bindings[1].descriptorCount = 1;
+	bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+	bindings[2].binding = 2;
+	bindings[2].descriptorCount = 1;
+	bindings[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	bindings[2].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+	VkDescriptorSetLayoutCreateInfo layoutInfo = {};
+	layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	layoutInfo.bindingCount = 3;
+	layoutInfo.pBindings = bindings;
+
+	VkCheck(vkCreateDescriptorSetLayout(vkDevice, &layoutInfo, nullptr, &descriptorLayouts[0]));
+
+	VkDescriptorPoolSize sizes[2] = {};
+	sizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	sizes[0].descriptorCount = 2;
+
+	sizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	sizes[1].descriptorCount = 1;
+
+	VkDescriptorPoolCreateInfo poolCreateInfo = {};
+	poolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	poolCreateInfo.pPoolSizes = sizes;
+	poolCreateInfo.poolSizeCount = 2;
+	poolCreateInfo.maxSets = 1;
+
+	VkDescriptorPool descriptorPool;
+
+	VkCheck(vkCreateDescriptorPool(vkDevice, &poolCreateInfo, nullptr, &descriptorPool));
+
+	VkDescriptorSetAllocateInfo allocInfo = {};
+	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	allocInfo.descriptorPool = descriptorPool;
+	allocInfo.descriptorSetCount = 1;
+	allocInfo.pSetLayouts = &descriptorLayouts[0];
+
+	VkCheck(vkAllocateDescriptorSets(vkDevice, &allocInfo, &vkDescriptorSet));
 
 	VkPipelineLayoutCreateInfo layoutCreateInfo = {};
 	layoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -580,7 +633,7 @@ static void Vk_RegisterDebugger()
 	info.sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT;
 	info.pfnCallback = VulkanUtil::debugCallback;
 	info.pUserData = nullptr;
-	info.flags = VK_DEBUG_REPORT_WARNING_BIT_EXT | VK_DEBUG_REPORT_ERROR_BIT_EXT;
+	info.flags = VK_DEBUG_REPORT_WARNING_BIT_EXT | VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_DEBUG_BIT_EXT | VK_DEBUG_REPORT_INFORMATION_BIT_EXT;
 
 	PFN_vkCreateDebugReportCallbackEXT vkCreateDebugReportCallbackEXT = 
 		(PFN_vkCreateDebugReportCallbackEXT)vkGetInstanceProcAddr(vkInstance, "vkCreateDebugReportCallbackEXT");
@@ -674,7 +727,7 @@ static bool Vk_InitDriver(VkImpParams_t params)
 	}
 
 	//
-	// startup the OpenGL subsystem by creating a context and making it current
+	// startup the Vulkan subsystem by creating a context and making it current
 	//
 	common->Printf( "...creating Vk context: " );
 	CreateVulkanContextOnHWND( win32.hWnd, r_debugContext.GetBool() );
@@ -738,7 +791,7 @@ static bool Vk_CreateWindow( VkImpParams_t params ) {
 		 NULL);
 
 	if ( !win32.hWnd ) {
-		common->Printf( "^3GLW_CreateWindow() - Couldn't create window^0\n" );
+		common->Printf( "^3Vk_CreateWindow() - Couldn't create window^0\n" );
 		return false;
 	}
 
@@ -751,7 +804,7 @@ static bool Vk_CreateWindow( VkImpParams_t params ) {
 	// makeCurrent NULL frees the DC, so get another
 	win32.hDC = GetDC( win32.hWnd );
 	if ( !win32.hDC ) {
-		common->Printf( "^3GLW_CreateWindow() - GetDC()failed^0\n" );
+		common->Printf( "^3Vk_CreateWindow() - GetDC()failed^0\n" );
 		return false;
 	}
 
@@ -786,7 +839,7 @@ bool VkImp_Init(VkImpParams_t params)
 
 	//cmdSystem->AddCommand( "testSwapBuffers", GLimp_TestSwapBuffers, CMD_FL_SYSTEM, "Times swapbuffer options" );
 
-	common->Printf( "Initializing OpenGL subsystem with multisamples:%i stereo:%i fullscreen:%i\n", 
+	common->Printf( "Initializing Vulkan subsystem with multisamples:%i stereo:%i fullscreen:%i\n", 
 		params.multiSamples, params.stereo, params.fullScreen );
 
 	// check our desktop attributes
@@ -944,10 +997,9 @@ void Vk_FlipPresent()
 	VkCheck(vkQueuePresentKHR(vkPresentQueue.vkQueue, &presentInfo));
 }
 
-VkBuffer Vk_CreateAndBindBuffer(const VkBufferCreateInfo& info, VkMemoryPropertyFlags flags)
+VkBuffer Vk_CreateAndBindBuffer(const VkBufferCreateInfo& info, VkMemoryPropertyFlags flags, VkDeviceMemory& memory)
 {
 	VkBuffer buffer;
-	VkDeviceMemory memory;
 
 	VkMemoryRequirements memReq;
 
@@ -965,10 +1017,9 @@ VkBuffer Vk_CreateAndBindBuffer(const VkBufferCreateInfo& info, VkMemoryProperty
 	return buffer;
 }
 
-VkImage Vk_AllocAndCreateImage(const VkImageCreateInfo& info)
+VkImage Vk_AllocAndCreateImage(const VkImageCreateInfo& info, VkDeviceMemory& memory)
 {
 	VkImage image;
-	VkDeviceMemory memory;
 
 	VkCheck(vkCreateImage(vkDevice, &info, nullptr, &image));
 
@@ -1023,8 +1074,9 @@ void Vk_SubmitOneShotCommandBuffer(VkCommandBuffer cmd)
 	submit.commandBufferCount = 1;
 	submit.pCommandBuffers = &cmd;
 
-	VkCheck(vkQueueSubmit(vkGraphicsQueue.vkQueue, 1, &submit, VK_NULL_HANDLE));
-	VkCheck(vkQueueWaitIdle(vkGraphicsQueue.vkQueue));
+	VkResult res;
+	VkCheck(res = vkQueueSubmit(vkGraphicsQueue.vkQueue, 1, &submit, VK_NULL_HANDLE));
+	VkCheck(res = vkQueueWaitIdle(vkGraphicsQueue.vkQueue));
 
 	vkFreeCommandBuffers(vkDevice, vkCommandPool, 1, &cmd);
 }
@@ -1042,6 +1094,9 @@ void Vk_SetImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout,
 	barrier.image = image;
 	barrier.subresourceRange = range;
 
+	VkPipelineStageFlags srcMask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+	VkPipelineStageFlags dstMask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+
 	switch (oldLayout)
 	{
 	case VK_IMAGE_LAYOUT_PREINITIALIZED:
@@ -1049,6 +1104,7 @@ void Vk_SetImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout,
 		break;
 	case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
 		barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+		srcMask = VK_PIPELINE_STAGE_TRANSFER_BIT;
 		break;
 	}
 
@@ -1056,13 +1112,15 @@ void Vk_SetImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout,
 	{
 	case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
 		barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+		dstMask = VK_PIPELINE_STAGE_TRANSFER_BIT;
 		break;
 	case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
 		barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+		dstMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
 		break;
 	}
 
-	vkCmdPipelineBarrier(buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);	
+	vkCmdPipelineBarrier(buffer, srcMask, dstMask, 0, 0, nullptr, 0, nullptr, 1, &barrier);	
 
 	Vk_SubmitOneShotCommandBuffer(buffer);
 }
@@ -1076,6 +1134,69 @@ void Vk_DestroyImageAndView(VkImage image, VkImageView imageView)
 void Vk_DestroyBuffer(VkBuffer buffer)
 {
 	vkDestroyBuffer(vkDevice, buffer, nullptr);
+}
+
+VkPipeline Vk_CreatePipeline(VkGraphicsPipelineCreateInfo& info)
+{
+	info.layout = vkPipelineLayout;
+	info.renderPass = vkRenderPass;
+
+	VkPipeline pipeline;
+	VkCheck(vkCreateGraphicsPipelines(vkDevice, VK_NULL_HANDLE, 1, &info, nullptr, &pipeline));
+
+	return pipeline;
+}
+
+VkShaderModule Vk_CreateShaderModule(const char* bytes, size_t length)
+{
+	VkShaderModule m;
+
+	VkShaderModuleCreateInfo info = {};
+	info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+	info.codeSize = length;
+	info.pCode = (uint32_t*)bytes;
+
+	VkCheck(vkCreateShaderModule(vkDevice, &info, nullptr, &m));
+
+	return m;
+}
+
+void Vk_UsePipeline(VkPipeline p)
+{
+	vkCmdBindPipeline(commandBuffers[activeCommandBufferIdx], VK_PIPELINE_BIND_POINT_GRAPHICS, p);
+}
+
+void* Vk_MapMemory(VkDeviceMemory memory, VkDeviceSize offset, VkDeviceSize size, VkFlags flags)
+{
+	void* ptr;
+	vkMapMemory(vkDevice, memory, offset, size, flags, &ptr);
+	return ptr;
+}
+
+void Vk_UnmapMemory(VkDeviceMemory m)
+{
+	vkUnmapMemory(vkDevice, m);
+}
+
+void Vk_CreateUniformBuffer(VkDeviceMemory& stagingMemory, VkBuffer& stagingBuffer,
+	VkDeviceMemory& memory, VkBuffer& buffer, VkDeviceSize size)
+{
+	VkBufferCreateInfo info = {};
+	info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+	info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	info.size = size;
+
+	stagingBuffer = Vk_CreateAndBindBuffer(info, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingMemory);
+
+	info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+	buffer = Vk_CreateAndBindBuffer(info, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, memory);
+}
+
+void Vk_UpdateDescriptorSet(VkWriteDescriptorSet& write)
+{
+	write.dstSet = vkDescriptorSet;
+	vkUpdateDescriptorSets(vkDevice, 1, &write, 0, 0);
 }
 
 #endif

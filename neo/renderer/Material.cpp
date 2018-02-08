@@ -1541,20 +1541,20 @@ void idMaterial::ParseStage( idLexer &src, const textureRepeat_t trpDefault ) {
 		}
 		if ( !token.Icmp( "program" ) ) {
 			if ( src.ReadTokenOnLine( &token ) ) {
-				newStage.vertexProgram = renderProgManager.FindVertexShader( token.c_str() );
-				newStage.fragmentProgram = renderProgManager.FindFragmentShader( token.c_str() );
+				newStage.vertexProgram = renderProgManager->FindVertexShader( token.c_str() );
+				newStage.fragmentProgram = renderProgManager->FindFragmentShader( token.c_str() );
 			}
 			continue;
 		}
 		if ( !token.Icmp( "fragmentProgram" ) ) {
 			if ( src.ReadTokenOnLine( &token ) ) {
-				newStage.fragmentProgram = renderProgManager.FindFragmentShader( token.c_str() );
+				newStage.fragmentProgram = renderProgManager->FindFragmentShader( token.c_str() );
 			}
 			continue;
 		}
 		if ( !token.Icmp( "vertexProgram" ) ) {
 			if ( src.ReadTokenOnLine( &token ) ) {
-				newStage.vertexProgram = renderProgManager.FindVertexShader( token.c_str() );
+				newStage.vertexProgram = renderProgManager->FindVertexShader( token.c_str() );
 			}
 			continue;
 		}
@@ -1583,7 +1583,7 @@ void idMaterial::ParseStage( idLexer &src, const textureRepeat_t trpDefault ) {
 
 	// if we are using newStage, allocate a copy of it
 	if ( newStage.fragmentProgram || newStage.vertexProgram ) {
-		newStage.glslProgram = renderProgManager.FindGLSLProgram( GetName(), newStage.vertexProgram, newStage.fragmentProgram );
+		newStage.glslProgram = renderProgManager->FindProgram( GetName(), newStage.vertexProgram, newStage.fragmentProgram );
 		ss->newStage = (newShaderStage_t *)Mem_Alloc( sizeof( newStage ), TAG_MATERIAL );
 		*(ss->newStage) = newStage;
 	}

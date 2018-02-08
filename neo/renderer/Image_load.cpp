@@ -192,6 +192,8 @@ void idImage::GenerateImage( const byte *pic, int width, int height, textureFilt
 		const byte * data = im.GetImageData( i );
 		SubImageUpload( img.level, 0, 0, img.destZ, img.width, img.height, data );
 	}
+
+	FinaliseImageUpload();
 }
 
 /*

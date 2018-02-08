@@ -135,16 +135,16 @@ public:
 	idRenderProgManager();
 	virtual ~idRenderProgManager();
 
-	void	Init();
-	void	Shutdown();
+	virtual void	Init();
+	virtual void	Shutdown();
 
-	void	SetRenderParm( renderParm_t rp, const float * value );
-	void	SetRenderParms( renderParm_t rp, const float * values, int numValues );
+	virtual void	SetRenderParm( renderParm_t rp, const float * value );
+	virtual void	SetRenderParms( renderParm_t rp, const float * values, int numValues );
 
-	int		FindVertexShader( const char * name );
-	int		FindFragmentShader( const char * name );
+	virtual int		FindVertexShader( const char * name );
+	virtual int		FindFragmentShader( const char * name );
 
-	void	BindShader( int vIndex, int fIndex );
+	virtual void	BindShader( int vIndex, int fIndex )=0;
 
 	void	BindShader_GUI( ) { BindShader_Builtin( BUILTIN_GUI ); }
 	void	BindShader_Color( ) { BindShader_Builtin( BUILTIN_COLOR ); }
@@ -189,23 +189,23 @@ public:
 	bool	ShaderHasOptionalSkinning() const { return vertexShaders[currentVertexShader].optionalSkinning; }
 
 	// unbind the currently bound render program
-	void	Unbind();
+	virtual void	Unbind()=0;
 
 	// this should only be called via the reload shader console command
-	void	LoadAllShaders();
-	void	KillAllShaders();
+	virtual void	LoadAllShaders();
+	virtual void	KillAllShaders()=0;
 
 	static const int	MAX_GLSL_USER_PARMS = 8;
-	const char*	GetGLSLParmName( int rp ) const;
-	int			GetGLSLCurrentProgram() const { return currentRenderProgram; }
-	void		SetUniformValue( const renderParm_t rp, const float * value );
-	void		CommitUniforms();
-	int			FindGLSLProgram( const char* name, int vIndex, int fIndex );
-	void		ZeroUniforms();
+	virtual const char*	GetParmName( int rp ) const=0;
+	int			GetCurrentProgram() const { return currentRenderProgram; }
+	virtual void		SetUniformValue( const renderParm_t rp, const float * value )=0;
+	virtual void		CommitUniforms()=0;
+	virtual int			FindProgram( const char* name, int vIndex, int fIndex )=0;
+	virtual void		ZeroUniforms()=0;
 
 protected:
-	void	LoadVertexShader( int index );
-	void	LoadFragmentShader( int index );
+	virtual void	LoadVertexShader( int index )=0;
+	virtual void	LoadFragmentShader( int index )=0;
 
 	enum {
 		BUILTIN_GUI,
@@ -250,10 +250,10 @@ protected:
 	int builtinShaders[MAX_BUILTINS];
 	void BindShader_Builtin( int i ) { BindShader( builtinShaders[i], builtinShaders[i] ); }
 
-	GLuint	LoadShader( GLenum target, const char * name, const char * startToken );
-	bool	CompileGLSL( GLenum target, const char * name );
-	GLuint	LoadGLSLShader( GLenum target, const char * name, idList<int> & uniforms );
-	void	LoadGLSLProgram( const int programIndex, const int vertexShaderIndex, const int fragmentShaderIndex );
+	virtual GLuint	LoadShader( GLenum target, const char * name, const char * startToken )=0;
+	virtual bool	Compile( GLenum target, const char * name )=0;
+	virtual GLuint	LoadGLSLShader( GLenum target, const char * name, idList<int> & uniforms )=0;
+	virtual void	LoadProgram( const int programIndex, const int vertexShaderIndex, const int fragmentShaderIndex )=0;
 
 	static const GLuint INVALID_PROGID = 0xFFFFFFFF;
 
@@ -297,6 +297,66 @@ protected:
 	idList<fragmentShader_t, TAG_RENDER> fragmentShaders;
 };
 
-extern idRenderProgManager renderProgManager;
+class idRenderProgManagerGL : public idRenderProgManager
+{
+public:
+	idRenderProgManagerGL();
+	virtual ~idRenderProgManagerGL();
+
+	void	BindShader( int vIndex, int fIndex ) override;
+
+	// unbind the currently bound render program
+	virtual void	Unbind() override;
+
+	virtual void	KillAllShaders() override;
+
+	virtual const char*	GetParmName( int rp ) const override;
+	virtual void		SetUniformValue( const renderParm_t rp, const float * value ) override;
+	virtual void		CommitUniforms() override;
+	virtual int			FindProgram( const char* name, int vIndex, int fIndex ) override;
+	virtual void		ZeroUniforms() override;
+
+protected:
+	virtual void	LoadVertexShader( int index ) override;
+	virtual void	LoadFragmentShader(int index) override;
+
+	virtual GLuint	LoadShader( GLenum target, const char * name, const char * startToken ) override;
+	virtual bool	Compile(GLenum target, const char * name) override { return true; };
+	virtual GLuint	LoadGLSLShader( GLenum target, const char * name, idList<int> & uniforms ) override;
+	virtual void	LoadProgram( const int programIndex, const int vertexShaderIndex, const int fragmentShaderIndex ) override;
+};
+
+class idRenderProgManagerVk : public idRenderProgManager
+{
+public:
+	idRenderProgManagerVk();
+	virtual ~idRenderProgManagerVk();
+
+	void	BindShader( int vIndex, int fIndex ) override;
+
+	// unbind the currently bound render program
+	virtual void	Unbind() override;
+
+	virtual void	KillAllShaders() override;
+
+	virtual const char*	GetParmName( int rp ) const override;
+	virtual void		SetUniformValue( const renderParm_t rp, const float * value ) override;
+	virtual void		CommitUniforms() override;
+	virtual int			FindProgram( const char* name, int vIndex, int fIndex ) override;
+	virtual void		ZeroUniforms() override;
+
+	virtual void Init() override;
+
+protected:
+	virtual void	LoadVertexShader( int index ) override;
+	virtual void	LoadFragmentShader(int index) override;
+
+	virtual GLuint	LoadShader( GLenum target, const char * name, const char * startToken ) override;
+	virtual bool	Compile( GLenum target, const char * name ) override;
+	virtual GLuint	LoadGLSLShader( GLenum target, const char * name, idList<int> & uniforms ) override;
+	virtual void	LoadProgram( const int programIndex, const int vertexShaderIndex, const int fragmentShaderIndex ) override;
+};
+
+extern idRenderProgManager* renderProgManager;
 
 #endif

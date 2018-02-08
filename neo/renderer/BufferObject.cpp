@@ -907,7 +907,7 @@ bool idBufferObjectVk::AllocBufferObject(const void * data, int allocSize){
 	info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 	info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 	info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	info.size = size;
+	info.size = allocSize;
 	
 	VkCheck(vkCreateBuffer(vkDevice, &info, nullptr, &stagingBuffer));
 	vkGetBufferMemoryRequirements(vkDevice, stagingBuffer, &memReq);
@@ -921,7 +921,7 @@ bool idBufferObjectVk::AllocBufferObject(const void * data, int allocSize){
 	VkCheck(vkBindBufferMemory(vkDevice, stagingBuffer, stagingMemory, 0));
 
 	//Now the main buffer
-	info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+	info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | bufferCreateFlags;
 	VkCheck(vkCreateBuffer(vkDevice, &info, nullptr, &buffer));
 	vkGetBufferMemoryRequirements(vkDevice, buffer, &memReq);
 
@@ -998,7 +998,7 @@ void idBufferObjectVk::Update(const void * data, int updateSize) const
 	VkCommandBuffer cmd = Vk_StartOneShotCommandBuffer();
 
 	VkBufferCopy copy = {};
-	copy.size = size;
+	copy.size = GetAllocedSize();
 	copy.dstOffset = copy.srcOffset = GetOffset();
 
 	vkCmdCopyBuffer(cmd, stagingBuffer, buffer, 1, &copy);
@@ -1036,7 +1036,7 @@ void idBufferObjectVk::Sync()
 	VkCommandBuffer cmd = Vk_StartOneShotCommandBuffer();
 
 	VkBufferCopy copy = {};
-	copy.size = size;
+	copy.size = GetAllocedSize();
 	copy.dstOffset = copy.srcOffset = 0;
 
 	vkCmdCopyBuffer(cmd, stagingBuffer, buffer, 1, &copy);

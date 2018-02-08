@@ -51,7 +51,12 @@ struct VulkanUtil
 		const char* msg,
 		void* userData)
 	{
-		printf("Validation layer: %s\r\n", msg);
+		if (flags & VK_DEBUG_REPORT_INFORMATION_BIT_EXT || flags & VK_DEBUG_REPORT_DEBUG_BIT_EXT)
+		{
+			//common->Printf("Validation: info: %s\r\n", msg);
+		}
+		else
+			common->Printf("Validation layer: %s\r\n", msg);
 
 		return VK_FALSE;
 	}

@@ -924,7 +924,8 @@ void R_InitOpenGL() {
 	// recheck all the extensions (FIXME: this might be dangerous)
 	R_CheckPortableExtensions();
 
-	renderProgManager.Init();
+	renderProgManager = new idRenderProgManagerGL();
+	renderProgManager->Init();
 
 	r_initialized = true;
 
@@ -971,8 +972,8 @@ void R_InitVulkan() {
 
 	Sys_InitInput();
 
-	//TODO
-	//renderProgManager.Init();
+	renderProgManager = new idRenderProgManagerVk();
+	renderProgManager->Init();
 
 	r_initialized = true;
 	

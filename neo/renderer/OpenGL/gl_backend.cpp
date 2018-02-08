@@ -245,8 +245,8 @@ void RB_StereoRenderExecuteBackEndCommands( const emptyCommand_t * const allCmds
 		
 		// Set the back end into a known default state to fix any stale render state issues
 		GL_SetDefaultState();
-		renderProgManager.Unbind();
-		renderProgManager.ZeroUniforms();
+		renderProgManager->Unbind();
+		renderProgManager->ZeroUniforms();
 
 		for ( const emptyCommand_t * cmds = allCmds; cmds != NULL; cmds = (const emptyCommand_t *)cmds->next ) {
 			switch ( cmds->commandId ) {
@@ -317,14 +317,14 @@ void RB_StereoRenderExecuteBackEndCommands( const emptyCommand_t * const allCmds
 	// any stale uniform data being present from a previous draw call
 	const float texS[4] = { 1.0f, 0.0f, 0.0f, 0.0f };
 	const float texT[4] = { 0.0f, 1.0f, 0.0f, 0.0f };
-	renderProgManager.SetRenderParm( RENDERPARM_TEXTUREMATRIX_S, texS );
-	renderProgManager.SetRenderParm( RENDERPARM_TEXTUREMATRIX_T, texT );
+	renderProgManager->SetRenderParm( RENDERPARM_TEXTUREMATRIX_S, texS );
+	renderProgManager->SetRenderParm( RENDERPARM_TEXTUREMATRIX_T, texT );
 
 	// disable any texgen
 	const float texGenEnabled[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
-	renderProgManager.SetRenderParm( RENDERPARM_TEXGEN_0_ENABLED, texGenEnabled );
+	renderProgManager->SetRenderParm( RENDERPARM_TEXGEN_0_ENABLED, texGenEnabled );
 
-	renderProgManager.BindShader_Texture();
+	renderProgManager->BindShader_Texture();
 	GL_Color( 1, 1, 1, 1 );
 
 	switch( renderSystem->GetStereo3DMode() ) {
@@ -371,7 +371,7 @@ void RB_StereoRenderExecuteBackEndCommands( const emptyCommand_t * const allCmds
 			// renderSystem->GetWidth() / GetHeight() have returned equal values (640 for initial Rift)
 			// and we are going to warp them onto a symetric square region of each half of the screen
 
-			renderProgManager.BindShader_StereoWarp();
+			renderProgManager->BindShader_StereoWarp();
 
 			// clear the entire screen to black
 			// we could be smart and only clear the areas we aren't going to draw on, but
@@ -394,7 +394,7 @@ void RB_StereoRenderExecuteBackEndCommands( const emptyCommand_t * const allCmds
 
 			idVec4	color( stereoRender_warpCenterX.GetFloat(), stereoRender_warpCenterY.GetFloat(), stereoRender_warpParmZ.GetFloat(), stereoRender_warpParmW.GetFloat() );
 			// don't use GL_Color(), because we don't want to clamp
-			renderProgManager.SetRenderParm( RENDERPARM_COLOR, color.ToFloatPtr() );
+			renderProgManager->SetRenderParm( RENDERPARM_COLOR, color.ToFloatPtr() );
 
 			GL_SelectTexture( 0 );
 			stereoRenderImages[0]->Bind();
@@ -404,7 +404,7 @@ void RB_StereoRenderExecuteBackEndCommands( const emptyCommand_t * const allCmds
 
 			idVec4	color2( stereoRender_warpCenterX.GetFloat(), stereoRender_warpCenterY.GetFloat(), stereoRender_warpParmZ.GetFloat(), stereoRender_warpParmW.GetFloat() );
 			// don't use GL_Color(), because we don't want to clamp
-			renderProgManager.SetRenderParm( RENDERPARM_COLOR, color2.ToFloatPtr() );
+			renderProgManager->SetRenderParm( RENDERPARM_COLOR, color2.ToFloatPtr() );
 
 			glViewport( ( glConfig.nativeScreenWidth >> 1 ),
 				( glConfig.nativeScreenHeight >> 1 ) - ( pixelDimensions >> 1 ), 
@@ -465,7 +465,7 @@ void RB_StereoRenderExecuteBackEndCommands( const emptyCommand_t * const allCmds
 		qglTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
 
 		GL_ViewportAndScissor( 0, 0, renderSystem->GetWidth(), renderSystem->GetHeight()*2 );
-		renderProgManager.BindShader_StereoInterlace();
+		renderProgManager->BindShader_StereoInterlace();
 		RB_DrawElementsWithCounters( &backEnd.unitSquareSurface );
 
 		GL_SelectTexture( 0 );

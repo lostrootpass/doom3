@@ -30,6 +30,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "../idlib/precompiled.h"
 
 #include "tr_local.h"
+#include "framework/Common_local.h"
 
 //idRenderSystemLocal	tr;
 idRenderSystemVk	tr;
@@ -132,6 +133,91 @@ void idRenderSystemLocal::RenderCommandBuffers( const emptyCommand_t * const cmd
 	resolutionScale.InitForMap( NULL );
 }
 void idRenderSystemVk::RenderCommandBuffers(const emptyCommand_t * const cmdHead) {
+	bool	hasView = false;
+	for ( const emptyCommand_t * cmd = cmdHead ; cmd ; cmd = (const emptyCommand_t *)cmd->next ) {
+		if ( cmd->commandId == RC_DRAW_VIEW_3D || cmd->commandId == RC_DRAW_VIEW_GUI ) {
+			hasView = true;
+			break;
+		}
+	}
+
+	if ( !hasView ) {
+		return;
+	}
+
+	if (!r_skipBackEnd.GetBool()) {
+		int c_draw3d = 0;
+		int c_draw2d = 0;
+		int c_setBuffers = 0;
+		int c_copyRenders = 0;
+
+		resolutionScale.SetCurrentGPUFrameTime( commonLocal.GetRendererGPUMicroseconds() );
+
+		renderLog.StartFrame();
+
+		const emptyCommand_t* cmds = cmdHead;
+		if ( cmds->commandId == RC_NOP && !cmds->next ) {
+			return;
+		}
+
+		uint64 backEndStartTime = Sys_Microseconds();
+
+		// needed for editor rendering
+		//GL_SetDefaultState();
+
+		// If we have a stereo pixel format, this will draw to both
+		// the back left and back right buffers, which will have a
+		// performance penalty.
+		//qglDrawBuffer( GL_BACK );
+
+		for ( ; cmds != NULL; cmds = (const emptyCommand_t *)cmds->next ) {
+			switch ( cmds->commandId ) {
+			case RC_NOP:
+				break;
+			case RC_DRAW_VIEW_3D:
+			case RC_DRAW_VIEW_GUI:
+				RB_DrawViewVk( cmds, 0 );
+				if ( ((const drawSurfsCommand_t *)cmds)->viewDef->viewEntitys ) {
+					c_draw3d++;
+				} else {
+					c_draw2d++;
+				}
+				break;
+			case RC_SET_BUFFER:
+				c_setBuffers++;
+				break;
+			case RC_COPY_RENDER:
+				RB_CopyRenderVk( cmds );
+				c_copyRenders++;
+				break;
+			case RC_POST_PROCESS:
+				RB_PostProcessVk( cmds );
+				break;
+			default:
+				common->Error( "RB_ExecuteBackEndCommands: bad commandId" );
+				break;
+			}
+		}
+
+		//RB_DrawFlickerBox();
+
+		// Fix for the steam overlay not showing up while in game without Shell/Debug/Console/Menu also rendering
+		//qglColorMask( 1, 1, 1, 1 );
+
+		//qglFlush();
+
+		// stop rendering on this thread
+		uint64 backEndFinishTime = Sys_Microseconds();
+		backEnd.pc.totalMicroSec = backEndFinishTime - backEndStartTime;
+
+		if ( r_debugRenderToTexture.GetInteger() == 1 ) {
+			common->Printf( "3d: %i, 2d: %i, SetBuf: %i, CpyRenders: %i, CpyFrameBuf: %i\n", c_draw3d, c_draw2d, c_setBuffers, c_copyRenders, backEnd.pc.c_copyFrameBuffer );
+			backEnd.pc.c_copyFrameBuffer = 0;
+		}
+		renderLog.EndFrame();
+	}
+
+	resolutionScale.InitForMap(nullptr);
 }
 
 /*
@@ -360,6 +446,7 @@ void idRenderSystemLocal::DrawStretchPic( float x, float y, float w, float h, fl
 }
 
 void idRenderSystemVk::DrawStretchPic( float x, float y, float w, float h, float s1, float t1, float s2, float t2, const idMaterial *material ) {
+	idRenderSystemLocal::DrawStretchPic( idVec4( x, y, s1, t1 ), idVec4( x+w, y, s2, t1 ), idVec4( x+w, y+h, s2, t2 ), idVec4( x, y+h, s1, t2 ), material );
 	}
 
 /*
@@ -415,7 +502,51 @@ void idRenderSystemLocal::DrawStretchPic( const idVec4 & topLeft, const idVec4 &
 }
 
 void idRenderSystemVk::DrawStretchPic( const idVec4 & topLeft, const idVec4 & topRight, const idVec4 & bottomRight, const idVec4 & bottomLeft, const idMaterial * material ) {
+	if ( !R_IsInitialized() ) {
+		return;
 	}
+	if ( material == NULL ) {
+		return;
+	}
+
+	idDrawVert * verts = guiModel->AllocTris( 4, quadPicIndexes, 6, material, currentGLState, STEREO_DEPTH_TYPE_NONE );
+	if ( verts == NULL ) {
+		return;
+	}
+
+	ALIGNTYPE16 idDrawVert localVerts[4];
+
+	localVerts[0].Clear();
+	localVerts[0].xyz[0] = topLeft.x;
+	localVerts[0].xyz[1] = topLeft.y;
+	localVerts[0].SetTexCoord( topLeft.z, topLeft.w );
+	localVerts[0].SetNativeOrderColor( currentColorNativeBytesOrder );
+	localVerts[0].ClearColor2();
+
+	localVerts[1].Clear();
+	localVerts[1].xyz[0] = topRight.x;
+	localVerts[1].xyz[1] = topRight.y;
+	localVerts[1].SetTexCoord( topRight.z, topRight.w );
+	localVerts[1].SetNativeOrderColor( currentColorNativeBytesOrder );
+	localVerts[1].ClearColor2();
+
+	localVerts[2].Clear();
+	localVerts[2].xyz[0] = bottomRight.x;
+	localVerts[2].xyz[1] = bottomRight.y;
+	localVerts[2].SetTexCoord( bottomRight.z, bottomRight.w );
+	localVerts[2].SetNativeOrderColor( currentColorNativeBytesOrder );
+	localVerts[2].ClearColor2();
+
+	localVerts[3].Clear();
+	localVerts[3].xyz[0] = bottomLeft.x;
+	localVerts[3].xyz[1] = bottomLeft.y;
+	localVerts[3].SetTexCoord( bottomLeft.z, bottomLeft.w );
+	localVerts[3].SetNativeOrderColor( currentColorNativeBytesOrder );
+	localVerts[3].ClearColor2();
+
+
+	WriteDrawVerts16( verts, localVerts, 4 );	
+}
 
 /*
 =============
@@ -745,6 +876,9 @@ void idRenderSystemVk::SwapCommandBuffers_FinishRendering(
 												uint64 * shadowMicroSec,
 												uint64 * gpuMicroSec )  {
 #ifdef DOOM3_VULKAN
+	vertexCache->frameData[vertexCache->listNum].vertexBuffer->Sync();
+	vertexCache->frameData[vertexCache->listNum].indexBuffer->Sync();
+	vertexCache->frameData[vertexCache->listNum].jointBuffer->Sync();
 	Vk_EndRenderPass();
 	Vk_FlipPresent();
 #endif
@@ -837,6 +971,9 @@ const emptyCommand_t * idRenderSystemLocal::SwapCommandBuffers_FinishCommandBuff
 
 const emptyCommand_t * idRenderSystemVk::SwapCommandBuffers_FinishCommandBuffers() {
 #ifdef DOOM3_VULKAN
+	//TODO: update uniform buffer here?
+	renderProgManager->CommitUniforms();
+
 	Vk_StartRenderPass();
 #endif
 	return idRenderSystemLocal::SwapCommandBuffers_FinishCommandBuffers();
