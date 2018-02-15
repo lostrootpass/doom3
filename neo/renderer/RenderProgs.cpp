@@ -146,6 +146,8 @@ void idRenderProgManager::Init() {
 	vertexShaders[builtinShaders[BUILTIN_FOG_SKINNED]].usesJoints = true;
 
 	cmdSystem->AddCommand( "reloadShaders", R_ReloadShaders, CMD_FL_RENDERER, "reloads shaders" );
+
+	currentRenderProgram = INVALID_PROGID;
 }
 
 /*

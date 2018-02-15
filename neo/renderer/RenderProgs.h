@@ -124,7 +124,6 @@ struct glslUniformLocation_t {
 };
 
 
-
 /*
 ================================================================================================
 idRenderProgManager
@@ -326,6 +325,8 @@ protected:
 	virtual void	LoadProgram( const int programIndex, const int vertexShaderIndex, const int fragmentShaderIndex ) override;
 };
 
+#ifdef DOOM3_VULKAN
+#include <vector>
 class idRenderProgManagerVk : public idRenderProgManager
 {
 public:
@@ -347,6 +348,10 @@ public:
 
 	virtual void Init() override;
 
+	VkPipeline GetPipelineForState(uint64 state);
+	size_t		GetCurrentVertUniformOffset() const;
+	size_t		GetCurrentFragUniformOffset() const;
+
 protected:
 	virtual void	LoadVertexShader( int index ) override;
 	virtual void	LoadFragmentShader(int index) override;
@@ -355,7 +360,25 @@ protected:
 	virtual bool	Compile( GLenum target, const char * name ) override;
 	virtual GLuint	LoadGLSLShader( GLenum target, const char * name, idList<int> & uniforms ) override;
 	virtual void	LoadProgram( const int programIndex, const int vertexShaderIndex, const int fragmentShaderIndex ) override;
+
+private:
+	struct CachedPipeline
+	{
+		uint64 stateBits;
+		VkPipeline pipeline;
+		int progId;
+	};
+	std::vector<CachedPipeline> pipelines;
+
+	VkDeviceMemory uniformStagingMemory;
+	VkDeviceMemory uniformMemory;
+
+	VkBuffer uniformStagingBuffer;
+	VkBuffer uniformBuffer;
+
+	int totalUniformCount;
 };
+#endif
 
 extern idRenderProgManager* renderProgManager;
 

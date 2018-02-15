@@ -1157,6 +1157,7 @@
     <ClCompile Include="renderer\Vulkan\vk_image.cpp">
       <Filter>Renderer\Vulkan</Filter>
     </ClCompile>
+    <ClCompile Include="renderer\Vulkan\vk_GraphicsAPIWrapper.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="sys\win32\rc\res\doom.ico">

@@ -263,6 +263,7 @@ void GL_SetDefaultState() {
 	}
 }
 
+#ifndef DOOM3_VULKAN
 /*
 ====================
 GL_State
@@ -474,6 +475,7 @@ void GL_State( uint64 stateBits, bool forceGlState ) {
 
 	backEnd.glState.glStateBits = stateBits;
 }
+#endif
 
 /*
 =================

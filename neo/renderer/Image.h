@@ -201,6 +201,8 @@ private:
 	VkImage image;
 	VkImageView imageView;
 	VkFormat format;
+	VkSampler sampler;
+	VkDescriptorSet descriptorSet;
 #endif
 
 };

@@ -23,6 +23,7 @@ VkSwapchainKHR vkSwapchain = VK_NULL_HANDLE;
 VkRenderPass vkRenderPass = VK_NULL_HANDLE;
 VkPipelineLayout vkPipelineLayout = VK_NULL_HANDLE;
 VkDescriptorSet vkDescriptorSet = VK_NULL_HANDLE;
+VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
 
 VkImage depthImage = VK_NULL_HANDLE;
 VkImageView depthView = VK_NULL_HANDLE;
@@ -55,6 +56,10 @@ VkSemaphore imageAvailableSemaphore;
 VkSemaphore renderingFinishedSemaphore;
 
 uint32_t activeCommandBufferIdx = -1;
+
+std::vector<VkDescriptorSetLayout> descriptorLayouts;
+
+const uint32_t MAX_IMAGE_DESC_SETS = 1024;
 
 static void CreateVulkanContextOnHWND(HWND hwnd, bool isDebug)
 {
@@ -568,46 +573,48 @@ static void Vk_RecordAllCommandBuffers()
 
 static void Vk_CreatePipelineLayout()
 {
-	std::vector<VkDescriptorSetLayout> descriptorLayouts;
-	descriptorLayouts.resize(1);
+	descriptorLayouts.resize(2);
 
 	VkDescriptorSetLayoutBinding bindings[3] = {};
 	bindings[0].binding = 0;
 	bindings[0].descriptorCount = 1;
-	bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
 	bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
 	bindings[1].binding = 1;
 	bindings[1].descriptorCount = 1;
-	bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
 	bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-	bindings[2].binding = 2;
+	bindings[2].binding = 0;
 	bindings[2].descriptorCount = 1;
 	bindings[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	bindings[2].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
 	VkDescriptorSetLayoutCreateInfo layoutInfo = {};
 	layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-	layoutInfo.bindingCount = 3;
+	layoutInfo.bindingCount = 2;
 	layoutInfo.pBindings = bindings;
 
 	VkCheck(vkCreateDescriptorSetLayout(vkDevice, &layoutInfo, nullptr, &descriptorLayouts[0]));
 
+	layoutInfo.bindingCount = 1;
+	layoutInfo.pBindings = &bindings[2];
+	VkCheck(vkCreateDescriptorSetLayout(vkDevice, &layoutInfo, nullptr, &descriptorLayouts[1]));
+
 	VkDescriptorPoolSize sizes[2] = {};
-	sizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	sizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
 	sizes[0].descriptorCount = 2;
 
 	sizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	sizes[1].descriptorCount = 1;
+	sizes[1].descriptorCount = MAX_IMAGE_DESC_SETS;
 
 	VkDescriptorPoolCreateInfo poolCreateInfo = {};
 	poolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	poolCreateInfo.pPoolSizes = sizes;
 	poolCreateInfo.poolSizeCount = 2;
-	poolCreateInfo.maxSets = 1;
+	poolCreateInfo.maxSets = MAX_IMAGE_DESC_SETS;
 
-	VkDescriptorPool descriptorPool;
 
 	VkCheck(vkCreateDescriptorPool(vkDevice, &poolCreateInfo, nullptr, &descriptorPool));
 
@@ -1163,6 +1170,7 @@ VkShaderModule Vk_CreateShaderModule(const char* bytes, size_t length)
 
 void Vk_UsePipeline(VkPipeline p)
 {
+	if (p == VK_NULL_HANDLE) return;
 	vkCmdBindPipeline(commandBuffers[activeCommandBufferIdx], VK_PIPELINE_BIND_POINT_GRAPHICS, p);
 }
 
@@ -1197,6 +1205,36 @@ void Vk_UpdateDescriptorSet(VkWriteDescriptorSet& write)
 {
 	write.dstSet = vkDescriptorSet;
 	vkUpdateDescriptorSets(vkDevice, 1, &write, 0, 0);
+}
+
+VkDevice Vk_GetDevice()
+{
+	return vkDevice;
+}
+
+VkDescriptorSet Vk_AllocDescriptorSetForImage()
+{
+	VkDescriptorSet set;
+
+	VkDescriptorSetAllocateInfo allocInfo = {};
+	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	allocInfo.descriptorPool = descriptorPool;
+	allocInfo.descriptorSetCount = 1;
+	allocInfo.pSetLayouts = &descriptorLayouts[1];
+
+	VkCheck(vkAllocateDescriptorSets(vkDevice, &allocInfo, &set));
+
+	return set;
+}
+
+VkPipelineLayout Vk_GetPipelineLayout()
+{
+	return vkPipelineLayout;
+}
+
+VkDescriptorSet Vk_UniformDescriptorSet()
+{
+	return vkDescriptorSet;
 }
 
 #endif

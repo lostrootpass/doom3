@@ -1212,6 +1212,10 @@ void Vk_UnmapMemory(VkDeviceMemory memory);
 void Vk_CreateUniformBuffer(VkDeviceMemory& stagingMemory, VkBuffer& stagingBuffer,
 	VkDeviceMemory& memory, VkBuffer& buffer, VkDeviceSize size);
 void Vk_UpdateDescriptorSet(VkWriteDescriptorSet& write);
+VkDevice Vk_GetDevice();
+VkDescriptorSet Vk_AllocDescriptorSetForImage();
+VkPipelineLayout Vk_GetPipelineLayout();
+VkDescriptorSet Vk_UniformDescriptorSet();
 #endif
 
 /*

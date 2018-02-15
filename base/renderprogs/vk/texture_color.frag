@@ -39,7 +39,7 @@ layout(set = 0, binding = 1) uniform UBO {
     vec4 _fa_[1];
 };
 
-//layout(set = 0, binding = 2) uniform sampler2D samp0;
+layout(set = 1, binding = 0) uniform sampler2D samp0;
 
 layout(location = 0) in vec4 inFragCoord;
 layout(location = 1) in vec2 vofi_TexCoord0;
@@ -48,8 +48,7 @@ layout(location = 2) in vec4 inColor;
 layout(location = 0) out vec4 outFragColor;
 
 void main() {
-	//vec4 color = tex2D ( samp0 , vofi_TexCoord0 ) * inColor ;
-	//clip ( color. a - _fa_[0 /* rpAlphaTest */] . x ) ;
-	//outFragColor = color ;
-	outFragColor = vec4(1.0);
+	vec4 color = tex2D ( samp0 , vofi_TexCoord0 ) * inColor ;
+	clip ( color. a - _fa_[0 /* rpAlphaTest */] . x ) ;
+	outFragColor = color ;
 }

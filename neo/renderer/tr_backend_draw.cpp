@@ -78,7 +78,21 @@ RB_SetMVP
 ================
 */
 void RB_SetMVP( const idRenderMatrix & mvp ) { 
+#ifdef DOOM3_VULKAN	
+	//GL and Vulkan coordinate systems don't precisely match up
+	//So we need a correction matrix here to invert Y and half Z
+	idRenderMatrix m;
+	m[0][0] = 1.0f; m[0][1] = 0.0f; m[0][2] = 0.0f; m[0][3] = 0.0f;
+	m[1][0] = 0.0f; m[1][1] = -1.0f; m[1][2] = 0.0f; m[1][3] = 0.0f;
+	m[2][0] = 0.0f; m[2][1] = 0.0f; m[2][2] = 0.5f; m[2][3] = 0.5f;
+	m[3][0] = 0.0f; m[3][1] = 0.0f; m[3][2] = 0.0f; m[3][3] = 1.0f;
+	
+	idRenderMatrix corrected;
+	idRenderMatrix::Multiply(m, mvp, corrected);
+	SetVertexParms( RENDERPARM_MVPMATRIX_X, corrected[0], 4 );
+#else
 	SetVertexParms( RENDERPARM_MVPMATRIX_X, mvp[0], 4 );
+#endif
 }
 
 /*
@@ -2207,17 +2221,7 @@ static int RB_DrawShaderPassesVk( const drawSurf_t * const * const drawSurfs, co
 			if ( guiStereoScreenOffset != 0.0f ) {
 				RB_SetMVPWithStereoOffset( space->mvp, currentGuiStereoOffset );
 			} else {
-				//GL and Vulkan coordinate systems don't precisely match up
-				//So we need a correction matrix here to invert Y and half Z
-				idRenderMatrix m;
-				m[0][0] = 1.0f; m[0][1] = 0.0f; m[0][2] = 0.0f; m[0][3] = 0.0f;
-				m[1][0] = 0.0f; m[1][1] = -1.0f; m[1][2] = 0.0f; m[1][3] = 0.0f;
-				m[2][0] = 0.0f; m[2][1] = 0.0f; m[2][2] = 0.5f; m[2][3] = 0.5f;
-				m[3][0] = 0.0f; m[3][1] = 0.0f; m[3][2] = 0.0f; m[3][3] = 1.0f;
-				
-				idRenderMatrix corrected;
-				idRenderMatrix::Multiply(m, space->mvp, corrected);
-				RB_SetMVP(corrected);
+				RB_SetMVP(space->mvp);
 			}
 
 			// set eye position in local space
@@ -2233,7 +2237,7 @@ static int RB_DrawShaderPassesVk( const drawSurf_t * const * const drawSurfs, co
 			// Set ModelView Matrix
 			float modelViewMatrixTranspose[16];
 			R_MatrixTranspose( space->modelViewMatrix, modelViewMatrixTranspose );
-			SetVertexParms( RENDERPARM_MODELVIEWMATRIX_X, modelViewMatrixTranspose, 4 );
+			SetVertexParms( RENDERPARM_MODELVIEWMATRIX_X, modelViewMatrixTranspose, 4 );			
 		}
 
 		// change the scissor if needed
@@ -2326,7 +2330,7 @@ static int RB_DrawShaderPassesVk( const drawSurf_t * const * const drawSurfs, co
 						image->Bind();
 					}
 				}
-
+			
 				// draw it
 				RB_DrawElementsWithCountersVk( surf );
 
@@ -2432,8 +2436,8 @@ static int RB_DrawShaderPassesVk( const drawSurf_t * const * const drawSurfs, co
 			}
 
 			// set the state
-			//GL_State( stageGLState );
-		
+			GL_State( stageGLState );
+
 			RB_PrepareStageTexturing( pStage, surf );
 
 			// draw it
@@ -3221,7 +3225,7 @@ void RB_DrawElementsWithCountersVk( const drawSurf_t *surf ) {
 
 	VkBuffer vkBuf = ((idVertexBufferVk*)vertexBuffer)->GetBuffer();
 	//TODO: move the sync call elsewhere.
-	((idVertexBufferVk*)vertexBuffer)->Sync();
+	//((idVertexBufferVk*)vertexBuffer)->Sync();
 
 	//renderdoc buffer view vertex format:
 	//float x; float y; float z; half s; half t; byte normal[4]; byte tangent[4]; byte color[4]; byte color2[4];
@@ -3242,7 +3246,7 @@ void RB_DrawElementsWithCountersVk( const drawSurf_t *surf ) {
 	}
 	const int indexOffset = (int)( ibHandle >> VERTCACHE_OFFSET_SHIFT ) & VERTCACHE_OFFSET_MASK;
 	vkBuf = ((idIndexBufferVk*)indexBuffer)->GetBuffer();
-	((idIndexBufferVk*)indexBuffer)->Sync();
+	//((idIndexBufferVk*)indexBuffer)->Sync();
 	//GL indices are byte though
 	vkCmdBindIndexBuffer(cmd, vkBuf, (VkDeviceSize)indexOffset, VK_INDEX_TYPE_UINT16);
 
@@ -3271,7 +3275,18 @@ void RB_DrawElementsWithCountersVk( const drawSurf_t *surf ) {
 		//qglBindBufferRange( GL_UNIFORM_BUFFER, 0, ubo, jointBuffer.GetOffset(), jointBuffer.GetNumJoints() * sizeof( idJointMat ) );
 	}
 
-	vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vkPipelineLayout, 0, 1, &vkDescriptorSet, 0, 0);
+	//renderProgManager->CommitUniforms();
+
+	idRenderProgManagerVk* rpm = (idRenderProgManagerVk*)renderProgManager;
+	Vk_UsePipeline(rpm->GetPipelineForState(backEnd.glState.glStateBits));
+
+	uint32_t dynamicOffsetCount = 2;
+	const uint32_t offsets[] = { 
+		rpm->GetCurrentVertUniformOffset(), rpm->GetCurrentFragUniformOffset()
+	};
+
+	vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vkPipelineLayout,
+		0, 1, &vkDescriptorSet, dynamicOffsetCount, offsets);
 	vkCmdDrawIndexed(cmd, r_singleTriangle.GetBool() ? 3 : surf->numIndexes,
 		1, 0, 0, 0);
 }
@@ -3332,7 +3347,7 @@ void RB_DrawViewInternalVk(const viewDef_t * viewDef, const int stereoEye) {
 	backEnd.glState.faceCulling = -1;		// force face culling to set next time
 
 	// ensures that depth writes are enabled for the depth clear
-	//GL_State( GLS_DEFAULT );
+	GL_State( GLS_DEFAULT );
 
 
 	// Clear the depth buffer and clear the stencil to 128 for stencil shadows as well as gui masking

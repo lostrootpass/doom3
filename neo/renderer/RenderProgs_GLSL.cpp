@@ -1491,12 +1491,6 @@ void idRenderProgManagerGL::Unbind() {
 				Vulkan
 **********************************************/
 
-VkDeviceMemory uniformStagingMemory;
-VkDeviceMemory uniformMemory;
-
-VkBuffer uniformStagingBuffer;
-VkBuffer uniformBuffer;
-
 
 /*
 ================================================================================================
@@ -1526,13 +1520,15 @@ void idRenderProgManagerVk::BindShader(int vIndex, int fIndex) {
 	if ( vIndex >= 0 && vIndex < glslPrograms.Num() ) {
 		currentRenderProgram = vIndex;
 		RENDERLOG_PRINTF( "Binding GLSL Program %s\n", glslPrograms[vIndex].name.c_str() );
-		Vk_UsePipeline(glslPrograms[vIndex].progId);
+		//Vk_UsePipeline(glslPrograms[vIndex].progId);
+		//Vk_UsePipeline(GetPipelineForState(GLS_DEFAULT));
 	}
 }
 
 void idRenderProgManagerVk::Unbind() {
 	currentVertexShader = -1;
 	currentFragmentShader = -1;
+	currentRenderProgram = INVALID_PROGID;
 
 	//
 }
@@ -1553,91 +1549,94 @@ void idRenderProgManagerVk::SetUniformValue(const renderParm_t rp, const float *
 }
 
 void idRenderProgManagerVk::CommitUniforms() {
-	const int progID = 4;// GetCurrentProgram();
-	const glslProgram_t & prog = glslPrograms[progID];
+	ALIGNTYPE16 idVec4 localVectors[RENDERPARM_USER + MAX_GLSL_USER_PARMS];
 
-	if ( r_useUniformArrays.GetBool() ) {
-		ALIGNTYPE16 idVec4 localVectors[RENDERPARM_USER + MAX_GLSL_USER_PARMS];
+	size_t size = totalUniformCount * sizeof(idVec4);
+	void* ptr = Vk_MapMemory(uniformStagingMemory, 0, size, 0);
+	size_t vertexUniformSize = 0, fragUniformSize = 0;
 
-		if ( prog.vertexShaderIndex >= 0 ) {
-			const idList<int> & vertexUniforms = vertexShaders[prog.vertexShaderIndex].uniforms;
-			if ( prog.vertexUniformArray != -1 && vertexUniforms.Num() > 0 ) {
-				for ( int i = 0; i < vertexUniforms.Num(); i++ ) {
-					localVectors[i] = glslUniforms[vertexUniforms[i]];
+	for (int progID = 0; progID < vertexShaders.Num(); ++progID)
+	{
+		const glslProgram_t & prog = glslPrograms[progID];
+
+		if (r_useUniformArrays.GetBool()) {
+			if (prog.vertexShaderIndex >= 0) {
+				const idList<int> & vertexUniforms = vertexShaders[prog.vertexShaderIndex].uniforms;
+				if (prog.vertexUniformArray != -1 && vertexUniforms.Num() > 0) {
+					for (int i = 0; i < vertexUniforms.Num(); i++) {
+						localVectors[i] = glslUniforms[vertexUniforms[i]];
+					}
 				}
-				//qglUniform4fv( prog.vertexUniformArray, vertexUniforms.Num(), localVectors->ToFloatPtr() );
+
+				size_t thisUniform = vertexUniforms.Num() * sizeof(idVec4);
+				memcpy(ptr, localVectors->ToFloatPtr(), thisUniform);
+
+				thisUniform = (thisUniform + 0x100) & -0x100;
+				ptr = (char*)ptr + thisUniform;
+				vertexUniformSize += thisUniform;
 			}
-
-			size_t size = vertexUniforms.Num() * sizeof(idVec4);
-			void* ptr = Vk_MapMemory(uniformStagingMemory, 0, size, 0);
-			memcpy(ptr, localVectors->ToFloatPtr(), size);
-			Vk_UnmapMemory(uniformStagingMemory);
-
-			VkCommandBuffer cmd = Vk_StartOneShotCommandBuffer();
-			
-			VkBufferCopy copy = {};
-			copy.size = size;
-
-			vkCmdCopyBuffer(cmd, uniformStagingBuffer, uniformBuffer, 1, &copy);
-			Vk_SubmitOneShotCommandBuffer(cmd);	
-
-			VkDescriptorBufferInfo bufferInfo = {};
-			bufferInfo.buffer = uniformBuffer;
-			bufferInfo.offset = 0;
-			bufferInfo.range = size;
-		
-			VkWriteDescriptorSet write = {};
-			write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			write.descriptorCount = 1;
-			write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-			write.dstBinding = 0;
-			write.pBufferInfo = &bufferInfo;
-
-			Vk_UpdateDescriptorSet(write);
-		}
-
-		if ( prog.fragmentShaderIndex >= 0 ) {
-			const idList<int> & fragmentUniforms = fragmentShaders[prog.fragmentShaderIndex].uniforms;
-			if ( prog.fragmentUniformArray != -1 && fragmentUniforms.Num() > 0 ) {
-				for ( int i = 0; i < fragmentUniforms.Num(); i++ ) {
-					localVectors[i] = glslUniforms[fragmentUniforms[i]];
-				}
-				//qglUniform4fv( prog.fragmentUniformArray, fragmentUniforms.Num(), localVectors->ToFloatPtr() );
-			}
-
-			size_t size = fragmentUniforms.Num() * sizeof(idVec4);
-			void* ptr = Vk_MapMemory(uniformStagingMemory, 12 * sizeof(idVec4), size, 0);
-			memcpy(ptr, localVectors->ToFloatPtr(), size);
-			Vk_UnmapMemory(uniformStagingMemory);
-
-			VkCommandBuffer cmd = Vk_StartOneShotCommandBuffer();
-			
-			VkBufferCopy copy = {};
-			copy.size = size;
-
-			vkCmdCopyBuffer(cmd, uniformStagingBuffer, uniformBuffer, 1, &copy);
-			Vk_SubmitOneShotCommandBuffer(cmd);	
-
-			VkDescriptorBufferInfo bufferInfo = {};
-			bufferInfo.buffer = uniformBuffer;
-			bufferInfo.offset = 0;
-			bufferInfo.range = size;
-		
-			VkWriteDescriptorSet write = {};
-			write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			write.descriptorCount = 1;
-			write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-			write.dstBinding = 1;
-			write.pBufferInfo = &bufferInfo;
-
-			Vk_UpdateDescriptorSet(write);
-		}
-	} else {
-		for ( int i = 0; i < prog.uniformLocations.Num(); i++ ) {
-			const glslUniformLocation_t & uniformLocation = prog.uniformLocations[i];
-			//qglUniform4fv( uniformLocation.uniformIndex, 1, glslUniforms[uniformLocation.parmIndex].ToFloatPtr() );
 		}
 	}
+
+	for (int progID = 0; progID < fragmentShaders.Num(); ++progID)
+	{
+		const glslProgram_t & prog = glslPrograms[progID];
+		if (prog.fragmentShaderIndex >= 0) {
+			const idList<int> & fragmentUniforms = fragmentShaders[prog.fragmentShaderIndex].uniforms;
+			if (prog.fragmentUniformArray != -1 && fragmentUniforms.Num() > 0) {
+				for (int i = 0; i < fragmentUniforms.Num(); i++) {
+					localVectors[i] = glslUniforms[fragmentUniforms[i]];
+				}
+			}
+
+			size_t thisUniform = fragmentUniforms.Num() * sizeof(idVec4);
+			memcpy(ptr, localVectors->ToFloatPtr(), thisUniform);
+			
+			thisUniform = (thisUniform + 0x100) & -0x100;
+			ptr = (char*)ptr + thisUniform;
+			fragUniformSize += thisUniform;
+		}
+	}
+
+	Vk_UnmapMemory(uniformStagingMemory);
+
+	VkCommandBuffer cmd = Vk_StartOneShotCommandBuffer();
+	VkBufferCopy copy = {};
+	copy.size = vertexUniformSize + fragUniformSize;
+
+	vkCmdCopyBuffer(cmd, uniformStagingBuffer, uniformBuffer, 1, &copy);
+	Vk_SubmitOneShotCommandBuffer(cmd);
+
+	VkDescriptorBufferInfo bufferInfo[2];
+	bufferInfo[0] = {};
+	bufferInfo[0].buffer = uniformBuffer;
+	bufferInfo[0].offset = 0;
+	bufferInfo[0].range = vertexUniformSize;
+
+	bufferInfo[1] = {};
+	bufferInfo[1].buffer = uniformBuffer;
+	bufferInfo[1].offset = vertexUniformSize;
+	bufferInfo[1].range = VK_WHOLE_SIZE;
+	//bufferInfo[1].range = fragUniformSize;
+
+	VkWriteDescriptorSet write[2];
+	write[0] = {};
+	write[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	write[0].descriptorCount = 1;
+	write[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+	write[0].dstBinding = 0;
+	write[0].pBufferInfo = &bufferInfo[0];
+	write[0].dstSet = Vk_UniformDescriptorSet();
+
+	write[1] = {};
+	write[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	write[1].descriptorCount = 1;
+	write[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+	write[1].dstBinding = 1;
+	write[1].pBufferInfo = &bufferInfo[1];
+	write[1].dstSet = Vk_UniformDescriptorSet();
+
+	vkUpdateDescriptorSets(Vk_GetDevice(), 2, write, 0, 0);
 }
 
 int idRenderProgManagerVk::FindProgram(const char* name, int vIndex, int fIndex) {
@@ -1774,26 +1773,225 @@ void idRenderProgManagerVk::LoadProgram(const int programIndex, const int vertex
 		fragmentShaders[fragmentShaderIndex].progId == INVALID_PROGID)
 		return;
 
-	VkPipeline pipeline;
+	glslPrograms[vertexShaderIndex].progId = programIndex;
+	glslPrograms[vertexShaderIndex].vertexShaderIndex = vertexShaderIndex;
+	glslPrograms[vertexShaderIndex].fragmentShaderIndex = fragmentShaderIndex;
+	glslPrograms[vertexShaderIndex].vertexUniformArray = 1; //uniformBuffer;
+	glslPrograms[vertexShaderIndex].fragmentUniformArray = 1;// uniformBuffer;
+}
+
+void idRenderProgManagerVk::Init()
+{
+	idRenderProgManager::Init();
+
+	totalUniformCount = 0;
+	size_t bufferSize = 0;
+	for (int i = 0; i < vertexShaders.Num(); ++i)
+	{
+		if (glslPrograms[i].vertexShaderIndex >= 0)
+		{
+			totalUniformCount += vertexShaders[i].uniforms.Num();
+			bufferSize += ((vertexShaders[i].uniforms.Num() * sizeof(idVec4)) + 0x100) & -0x100;
+		}
+	}
+
+	for (int i = 0; i < fragmentShaders.Num(); ++i)
+	{
+		if (glslPrograms[i].fragmentShaderIndex >= 0)
+		{
+			totalUniformCount += fragmentShaders[i].uniforms.Num();
+			bufferSize += ((fragmentShaders[i].uniforms.Num() * sizeof(idVec4)) + 0x100) & -0x100;
+		}
+	}
+
+	Vk_CreateUniformBuffer(uniformStagingMemory, uniformStagingBuffer, 
+		uniformMemory, uniformBuffer, bufferSize);
+}
+
+VkPipeline idRenderProgManagerVk::GetPipelineForState(uint64 stateBits)
+{
+    if(currentRenderProgram == INVALID_PROGID) return VK_NULL_HANDLE;
+
+	for (CachedPipeline p : pipelines)
+	{
+		if (p.progId == currentRenderProgram && p.stateBits == stateBits)
+			return p.pipeline;
+	}
+
+	//
+	// check depthFunc bits
+	//
+	VkCompareOp depthCompareOp;
+	switch ( stateBits & GLS_DEPTHFUNC_BITS ) {
+	case GLS_DEPTHFUNC_EQUAL:	depthCompareOp = VK_COMPARE_OP_EQUAL; break;
+	case GLS_DEPTHFUNC_ALWAYS:	depthCompareOp = VK_COMPARE_OP_ALWAYS; break;
+	case GLS_DEPTHFUNC_LESS: depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL; break;
+	case GLS_DEPTHFUNC_GREATER:	depthCompareOp = VK_COMPARE_OP_GREATER_OR_EQUAL; break;
+	}
+	
+	//
+	// check blend bits
+	//
+	VkBlendFactor srcFactor = VK_BLEND_FACTOR_ONE;
+	VkBlendFactor dstFactor = VK_BLEND_FACTOR_ZERO;
+
+	switch ( stateBits & GLS_SRCBLEND_BITS ) {
+		case GLS_SRCBLEND_ZERO:					srcFactor = VK_BLEND_FACTOR_ZERO; break;
+		case GLS_SRCBLEND_ONE:					srcFactor = VK_BLEND_FACTOR_ONE; break;
+		case GLS_SRCBLEND_DST_COLOR:			srcFactor = VK_BLEND_FACTOR_DST_COLOR; break;
+		case GLS_SRCBLEND_ONE_MINUS_DST_COLOR:	srcFactor = VK_BLEND_FACTOR_ONE_MINUS_DST_COLOR; break;
+		case GLS_SRCBLEND_SRC_ALPHA:			srcFactor = VK_BLEND_FACTOR_SRC_ALPHA; break;
+		case GLS_SRCBLEND_ONE_MINUS_SRC_ALPHA:	srcFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA; break;
+		case GLS_SRCBLEND_DST_ALPHA:			srcFactor = VK_BLEND_FACTOR_DST_ALPHA; break;
+		case GLS_SRCBLEND_ONE_MINUS_DST_ALPHA:	srcFactor = VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA; break;
+		default:
+			assert( !"VK_BLEND_FACTOR_State: invalid src blend state bits\n" );
+			break;
+	}
+
+	switch ( stateBits & GLS_DSTBLEND_BITS ) {
+		case GLS_DSTBLEND_ZERO:					dstFactor = VK_BLEND_FACTOR_ZERO; break;
+		case GLS_DSTBLEND_ONE:					dstFactor = VK_BLEND_FACTOR_ONE; break;
+		case GLS_DSTBLEND_SRC_COLOR:			dstFactor = VK_BLEND_FACTOR_SRC_COLOR; break;
+		case GLS_DSTBLEND_ONE_MINUS_SRC_COLOR:	dstFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR; break;
+		case GLS_DSTBLEND_SRC_ALPHA:			dstFactor = VK_BLEND_FACTOR_SRC_ALPHA; break;
+		case GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA:	dstFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA; break;
+		case GLS_DSTBLEND_DST_ALPHA:			dstFactor = VK_BLEND_FACTOR_DST_ALPHA; break;
+		case GLS_DSTBLEND_ONE_MINUS_DST_ALPHA:  dstFactor = VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA; break;
+		default:
+			assert( !"VK_BLEND_FACTOR_State: invalid dst blend state bits\n" );
+			break;
+	}
+
+	// Only actually update GL's blend func if blending is enabled.
+	VkBool32 blendEnable = VK_TRUE;
+	if ( srcFactor == VK_BLEND_FACTOR_ONE && dstFactor == VK_BLEND_FACTOR_ZERO ) {
+		blendEnable = VK_FALSE;
+	}
+
+	//
+	// check depthmask
+	//
+	VkBool32 depthWriteEnable = VK_TRUE;
+   	if ( stateBits & GLS_DEPTHMASK ) {
+		depthWriteEnable = VK_FALSE;
+   	} 
+
+	//
+	// check colormask
+	//
+	VkColorComponentFlags colorWriteMask = 0;
+   	colorWriteMask |= ( stateBits & GLS_REDMASK ) ? 0 : VK_COLOR_COMPONENT_R_BIT;
+   	colorWriteMask |= ( stateBits & GLS_GREENMASK ) ? 0 : VK_COLOR_COMPONENT_G_BIT;
+   	colorWriteMask |= ( stateBits & GLS_BLUEMASK ) ? 0 : VK_COLOR_COMPONENT_B_BIT;
+   	colorWriteMask |= ( stateBits & GLS_ALPHAMASK ) ? 0 : VK_COLOR_COMPONENT_A_BIT;
+
+	//
+	// fill/line mode
+	//
+	VkPolygonMode polygonMode;
+   	if ( stateBits & GLS_POLYMODE_LINE ) {
+		polygonMode = VK_POLYGON_MODE_LINE;
+   	} else {
+		polygonMode = VK_POLYGON_MODE_FILL;
+   	}
+
+	//
+	// polygon offset
+	//
+	VkBool32 depthBiasEnable = VK_FALSE;
+	float depthBias = 0.0f;
+	float depthSlope = 0.0f;
+	if (stateBits & GLS_POLYGON_OFFSET)
+	{
+		depthBiasEnable = VK_TRUE;
+		depthBias = backEnd.glState.polyOfsBias;
+		depthSlope = backEnd.glState.polyOfsScale;
+	}
+
+    //
+	// stencil
+	//
+	VkBool32 stencilEnabled = VK_FALSE;
+	if ( ( stateBits & ( GLS_STENCIL_FUNC_BITS | GLS_STENCIL_OP_BITS ) ) != 0 ) {
+		stencilEnabled = VK_TRUE;
+	} 
+
+	uint32_t ref = uint32_t( ( stateBits & GLS_STENCIL_FUNC_REF_BITS ) >> GLS_STENCIL_FUNC_REF_SHIFT );
+	uint32_t mask = uint32_t( ( stateBits & GLS_STENCIL_FUNC_MASK_BITS ) >> GLS_STENCIL_FUNC_MASK_SHIFT );
+	VkCompareOp func = VK_COMPARE_OP_NEVER;
+
+	switch ( stateBits & GLS_STENCIL_FUNC_BITS ) {
+		case GLS_STENCIL_FUNC_NEVER:		func = VK_COMPARE_OP_NEVER; break;
+		case GLS_STENCIL_FUNC_LESS:			func = VK_COMPARE_OP_LESS; break;
+		case GLS_STENCIL_FUNC_EQUAL:		func = VK_COMPARE_OP_EQUAL; break;
+		case GLS_STENCIL_FUNC_LEQUAL:		func = VK_COMPARE_OP_LESS_OR_EQUAL; break;
+		case GLS_STENCIL_FUNC_GREATER:		func = VK_COMPARE_OP_GREATER; break;
+		case GLS_STENCIL_FUNC_NOTEQUAL:		func = VK_COMPARE_OP_NOT_EQUAL; break;
+		case GLS_STENCIL_FUNC_GEQUAL:		func = VK_COMPARE_OP_GREATER_OR_EQUAL; break;
+		case GLS_STENCIL_FUNC_ALWAYS:		func = VK_COMPARE_OP_ALWAYS; break;
+	}
+
+	VkStencilOp sFail = VK_STENCIL_OP_KEEP;
+	VkStencilOp zFail = VK_STENCIL_OP_KEEP;
+	VkStencilOp pass = VK_STENCIL_OP_KEEP;
+
+	switch ( stateBits & GLS_STENCIL_OP_FAIL_BITS ) {
+		case GLS_STENCIL_OP_FAIL_KEEP:		sFail = VK_STENCIL_OP_KEEP; break;
+		case GLS_STENCIL_OP_FAIL_ZERO:		sFail = VK_STENCIL_OP_ZERO; break;
+		case GLS_STENCIL_OP_FAIL_REPLACE:	sFail = VK_STENCIL_OP_REPLACE; break;
+		case GLS_STENCIL_OP_FAIL_INCR:		sFail = VK_STENCIL_OP_INCREMENT_AND_CLAMP; break;
+		case GLS_STENCIL_OP_FAIL_DECR:		sFail = VK_STENCIL_OP_DECREMENT_AND_CLAMP; break;
+		case GLS_STENCIL_OP_FAIL_INVERT:	sFail = VK_STENCIL_OP_INVERT; break;
+		case GLS_STENCIL_OP_FAIL_INCR_WRAP: sFail = VK_STENCIL_OP_INCREMENT_AND_WRAP; break;
+		case GLS_STENCIL_OP_FAIL_DECR_WRAP: sFail = VK_STENCIL_OP_DECREMENT_AND_WRAP; break;
+	}
+	switch ( stateBits & GLS_STENCIL_OP_ZFAIL_BITS ) {
+		case GLS_STENCIL_OP_ZFAIL_KEEP:		zFail = VK_STENCIL_OP_KEEP; break;
+		case GLS_STENCIL_OP_ZFAIL_ZERO:		zFail = VK_STENCIL_OP_ZERO; break;
+		case GLS_STENCIL_OP_ZFAIL_REPLACE:	zFail = VK_STENCIL_OP_REPLACE; break;
+		case GLS_STENCIL_OP_ZFAIL_INCR:		zFail = VK_STENCIL_OP_INCREMENT_AND_CLAMP; break;
+		case GLS_STENCIL_OP_ZFAIL_DECR:		zFail = VK_STENCIL_OP_DECREMENT_AND_CLAMP; break;
+		case GLS_STENCIL_OP_ZFAIL_INVERT:	zFail = VK_STENCIL_OP_INVERT; break;
+		case GLS_STENCIL_OP_ZFAIL_INCR_WRAP:zFail = VK_STENCIL_OP_INCREMENT_AND_WRAP; break;
+		case GLS_STENCIL_OP_ZFAIL_DECR_WRAP:zFail = VK_STENCIL_OP_DECREMENT_AND_WRAP; break;
+	}
+	switch ( stateBits & GLS_STENCIL_OP_PASS_BITS ) {
+		case GLS_STENCIL_OP_PASS_KEEP:		pass = VK_STENCIL_OP_KEEP; break;
+		case GLS_STENCIL_OP_PASS_ZERO:		pass = VK_STENCIL_OP_ZERO; break;
+		case GLS_STENCIL_OP_PASS_REPLACE:	pass = VK_STENCIL_OP_REPLACE; break;
+		case GLS_STENCIL_OP_PASS_INCR:		pass = VK_STENCIL_OP_INCREMENT_AND_CLAMP; break;
+		case GLS_STENCIL_OP_PASS_DECR:		pass = VK_STENCIL_OP_DECREMENT_AND_CLAMP; break;
+		case GLS_STENCIL_OP_PASS_INVERT:	pass = VK_STENCIL_OP_INVERT; break;
+		case GLS_STENCIL_OP_PASS_INCR_WRAP:	pass = VK_STENCIL_OP_INCREMENT_AND_WRAP; break;
+		case GLS_STENCIL_OP_PASS_DECR_WRAP:	pass = VK_STENCIL_OP_DECREMENT_AND_WRAP; break;
+	}
+
+
+	VkPipeline pipeline = VK_NULL_HANDLE;
 
 	VkPipelineShaderStageCreateInfo stages[2] = {};
 	stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 	stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
 	stages[0].pName = "main";
-	stages[0].module = vertexShaders[vertexShaderIndex].progId;
+	stages[0].module = vertexShaders[currentVertexShader].progId;
 
 	stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 	stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
 	stages[1].pName = "main";
-	stages[1].module = fragmentShaders[fragmentShaderIndex].progId;
+	stages[1].module = fragmentShaders[currentFragmentShader].progId;
 
 	VkPipelineColorBlendAttachmentState cba = {};
 	cba.blendEnable = VK_TRUE;
-	cba.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-
+	cba.colorWriteMask = colorWriteMask;
+	
 	cba.colorBlendOp = VK_BLEND_OP_ADD;
-	cba.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-	cba.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+	cba.srcColorBlendFactor = srcFactor;
+	cba.dstColorBlendFactor = dstFactor;
+
+	cba.alphaBlendOp = VK_BLEND_OP_ADD;
+	cba.srcAlphaBlendFactor = srcFactor;
+	cba.dstAlphaBlendFactor = dstFactor;
 
 	VkPipelineColorBlendStateCreateInfo cbs = {};
 	cbs.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
@@ -1813,31 +2011,26 @@ void idRenderProgManagerVk::LoadProgram(const int programIndex, const int vertex
 	VkPipelineRasterizationStateCreateInfo rs = {};
 	rs.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
 	rs.cullMode = VK_CULL_MODE_NONE;
-	rs.polygonMode = VK_POLYGON_MODE_FILL;
+	rs.polygonMode = polygonMode;
 	rs.lineWidth = 1.0f;
 	rs.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-	rs.depthBiasEnable = VK_TRUE;
-	rs.depthBiasConstantFactor = 0.005f;
-	rs.depthBiasSlopeFactor = 0.8f;
+	rs.depthBiasEnable = depthBiasEnable;
+	rs.depthBiasConstantFactor = depthBias;
+	rs.depthBiasSlopeFactor = depthSlope;
 
-	const int VTX_ATTR_COUNT = 5;
+	const int VTX_ATTR_COUNT = 6;
 	const size_t sz[] = {
 		//see: idDrawVert in DrawVert.h
 		sizeof(idVec3), sizeof(halfFloat_t)*2, 4, 4, 4, 4
 	};
 
 	const VkFormat fmt[] = {
-		/*VK_FORMAT_R32G32B32A32_SFLOAT,
-		VK_FORMAT_R32G32_SFLOAT,
-		VK_FORMAT_R32G32B32A32_SFLOAT,
-		VK_FORMAT_R32G32B32A32_SFLOAT,
-		VK_FORMAT_R32G32B32A32_SFLOAT,*/
 		VK_FORMAT_R32G32B32_SFLOAT,
 		VK_FORMAT_R16G16_SFLOAT,
-		VK_FORMAT_R8G8B8A8_SINT,
-		VK_FORMAT_R8G8B8A8_SINT,
-		VK_FORMAT_R8G8B8A8_SINT,
-		VK_FORMAT_R8G8B8A8_SINT,
+		VK_FORMAT_R8G8B8A8_UNORM,
+		VK_FORMAT_R8G8B8A8_UNORM,
+		VK_FORMAT_R8G8B8A8_UNORM,
+		VK_FORMAT_R8G8B8A8_UNORM
 	};
 
 	const size_t offsets[] = {
@@ -1851,7 +2044,7 @@ void idRenderProgManagerVk::LoadProgram(const int programIndex, const int vertex
 
 	VkVertexInputBindingDescription vbs = {};
 	vbs.binding = 0;
-	vbs.stride = ((sz[0] + sz[1] + sz[2] + sz[3] + sz[4])) + 15 & -16;
+	vbs.stride = ((sz[0] + sz[1] + sz[2] + sz[3] + sz[4] + sz[5])) + 15 & -16;
 	vbs.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
 	VkVertexInputAttributeDescription vtxAttrs[VTX_ATTR_COUNT] = {};
@@ -1880,12 +2073,22 @@ void idRenderProgManagerVk::LoadProgram(const int programIndex, const int vertex
 	vps.pViewports = &vp;
 	vps.pScissors = &sc;
 
+	VkStencilOpState stencilState = {};
+	stencilState.depthFailOp = zFail;
+	stencilState.passOp = pass;
+	stencilState.failOp = sFail;
+	stencilState.compareOp = func;
+	stencilState.compareMask = mask;
+	stencilState.reference = ref;
+
 	VkPipelineDepthStencilStateCreateInfo dss = {};
 	dss.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
 	dss.depthTestEnable = VK_TRUE;
-	dss.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
-	dss.depthWriteEnable = VK_TRUE;
-
+	dss.depthCompareOp = depthCompareOp;
+	dss.depthWriteEnable = depthWriteEnable;
+	dss.stencilTestEnable = stencilEnabled;
+	dss.front = stencilState;
+	
 	VkDynamicState dynStates[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
 	VkPipelineDynamicStateCreateInfo dys = {};
 	dys.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
@@ -1909,17 +2112,33 @@ void idRenderProgManagerVk::LoadProgram(const int programIndex, const int vertex
 	//Don't populate the layout or render pass in info before passing it in.
 	pipeline = Vk_CreatePipeline(info);
 
-	glslPrograms[vertexShaderIndex].progId = pipeline;
-	glslPrograms[vertexShaderIndex].vertexShaderIndex = vertexShaderIndex;
-	glslPrograms[vertexShaderIndex].fragmentShaderIndex = fragmentShaderIndex;
-	glslPrograms[vertexShaderIndex].vertexUniformArray = 1; //uniformBuffer;
-	glslPrograms[vertexShaderIndex].fragmentUniformArray = 1;// uniformBuffer;
+	pipelines.push_back({stateBits, pipeline, currentRenderProgram});
+
+	return pipeline;
 }
 
-void idRenderProgManagerVk::Init()
+size_t idRenderProgManagerVk::GetCurrentVertUniformOffset() const
 {
-	idRenderProgManager::Init();
+	size_t offset = 0;
 
-	Vk_CreateUniformBuffer(uniformStagingMemory, uniformStagingBuffer, 
-		uniformMemory, uniformBuffer, 14 * 4 * sizeof(float));
+	for (int i = 0; i < currentRenderProgram; ++i)
+	{
+		if(glslPrograms[i].vertexShaderIndex >= 0)
+			offset += ((vertexShaders[i].uniforms.Num() * sizeof(idVec4))) + 0x100 & -0x100;
+	}
+
+	return offset;
+}
+
+size_t idRenderProgManagerVk::GetCurrentFragUniformOffset() const
+{
+	size_t offset = 0;
+
+	for (int i = 0; i < currentRenderProgram; ++i)
+	{
+		if(glslPrograms[i].fragmentShaderIndex >= 0)
+			offset += ((fragmentShaders[i].uniforms.Num() * sizeof(idVec4))) + 0x100 & -0x100;
+	}
+
+	return offset;
 }

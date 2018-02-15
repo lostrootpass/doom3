@@ -164,6 +164,7 @@ void idRenderSystemVk::RenderCommandBuffers(const emptyCommand_t * const cmdHead
 
 		// needed for editor rendering
 		//GL_SetDefaultState();
+		GL_State(GLS_DEFAULT);
 
 		// If we have a stereo pixel format, this will draw to both
 		// the back left and back right buffers, which will have a
@@ -396,6 +397,7 @@ void idRenderSystemLocal::SetColor( const idVec4 & rgba ) {
 }
 
 void idRenderSystemVk::SetColor(const idVec4 & rgba) {
+	currentColorNativeBytesOrder = LittleLong( PackColor( rgba ) );
 }
 
 /*
@@ -408,7 +410,7 @@ uint32 idRenderSystemLocal::GetColor() {
 }
 
 uint32 idRenderSystemVk::GetColor() {
-	return 0;
+	return LittleLong( currentColorNativeBytesOrder );
 }
 
 /*
@@ -421,6 +423,7 @@ void idRenderSystemLocal::SetGLState( const uint64 glState ) {
 }
 
 void idRenderSystemVk::SetGLState( const uint64 glState ) {
+	currentGLState = glState;
 	}
 
 /*
@@ -434,7 +437,9 @@ void idRenderSystemLocal::DrawFilled( const idVec4 & color, float x, float y, fl
 }
 
 void idRenderSystemVk::DrawFilled( const idVec4 & color, float x, float y, float w, float h ) {
-	}
+	SetColor( color );
+	DrawStretchPic( x, y, w, h, 0.0f, 0.0f, 1.0f, 1.0f, whiteMaterial );
+}
 
 /*
 =============
@@ -595,7 +600,8 @@ void idRenderSystemLocal::DrawStretchTri( const idVec2 & p1, const idVec2 & p2, 
 }
 
 void idRenderSystemVk::DrawStretchTri( const idVec2 & p1, const idVec2 & p2, const idVec2 & p3, const idVec2 & t1, const idVec2 & t2, const idVec2 & t3, const idMaterial *material ) {
-	}
+	idRenderSystemLocal::DrawStretchTri(p1, p2, p3, t1, t2, t3, material);
+}
 
 /*
 =============
@@ -646,7 +652,8 @@ void idRenderSystemLocal::DrawSmallChar( int x, int y, int ch ) {
 }
 
 void idRenderSystemVk::DrawSmallChar( int x, int y, int ch ) {
-	}
+	idRenderSystemLocal::DrawSmallChar(x, y, ch);
+}
 
 /*
 ==================
@@ -689,7 +696,8 @@ void idRenderSystemLocal::DrawSmallStringExt( int x, int y, const char *string, 
 }
 
 void idRenderSystemVk::DrawSmallStringExt( int x, int y, const char *string, const idVec4 &setColor, bool forceColor ) {
-	}
+	idRenderSystemLocal::DrawSmallStringExt(x, y, string, setColor, forceColor);
+}
 
 /*
 =====================
@@ -725,7 +733,8 @@ void idRenderSystemLocal::DrawBigChar( int x, int y, int ch ) {
 }
 
 void idRenderSystemVk::DrawBigChar( int x, int y, int ch ) {
-	}
+	idRenderSystemLocal::DrawBigChar(x, y, ch);
+}
 
 /*
 ==================
@@ -768,7 +777,8 @@ void idRenderSystemLocal::DrawBigStringExt( int x, int y, const char *string, co
 }
 
 void idRenderSystemVk::DrawBigStringExt( int x, int y, const char *string, const idVec4 &setColor, bool forceColor ) {
-	}
+	idRenderSystemLocal::DrawBigStringExt(x, y, string, setColor, forceColor);
+}
 
 //======================================================================================
 
@@ -990,7 +1000,8 @@ void idRenderSystemLocal::WriteDemoPics() {
 }
 
 void idRenderSystemVk::WriteDemoPics() {
-	}
+	idRenderSystemLocal::WriteDemoPics();
+}
 
 /*
 =====================
@@ -1015,7 +1026,8 @@ void idRenderSystemLocal::GetCroppedViewport( idScreenRect * viewport ) {
 }
 
 void idRenderSystemVk::GetCroppedViewport( idScreenRect * viewport ) {
-	}
+	*viewport = renderCrops[currentRenderCrop];
+}
 
 /*
 ========================
@@ -1219,7 +1231,7 @@ idRenderWorld *idRenderSystemLocal::AllocRenderWorld() {
 }
 
 idRenderWorld *idRenderSystemVk::AllocRenderWorld() {
-	return nullptr;
+	return idRenderSystemLocal::AllocRenderWorld();
 }
 
 /*
@@ -1236,7 +1248,8 @@ void idRenderSystemLocal::FreeRenderWorld( idRenderWorld *rw ) {
 }
 
 void idRenderSystemVk::FreeRenderWorld( idRenderWorld *rw ) {
-	}
+	idRenderSystemLocal::FreeRenderWorld(rw);
+}
 
 /*
 ==============
@@ -1255,7 +1268,8 @@ void idRenderSystemLocal::PrintMemInfo( MemInfo_t *mi ) {
 }
 
 void idRenderSystemVk::PrintMemInfo( MemInfo_t *mi ) {
-	}
+	idRenderSystemLocal::PrintMemInfo(mi);
+}
 
 /*
 ===============
@@ -1272,5 +1286,5 @@ bool idRenderSystemLocal::UploadImage( const char *imageName, const byte *data, 
 }
 
 bool idRenderSystemVk::UploadImage( const char *imageName, const byte *data, int width, int height  ) {
-	return false;
+	return idRenderSystemLocal::UploadImage(imageName, data, width, height);
 }
