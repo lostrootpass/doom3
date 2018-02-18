@@ -95,7 +95,7 @@ static void AllocGeoBufferSet( geoBufferSet_t &gbs, const int vertexBytes, const
 	gbs.vertexBuffer->AllocBufferObject( NULL, vertexBytes );
 	gbs.indexBuffer->AllocBufferObject( NULL, indexBytes );
 	if ( jointBytes != 0 ) {
-		gbs.jointBuffer->AllocBufferObject( NULL, jointBytes / sizeof( idJointMat ) );
+		gbs.jointBuffer->AllocBufferObject( NULL, jointBytes );
 	}
 	ClearGeoBufferSet( gbs );
 }

@@ -31,6 +31,7 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "tr_local.h"
 #include "framework/Common_local.h"
+#include "Vulkan/vk_RenderBackend.h"
 
 //idRenderSystemLocal	tr;
 idRenderSystemVk	tr;
@@ -177,7 +178,7 @@ void idRenderSystemVk::RenderCommandBuffers(const emptyCommand_t * const cmdHead
 				break;
 			case RC_DRAW_VIEW_3D:
 			case RC_DRAW_VIEW_GUI:
-				RB_DrawViewVk( cmds, 0 );
+				renderBackend->DrawView(cmds, 0);
 				if ( ((const drawSurfsCommand_t *)cmds)->viewDef->viewEntitys ) {
 					c_draw3d++;
 				} else {
@@ -188,11 +189,11 @@ void idRenderSystemVk::RenderCommandBuffers(const emptyCommand_t * const cmdHead
 				c_setBuffers++;
 				break;
 			case RC_COPY_RENDER:
-				RB_CopyRenderVk( cmds );
+				renderBackend->CopyRender(cmds);
 				c_copyRenders++;
 				break;
 			case RC_POST_PROCESS:
-				RB_PostProcessVk( cmds );
+				renderBackend->PostProcess(cmds);
 				break;
 			default:
 				common->Error( "RB_ExecuteBackEndCommands: bad commandId" );
@@ -374,6 +375,7 @@ idRenderSystemLocal::idRenderSystemLocal() :
 
 idRenderSystemVk::idRenderSystemVk() : idRenderSystemLocal()
 {
+	renderBackend = new idRenderBackendVk();
 }
 
 /*
@@ -385,7 +387,7 @@ idRenderSystemLocal::~idRenderSystemLocal() {
 }
 
 idRenderSystemVk::~idRenderSystemVk() {
-	}
+}
 
 /*
 =============
@@ -983,6 +985,9 @@ const emptyCommand_t * idRenderSystemVk::SwapCommandBuffers_FinishCommandBuffers
 #ifdef DOOM3_VULKAN
 	//TODO: update uniform buffer here?
 	renderProgManager->CommitUniforms();
+
+	//update joint buffer here
+
 
 	Vk_StartRenderPass();
 #endif

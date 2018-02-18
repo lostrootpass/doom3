@@ -179,7 +179,7 @@ class idJointBufferVk : public idBufferObjectVk
 public:
 	idJointBufferVk() : idBufferObjectVk()
 	{
-		bufferCreateFlags = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
+		bufferCreateFlags = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
 	}
 
 private:
@@ -267,7 +267,7 @@ public:
 						~idJointBuffer();
 
 	// Allocate or free the buffer.
-	bool				AllocBufferObject( const void * joints, int numAllocJoints );
+	bool				AllocBufferObject( const void * joints, int numBytes );
 	void				FreeBufferObject();
 
 	// Make this buffer a reference to another buffer.

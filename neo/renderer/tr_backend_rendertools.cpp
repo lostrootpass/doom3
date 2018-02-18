@@ -81,7 +81,17 @@ int				rb_debugPolygonTime = 0;
 
 static void RB_DrawText( const char *text, const idVec3 &origin, float scale, const idVec4 &color, const idMat3 &viewAxis, const int align );
 
-void RB_SetMVP( const idRenderMatrix & mvp );
+void RB_SetMVP(const idRenderMatrix & mvp)
+{
+	idRenderBackend* rb = ((idRenderSystemLocal*)renderSystem)->renderBackend;
+	rb->SetMVP(mvp);
+}
+
+void RB_DrawElementsWithCounters(const drawSurf_t* surf)
+{
+	idRenderBackend* rb = ((idRenderSystemLocal*)renderSystem)->renderBackend;
+	rb->DrawElementsWithCounters(surf);
+}
 
 /*
 ================
@@ -1589,6 +1599,8 @@ static void RB_ShowLights() {
 
 	common->Printf( "volumes: " );	// FIXME: not in back end!
 
+	idRenderBackend* rb = ((idRenderSystemLocal*)renderSystem)->renderBackend;
+
 	int count = 0;
 	for ( viewLight_t * vLight = backEnd.viewDef->viewLights; vLight != NULL; vLight = vLight->next ) {
 		count++;
@@ -1599,8 +1611,8 @@ static void RB_ShowLights() {
 			GL_Color( 0.0f, 0.0f, 1.0f, 0.25f );
 			idRenderMatrix invProjectMVPMatrix;
 			idRenderMatrix::Multiply( backEnd.viewDef->worldSpace.mvp, vLight->inverseBaseLightProject, invProjectMVPMatrix );
-			RB_SetMVP( invProjectMVPMatrix );
-			RB_DrawElementsWithCounters( &backEnd.zeroOneCubeSurface );
+			rb->SetMVP( invProjectMVPMatrix );
+			rb->DrawElementsWithCounters( &backEnd.zeroOneCubeSurface );
 		}
 
 		// non-hidden lines
@@ -1609,8 +1621,8 @@ static void RB_ShowLights() {
 			GL_Color( 1.0f, 1.0f, 1.0f );
 			idRenderMatrix invProjectMVPMatrix;
 			idRenderMatrix::Multiply( backEnd.viewDef->worldSpace.mvp, vLight->inverseBaseLightProject, invProjectMVPMatrix );
-			RB_SetMVP( invProjectMVPMatrix );
-			RB_DrawElementsWithCounters( &backEnd.zeroOneCubeSurface );
+			rb->SetMVP( invProjectMVPMatrix );
+			rb->DrawElementsWithCounters( &backEnd.zeroOneCubeSurface );
 		}
 
 		common->Printf( "%i ", vLight->lightDef->index );

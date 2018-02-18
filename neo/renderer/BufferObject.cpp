@@ -664,15 +664,16 @@ idJointBuffer::~idJointBuffer() {
 idJointBuffer::AllocBufferObject
 ========================
 */
-bool idJointBuffer::AllocBufferObject( const void * joints, int numAllocJoints ) {
+bool idJointBuffer::AllocBufferObject( const void * joints, int jointBytes ) {
 	assert( apiObject == NULL );
 	assert_16_byte_aligned( joints );
 
-	if ( numAllocJoints <= 0 ) {
-		idLib::Error( "idJointBuffer::AllocBufferObject: joints = %i", numAllocJoints );
+	numJoints = jointBytes / sizeof(idJointMat);
+
+	if ( numJoints <= 0 ) {
+		idLib::Error( "idJointBuffer::AllocBufferObject: joints = %i", numJoints );
 	}
 
-	numJoints = numAllocJoints;
 
 	bool allocationFailed = false;
 
@@ -691,7 +692,7 @@ bool idJointBuffer::AllocBufferObject( const void * joints, int numAllocJoints )
 
 	// copy the data
 	if ( joints != NULL ) {
-		Update( joints, numAllocJoints );
+		Update( joints, numJoints );
 	}
 
 	return !allocationFailed;
@@ -880,6 +881,7 @@ idBufferObjectVk::idBufferObjectVk() : idBufferObject()
 {
 	buffer = stagingBuffer = VK_NULL_HANDLE;
 	memory = stagingMemory = VK_NULL_HANDLE;
+	size = 0;
 }
 
 idBufferObjectVk::~idBufferObjectVk()

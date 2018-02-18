@@ -976,6 +976,9 @@ void R_InitVulkan() {
 	renderProgManager->Init();
 
 	r_initialized = true;
+
+	//TODO: query dynamically;
+	glConfig.uniformBufferOffsetAlignment = 0x100;
 	
 	vertexCache = new idVertexCacheVk();
 	vertexCache->Init();
@@ -2434,6 +2437,7 @@ void idRenderSystemLocal::BeginLevelLoad() {
 }
 
 void idRenderSystemVk::BeginLevelLoad() {
+	idRenderSystemLocal::BeginLevelLoad();
 }
 
 /*
@@ -2446,6 +2450,7 @@ void idRenderSystemLocal::LoadLevelImages() {
 }
 
 void idRenderSystemVk::LoadLevelImages() {
+	globalImages->LoadLevelImages( false );
 }
 
 /*
@@ -2460,6 +2465,9 @@ void idRenderSystemLocal::Preload( const idPreloadManifest &manifest, const char
 }
 
 void idRenderSystemVk::Preload( const idPreloadManifest &manifest, const char *mapName ) {
+	globalImages->Preload( manifest, true );
+	uiManager->Preload( mapName );
+	renderModelManager->Preload( manifest );
 }
 
 /*
@@ -2473,6 +2481,8 @@ void idRenderSystemLocal::EndLevelLoad() {
 }
 
 void idRenderSystemVk::EndLevelLoad() {
+	renderModelManager->EndLevelLoad();
+	globalImages->EndLevelLoad();
 }
 
 /*
@@ -2484,7 +2494,7 @@ void idRenderSystemLocal::BeginAutomaticBackgroundSwaps( autoRenderIconType_t ic
 }
 
 void idRenderSystemVk::BeginAutomaticBackgroundSwaps( autoRenderIconType_t icon ) {
-	}
+}
 
 /*
 ========================
@@ -2544,6 +2554,7 @@ void idRenderSystemLocal::ResetFonts() {
 }
 
 void idRenderSystemVk::ResetFonts() {
+	fonts.DeleteContents(true);
 }
 
 /*
@@ -2569,6 +2580,8 @@ void idRenderSystemLocal::InitRenderBackend() {
 void idRenderSystemVk::InitRenderBackend() {
 	if (!R_IsInitialized()) {
 		R_InitVulkan();
+
+		globalImages->ReloadImages(true);
 	}
 }
 
@@ -2602,7 +2615,7 @@ bool idRenderSystemLocal::IsRenderBackendRunning() const {
 }
 
 bool idRenderSystemVk::IsRenderBackendRunning() const {
-	return false;
+	return R_IsInitialized();
 }
 
 /*
@@ -2615,7 +2628,7 @@ bool idRenderSystemLocal::IsFullScreen() const {
 }
 
 bool idRenderSystemVk::IsFullScreen() const {
-	return false;
+	return glConfig.isFullscreen != 0;
 }
 
 /*
@@ -2669,7 +2682,7 @@ stereo3DMode_t idRenderSystemLocal::GetStereo3DMode() const {
 
 stereo3DMode_t idRenderSystemVk::GetStereo3DMode() const {
 	return STEREO3D_OFF;
-	}
+}
 
 /*
 ========================
@@ -2682,7 +2695,7 @@ bool idRenderSystemLocal::IsStereoScopicRenderingSupported() const {
 
 bool idRenderSystemVk::IsStereoScopicRenderingSupported() const {
 	return false;
-	}
+}
 
 /*
 ========================
@@ -2695,7 +2708,7 @@ bool idRenderSystemLocal::HasQuadBufferSupport() const {
 
 bool idRenderSystemVk::HasQuadBufferSupport() const {
 	return false;
-	}
+}
 
 /*
 ========================
@@ -2708,7 +2721,7 @@ stereo3DMode_t idRenderSystemLocal::GetStereoScopicRenderingMode() const {
 
 stereo3DMode_t idRenderSystemVk::GetStereoScopicRenderingMode() const {
 	return STEREO3D_OFF;
-	}
+}
 
 /*
 ========================
@@ -2720,7 +2733,7 @@ void idRenderSystemLocal::EnableStereoScopicRendering( const stereo3DMode_t mode
 }
 
 void idRenderSystemVk::EnableStereoScopicRendering( const stereo3DMode_t mode ) const {
-	}
+}
 
 /*
 ========================

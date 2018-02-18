@@ -213,11 +213,14 @@
     <ClInclude Include="renderer\ModelManager.h" />
     <ClInclude Include="renderer\ModelOverlay.h" />
     <ClInclude Include="renderer\OpenGL\glext.h" />
+    <ClInclude Include="renderer\OpenGL\gl_RenderBackend.h" />
     <ClInclude Include="renderer\OpenGL\qgl.h" />
     <ClInclude Include="renderer\OpenGL\qgl_linked.h" />
     <ClInclude Include="renderer\OpenGL\wglext.h" />
+    <ClInclude Include="renderer\RenderBackend.h" />
     <ClInclude Include="renderer\RenderContext.h" />
     <ClInclude Include="renderer\RenderLog.h" />
+    <ClInclude Include="renderer\RenderParms.h" />
     <ClInclude Include="renderer\RenderProgs.h" />
     <ClInclude Include="renderer\RenderSystem.h" />
     <ClInclude Include="renderer\RenderTexture.h" />
@@ -228,6 +231,7 @@
     <ClInclude Include="renderer\simplex.h" />
     <ClInclude Include="renderer\tr_local.h" />
     <ClInclude Include="renderer\VertexCache.h" />
+    <ClInclude Include="renderer\Vulkan\vk_RenderBackend.h" />
     <ClInclude Include="sound\snd_local.h" />
     <ClInclude Include="sound\sound.h" />
     <ClInclude Include="swf\SWF.h" />
@@ -410,6 +414,8 @@
     <ClCompile Include="renderer\OpenGL\gl_GraphicsAPIWrapper.cpp" />
     <ClCompile Include="renderer\OpenGL\gl_image.cpp" />
     <ClCompile Include="renderer\OpenGL\gl_backend.cpp" />
+    <ClCompile Include="renderer\OpenGL\gl_RenderBackend.cpp" />
+    <ClCompile Include="renderer\RenderBackend.cpp" />
     <ClCompile Include="renderer\RenderProgs.cpp" />
     <ClCompile Include="renderer\RenderProgs_GLSL.cpp" />
     <ClCompile Include="renderer\RenderWorld_defs.cpp" />
@@ -436,6 +442,7 @@
     <ClCompile Include="renderer\VertexCache.cpp" />
     <ClCompile Include="renderer\Vulkan\vk_GraphicsAPIWrapper.cpp" />
     <ClCompile Include="renderer\Vulkan\vk_image.cpp" />
+    <ClCompile Include="renderer\Vulkan\vk_RenderBackend.cpp" />
     <ClCompile Include="sound\snd_emitter.cpp" />
     <ClCompile Include="sound\snd_shader.cpp" />
     <ClCompile Include="sound\snd_system.cpp" />

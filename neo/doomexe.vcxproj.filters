@@ -546,6 +546,10 @@
     <ClInclude Include="sys\win32\win_vkutil.h">
       <Filter>Sys\Win32</Filter>
     </ClInclude>
+    <ClInclude Include="renderer\Vulkan\vk_RenderBackend.h" />
+    <ClInclude Include="renderer\RenderBackend.h" />
+    <ClInclude Include="renderer\OpenGL\gl_RenderBackend.h" />
+    <ClInclude Include="renderer\RenderParms.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="cm\CollisionModel_contacts.cpp">
@@ -1085,9 +1089,6 @@
     <ClCompile Include="renderer\jobs\dynamicshadowvolume\DynamicShadowVolume.cpp">
       <Filter>Renderer\Jobs\DynamicShadowVolume</Filter>
     </ClCompile>
-    <ClCompile Include="renderer\tr_backend_draw.cpp">
-      <Filter>Renderer</Filter>
-    </ClCompile>
     <ClCompile Include="renderer\tr_backend_rendertools.cpp">
       <Filter>Renderer</Filter>
     </ClCompile>
@@ -1158,6 +1159,10 @@
       <Filter>Renderer\Vulkan</Filter>
     </ClCompile>
     <ClCompile Include="renderer\Vulkan\vk_GraphicsAPIWrapper.cpp" />
+    <ClCompile Include="renderer\Vulkan\vk_RenderBackend.cpp" />
+    <ClCompile Include="renderer\RenderBackend.cpp" />
+    <ClCompile Include="renderer\OpenGL\gl_RenderBackend.cpp" />
+    <ClCompile Include="renderer\tr_backend_draw.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="sys\win32\rc\res\doom.ico">

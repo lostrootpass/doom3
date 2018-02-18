@@ -681,6 +681,9 @@ static const int MAX_RENDER_CROPS = 8;
 ** but may read fields that aren't dynamically modified
 ** by the frontend.
 */
+
+class idRenderBackend;
+
 class idRenderSystemLocal : public idRenderSystem {
 public:
 	// external functions
@@ -769,6 +772,8 @@ public:
 	idVec4					ambientLightVector;	// used for "ambient bump mapping"
 
 	idList<idRenderWorldLocal*>worlds;
+
+	idRenderBackend*		renderBackend;
 
 	idRenderWorldLocal *	primaryWorld;
 	renderView_t			primaryRenderView;
@@ -1467,26 +1472,6 @@ BACKEND
 void RB_ExecuteBackEndCommands( const emptyCommand_t *cmds );
 
 /*
-============================================================
-
-TR_BACKEND_DRAW
-
-============================================================
-*/
-
-void RB_DrawElementsWithCounters( const drawSurf_t *surf );
-void RB_DrawViewInternal( const viewDef_t * viewDef, const int stereoEye );
-void RB_DrawView( const void *data, const int stereoEye );
-void RB_CopyRender( const void *data );
-void RB_PostProcess( const void *data );
-
-void RB_DrawElementsWithCountersVk( const drawSurf_t *surf );
-void RB_DrawViewInternalVk( const viewDef_t * viewDef, const int stereoEye );
-void RB_DrawViewVk( const void *data, const int stereoEye );
-void RB_CopyRenderVk( const void *data );
-void RB_PostProcessVk( const void *data );
-
-/*
 =============================================================
 
 TR_BACKEND_RENDERTOOLS
@@ -1525,11 +1510,12 @@ void RB_ShutdownDebugTools();
 #include "GLMatrix.h"
 
 
-
 #include "BufferObject.h"
 #include "RenderProgs.h"
 #include "RenderWorld_local.h"
 #include "GuiModel.h"
 #include "VertexCache.h"
+#include "RenderParms.h"
+#include "RenderBackend.h"
 
 #endif /* !__TR_LOCAL_H__ */

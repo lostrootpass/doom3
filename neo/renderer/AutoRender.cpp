@@ -181,7 +181,8 @@ void idAutoRender::RenderBackground() {
 
 	renderProgManager->BindShader_TextureVertexColor();
 
-	RB_DrawElementsWithCounters( &backEnd.unitSquareSurface );
+	idRenderSystemLocal* rs = (idRenderSystemLocal*)renderSystem;
+	rs->renderBackend->DrawElementsWithCounters( &backEnd.unitSquareSurface );
 }
 
 /*
@@ -275,5 +276,6 @@ void idAutoRender::RenderLoadingIcon( float fracX, float fracY, float size, floa
 
 	renderProgManager->BindShader_TextureVertexColor();
 
-	RB_DrawElementsWithCounters( &backEnd.unitSquareSurface );
+	idRenderSystemLocal* rs = (idRenderSystemLocal*)renderSystem;
+	rs->renderBackend->DrawElementsWithCounters( &backEnd.unitSquareSurface );
 }

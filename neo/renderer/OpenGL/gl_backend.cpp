@@ -238,6 +238,8 @@ void RB_StereoRenderExecuteBackEndCommands( const emptyCommand_t * const allCmds
 	// texture mapping works properly, then copy the portion we are going to use
 	// off to a texture.
 	bool foundEye[2] = { false, false };
+	
+	idRenderBackend* rb = ((idRenderSystemLocal*)renderSystem)->renderBackend;
 
 	for ( int stereoEye = 1; stereoEye >= -1; stereoEye -= 2 ) {
 		// set up the target texture we will draw to
@@ -264,7 +266,7 @@ void RB_StereoRenderExecuteBackEndCommands( const emptyCommand_t * const allCmds
 					}
 
 					foundEye[ targetEye ] = true;
-					RB_DrawView( dsc, stereoEye );
+					rb->DrawView( dsc, stereoEye );
 					if ( cmds->commandId == RC_DRAW_VIEW_GUI ) {
 					}
 				}
@@ -273,7 +275,7 @@ void RB_StereoRenderExecuteBackEndCommands( const emptyCommand_t * const allCmds
 				RB_SetBuffer( cmds );
 				break;
 			case RC_COPY_RENDER:
-				RB_CopyRender( cmds );
+				rb->CopyRender( cmds );
 				break;
 			case RC_POST_PROCESS:
 				{
@@ -281,7 +283,7 @@ void RB_StereoRenderExecuteBackEndCommands( const emptyCommand_t * const allCmds
 					if ( cmd->viewDef->renderView.viewEyeBuffer != stereoEye ) {
 						break;
 					}
-					RB_PostProcess( cmds );
+					rb->PostProcess( cmds );
 				}
 				break;
 			default:
@@ -334,14 +336,14 @@ void RB_StereoRenderExecuteBackEndCommands( const emptyCommand_t * const allCmds
 		stereoRenderImages[1]->Bind();
 		GL_SelectTexture( 1 );
 		stereoRenderImages[0]->Bind();
-		RB_DrawElementsWithCounters( &backEnd.unitSquareSurface );
+		rb->DrawElementsWithCounters( &backEnd.unitSquareSurface );
 
 		glDrawBuffer( GL_BACK_LEFT );
 		GL_SelectTexture( 1 );
 		stereoRenderImages[1]->Bind();
 		GL_SelectTexture( 0 );
 		stereoRenderImages[0]->Bind();
-		RB_DrawElementsWithCounters( &backEnd.unitSquareSurface );
+		rb->DrawElementsWithCounters( &backEnd.unitSquareSurface );
 
 		break;
 	case STEREO3D_HDMI_720:
@@ -351,14 +353,14 @@ void RB_StereoRenderExecuteBackEndCommands( const emptyCommand_t * const allCmds
 		GL_SelectTexture( 1 );
 		stereoRenderImages[0]->Bind();
 		GL_ViewportAndScissor( 0, 0, 1280, 720 );
-		RB_DrawElementsWithCounters( &backEnd.unitSquareSurface );
+		rb->DrawElementsWithCounters( &backEnd.unitSquareSurface );
 
 		GL_SelectTexture( 0 );
 		stereoRenderImages[0]->Bind();
 		GL_SelectTexture( 1 );
 		stereoRenderImages[1]->Bind();
 		GL_ViewportAndScissor( 0, 750, 1280, 720 );
-		RB_DrawElementsWithCounters( &backEnd.unitSquareSurface );
+		rb->DrawElementsWithCounters( &backEnd.unitSquareSurface );
 
 		// force the HDMI 720P 3D guard band to a constant color
 		glScissor( 0, 720, 1280, 30 );
@@ -400,7 +402,7 @@ void RB_StereoRenderExecuteBackEndCommands( const emptyCommand_t * const allCmds
 			stereoRenderImages[0]->Bind();
 			qglTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER );
 			qglTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER );
-			RB_DrawElementsWithCounters( &backEnd.unitSquareSurface );
+			rb->DrawElementsWithCounters( &backEnd.unitSquareSurface );
 
 			idVec4	color2( stereoRender_warpCenterX.GetFloat(), stereoRender_warpCenterY.GetFloat(), stereoRender_warpParmZ.GetFloat(), stereoRender_warpParmW.GetFloat() );
 			// don't use GL_Color(), because we don't want to clamp
@@ -415,7 +417,7 @@ void RB_StereoRenderExecuteBackEndCommands( const emptyCommand_t * const allCmds
 			stereoRenderImages[1]->Bind();
 			qglTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER );
 			qglTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER );
-			RB_DrawElementsWithCounters( &backEnd.unitSquareSurface );
+			rb->DrawElementsWithCounters( &backEnd.unitSquareSurface );
 			break;
 		}
 		// a non-warped side-by-side-uncompressed (dual input cable) is rendered
@@ -426,14 +428,14 @@ void RB_StereoRenderExecuteBackEndCommands( const emptyCommand_t * const allCmds
 		GL_SelectTexture( 1 );
 		stereoRenderImages[1]->Bind();
 		GL_ViewportAndScissor( 0, 0, renderSystem->GetWidth(), renderSystem->GetHeight() );
-		RB_DrawElementsWithCounters( &backEnd.unitSquareSurface );
+		rb->DrawElementsWithCounters( &backEnd.unitSquareSurface );
 
 		GL_SelectTexture( 0 );
 		stereoRenderImages[1]->Bind();
 		GL_SelectTexture( 1 );
 		stereoRenderImages[0]->Bind();
 		GL_ViewportAndScissor( renderSystem->GetWidth(), 0, renderSystem->GetWidth(), renderSystem->GetHeight() );
-		RB_DrawElementsWithCounters( &backEnd.unitSquareSurface );
+		rb->DrawElementsWithCounters( &backEnd.unitSquareSurface );
 		break;
 
 	case STEREO3D_TOP_AND_BOTTOM_COMPRESSED:
@@ -442,14 +444,14 @@ void RB_StereoRenderExecuteBackEndCommands( const emptyCommand_t * const allCmds
 		GL_SelectTexture( 0 );
 		stereoRenderImages[1]->Bind();
 		GL_ViewportAndScissor( 0, 0, renderSystem->GetWidth(), renderSystem->GetHeight() );
-		RB_DrawElementsWithCounters( &backEnd.unitSquareSurface );
+		rb->DrawElementsWithCounters( &backEnd.unitSquareSurface );
 
 		GL_SelectTexture( 1 );
 		stereoRenderImages[1]->Bind();
 		GL_SelectTexture( 0 );
 		stereoRenderImages[0]->Bind();
 		GL_ViewportAndScissor( 0, renderSystem->GetHeight(), renderSystem->GetWidth(), renderSystem->GetHeight() );
-		RB_DrawElementsWithCounters( &backEnd.unitSquareSurface );
+		rb->DrawElementsWithCounters( &backEnd.unitSquareSurface );
 		break;
 
 	case STEREO3D_INTERLACED:
@@ -466,7 +468,7 @@ void RB_StereoRenderExecuteBackEndCommands( const emptyCommand_t * const allCmds
 
 		GL_ViewportAndScissor( 0, 0, renderSystem->GetWidth(), renderSystem->GetHeight()*2 );
 		renderProgManager->BindShader_StereoInterlace();
-		RB_DrawElementsWithCounters( &backEnd.unitSquareSurface );
+		rb->DrawElementsWithCounters( &backEnd.unitSquareSurface );
 
 		GL_SelectTexture( 0 );
 		qglTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
@@ -531,13 +533,15 @@ void RB_ExecuteBackEndCommands( const emptyCommand_t *cmds ) {
 	// performance penalty.
 	qglDrawBuffer( GL_BACK );
 
+	idRenderBackend* rb = ((idRenderSystemLocal*)renderSystem)->renderBackend;
+	
 	for ( ; cmds != NULL; cmds = (const emptyCommand_t *)cmds->next ) {
 		switch ( cmds->commandId ) {
 		case RC_NOP:
 			break;
 		case RC_DRAW_VIEW_3D:
 		case RC_DRAW_VIEW_GUI:
-			RB_DrawView( cmds, 0 );
+			rb->DrawView( cmds, 0 );
 			if ( ((const drawSurfsCommand_t *)cmds)->viewDef->viewEntitys ) {
 				c_draw3d++;
 			} else {
@@ -548,11 +552,11 @@ void RB_ExecuteBackEndCommands( const emptyCommand_t *cmds ) {
 			c_setBuffers++;
 			break;
 		case RC_COPY_RENDER:
-			RB_CopyRender( cmds );
+			rb->CopyRender( cmds );
 			c_copyRenders++;
 			break;
 		case RC_POST_PROCESS:
-			RB_PostProcess( cmds );
+			rb->PostProcess( cmds );
 			break;
 		default:
 			common->Error( "RB_ExecuteBackEndCommands: bad commandId" );
