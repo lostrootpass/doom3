@@ -16,6 +16,22 @@ Contains the Image implementation for OpenGL.
 
 void idImage::FinaliseImageUpload()
 {
+	VkImageViewType target = VK_IMAGE_VIEW_TYPE_2D;
+	uint32_t layerCount = 1;
+	switch ( opts.textureType ) {
+		case TT_2D:
+			target = VK_IMAGE_VIEW_TYPE_2D;
+			layerCount = 1;
+			break;
+		case TT_CUBIC:
+			target = VK_IMAGE_VIEW_TYPE_CUBE;
+			layerCount = 6;
+			break;
+		default:
+			idLib::FatalError( "%s: bad texture type %d", GetName(), opts.textureType );
+			return;
+	}
+
 	VkExtent3D extent = { 
 		(uint32_t)opts.width, (uint32_t)opts.height, 1 //(uint32_t)opts.numLevels
 	};
@@ -25,46 +41,36 @@ void idImage::FinaliseImageUpload()
 
 	for(int i = 0; i < opts.numLevels; ++i)
 	{
-		int d = (int)idMath::Pow(2, i) ;
-		uint32_t mipWidth = Max(1, opts.width / d);
-		uint32_t mipHeight = Max(1, opts.height / d);
+		uint32_t mipWidth = Max(opts.width >> i, 1);
+		uint32_t mipHeight = Max(opts.height >> i, 1);
 
 		VkBufferImageCopy copy = {};
 		copy.imageExtent = { mipWidth, mipHeight, 1 };
 		copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		copy.imageSubresource.baseArrayLayer = 0;
-		copy.imageSubresource.layerCount = 1;
+		copy.imageSubresource.layerCount = layerCount;
 		copy.imageSubresource.mipLevel = i;
 		copy.bufferOffset = offset;
-		copy.bufferImageHeight = mipHeight;// opts.height;
-		copy.bufferRowLength = mipWidth;// opts.width;
+		copy.bufferImageHeight = (mipHeight + 3) & ~3;// opts.height;
+		copy.bufferRowLength = (mipWidth + 3) & ~3;// opts.width;
 
 		copies.push_back(copy);
 		offset += (mipWidth * mipHeight * BitsForFormat(opts.format)) / 8;
+		offset = (offset + 3) & ~3;
 	}	
 
 	VkCommandBuffer cmd = Vk_StartOneShotCommandBuffer();
 	vkCmdCopyBufferToImage(cmd, stagingBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, (uint32_t)copies.size(), copies.data());
 	Vk_SubmitOneShotCommandBuffer(cmd);
 
+	Vk_DestroyBuffer(stagingBuffer);
+	Vk_FreeMemory(stagingMemory);
+
 	VkImageSubresourceRange range = {};
-	range.layerCount = 1;
+	range.layerCount = layerCount;
 	range.levelCount = 1;
 	range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 	Vk_SetImageLayout(image, format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, range);
-
-	VkImageType target = VK_IMAGE_TYPE_2D;
-	switch ( opts.textureType ) {
-		case TT_2D:
-			target = VK_IMAGE_TYPE_2D;
-			break;
-		case TT_CUBIC:
-			target = VK_IMAGE_TYPE_3D;
-			break;
-		default:
-			idLib::FatalError( "%s: bad texture type %d", GetName(), opts.textureType );
-			return;
-	}
 
 	VkComponentSwizzle r, g, b, a;
 	if ( opts.colorFormat == CFM_GREEN_ALPHA ) {
@@ -161,7 +167,7 @@ void idImage::FinaliseImageUpload()
 	view.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 	view.components = { r, g, b, a };
 	view.image = image;
-	view.viewType = VK_IMAGE_VIEW_TYPE_2D;
+	view.viewType = target;
 	view.format = format;
 	view.subresourceRange = range;
 
@@ -246,11 +252,14 @@ void idImage::SubImageUpload(int mipLevel, int x, int y, int z, int width, int h
 	VkDeviceSize size = (width * height * BitsForFormat(opts.format)) / 8;
 	VkDeviceSize offset = 0;
 
+	size = Max(size, (VkDeviceSize)compressedSize);
+
+	if (size == 0) return;
+
 	for (int i = 0; i < mipLevel; ++i)
 	{
-		int p = (int)idMath::Pow(2, i);
-		mipWidth = Max(1, opts.width / p);
-		mipHeight = Max(1, opts.height / p);
+		mipWidth = Max(opts.width >> i, 1);
+		mipHeight = Max(opts.height >> i, 1);
 		offset += (mipWidth * mipHeight * BitsForFormat(opts.format)) / 8;
 	}
 
@@ -338,9 +347,28 @@ void idImage::AllocImage() {
 		return;
 	}
 
-	VkDeviceSize size = opts.width * opts.height * opts.numLevels;
-	size *= BitsForFormat(opts.format);
-	size /= 8;
+	VkDeviceSize size = 0;
+	if (IsCompressed())
+	{
+		size = (((opts.width + 3) / 4) * ((opts.height + 3) / 4) * int64(16));
+		size *= opts.numLevels;
+
+		if (opts.textureType == TT_CUBIC)
+			size *= 6;
+			
+		size = (size * BitsForFormat(opts.format)) / 8;
+	}
+	else
+	{
+		size = opts.width * opts.height * opts.numLevels;
+		
+		if (opts.textureType == TT_CUBIC)
+			size *= 6;
+
+		size = size * BitsForFormat(opts.format) / 8;
+	}
+
+	if (size == 0) return;
 
 	VkExtent3D extent = { (uint32_t)opts.width, (uint32_t)opts.height, (uint32_t)1 };
 
@@ -357,19 +385,22 @@ void idImage::AllocImage() {
 	info.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 	info.imageType = VK_IMAGE_TYPE_2D;
 	info.extent = extent;
-	info.arrayLayers = 1;
+	info.arrayLayers = opts.textureType == TT_CUBIC ? 6 : 1;
 	info.mipLevels = opts.numLevels;
 	info.format = format;
 	info.tiling = VK_IMAGE_TILING_OPTIMAL;
 	info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 	info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	info.samples = VK_SAMPLE_COUNT_1_BIT;
+	
+	if (opts.textureType == TT_CUBIC)
+		info.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
 
 
 	image = Vk_AllocAndCreateImage(info, deviceMemory);
 
 	VkImageSubresourceRange range = {};
-	range.layerCount = 1;
+	range.layerCount = opts.textureType == TT_CUBIC ? 6 : 1;
 	range.levelCount = opts.numLevels;
 	range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 
@@ -383,10 +414,16 @@ void idImage::AllocImage() {
 idImage::PurgeImage
 ========================
 */
-void idImage::PurgeImage() {
+
+void idImage::PurgeImage()
+{
+	if(texnum != TEXTURE_NOT_LOADED)
+		renderSystem->QueueImagePurge(this);
+}
+
+void idImage::ActuallyPurgeImage() {
 	if (texnum != TEXTURE_NOT_LOADED) {
 		Vk_DestroyImageAndView(image, imageView);
-		Vk_DestroyBuffer(stagingBuffer);
 		texnum = TEXTURE_NOT_LOADED;
 	}
 
@@ -454,7 +491,7 @@ void idImage::Bind() {
 	}
 
 	vkCmdBindDescriptorSets(Vk_ActiveCommandBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS,
-		Vk_GetPipelineLayout(), 1, 1, &descriptorSet, 0, nullptr);
+		Vk_GetPipelineLayout(), texUnit + 1, 1, &descriptorSet, 0, nullptr);
 }
 
 /*

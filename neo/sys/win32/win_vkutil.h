@@ -53,10 +53,10 @@ struct VulkanUtil
 	{
 		if (flags & VK_DEBUG_REPORT_INFORMATION_BIT_EXT || flags & VK_DEBUG_REPORT_DEBUG_BIT_EXT)
 		{
-			//common->Printf("Validation: info: %s\r\n", msg);
+			//common->Printf("Vulkan [info] (%s): %s [obj: 0x%X]\r\n", layerPrefix, msg, obj);
 		}
 		else
-			common->Printf("Validation layer: %s\r\n", msg);
+			common->Printf("Vulkan (%s): %s [obj: 0x%X]\r\n", layerPrefix, msg, obj);
 
 		return VK_FALSE;
 	}

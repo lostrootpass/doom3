@@ -6,11 +6,6 @@
 
 #include "vk_RenderBackend.h"
 
-extern VkPipelineLayout vkPipelineLayout;
-extern VkPipelineLayout vkPipelineLayoutShadow;
-extern VkDescriptorSet vkDescriptorSetVertex;
-extern VkDescriptorSet vkDescriptorSetShadowSkinned;
-
 idRenderBackendVk::idRenderBackendVk()
 {
 
@@ -82,7 +77,11 @@ void idRenderBackendVk::DrawElementsWithCounters(const drawSurf_t* surf)
 	const VkDeviceSize vertOffset = (VkDeviceSize)( vbHandle >> VERTCACHE_OFFSET_SHIFT ) & VERTCACHE_OFFSET_MASK;
 
 	VkBuffer vkBuf = ((idVertexBufferVk*)vertexBuffer)->GetBuffer();
-	//TODO: move the sync call elsewhere.
+
+	//TODO: move the sync call elsewhere -- too expensive to do this for every call
+	//but needs to be moved to somewhere we can guarantee that we're "done" with the buffer
+	//need to check if the buffer gets updated after draw calls start, might need
+	//to do partial buffer syncs each call. slow, but better than full syncs each call.
 	//((idVertexBufferVk*)vertexBuffer)->Sync();
 
 	//renderdoc buffer view vertex format:
@@ -104,6 +103,7 @@ void idRenderBackendVk::DrawElementsWithCounters(const drawSurf_t* surf)
 	}
 	const int indexOffset = (int)( ibHandle >> VERTCACHE_OFFSET_SHIFT ) & VERTCACHE_OFFSET_MASK;
 	vkBuf = ((idIndexBufferVk*)indexBuffer)->GetBuffer();
+
 	//((idIndexBufferVk*)indexBuffer)->Sync();
 	//GL indices are byte though
 	vkCmdBindIndexBuffer(cmd, vkBuf, (VkDeviceSize)indexOffset, VK_INDEX_TYPE_UINT16);
@@ -131,6 +131,17 @@ void idRenderBackendVk::DrawElementsWithCounters(const drawSurf_t* surf)
 
 		const GLuint ubo = reinterpret_cast< GLuint >( jointBuffer.GetAPIObject() );
 		//qglBindBufferRange( GL_UNIFORM_BUFFER, 0, ubo, jointBuffer.GetOffset(), jointBuffer.GetNumJoints() * sizeof( idJointMat ) );
+
+		//if (vertexCache->CacheIsStatic(surf->jointCache))
+		//{
+		//	idJointBufferVk* jb = (idJointBufferVk*)vertexCache->staticData.jointBuffer;
+		//	jb->Sync();
+		//}
+		//else
+		//{
+		//	idJointBufferVk* jb = (idJointBufferVk*)vertexCache->frameData[vertexCache->drawListNum].jointBuffer;
+		//	jb->Sync();
+		//}
 	}
 
 	//TODO: find out how to set this properly
@@ -139,29 +150,36 @@ void idRenderBackendVk::DrawElementsWithCounters(const drawSurf_t* surf)
 	idRenderProgManagerVk* rpm = (idRenderProgManagerVk*)renderProgManager;
 	Vk_UsePipeline(rpm->GetPipelineForState(backEnd.glState.glStateBits));
 
+	rpm->CommitUniforms();
+	VkDescriptorSet sets[] = { Vk_UniformDescriptorSet() };
+
 	if (backEnd.glState.vertexLayout == LAYOUT_DRAW_VERT)
 	{
-		uint32_t dynamicOffsetCount = 2;
+		uint32_t dynamicOffsetCount = 3;
 		const uint32_t offsets[] = {
-			rpm->GetCurrentVertUniformOffset(), rpm->GetCurrentFragUniformOffset()
+			rpm->GetCurrentVertUniformOffset(), rpm->GetCurrentFragUniformOffset(), 0
 		};
 
-		vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vkPipelineLayout,
-			0, 1, &vkDescriptorSetVertex, dynamicOffsetCount, offsets);
+		vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, Vk_GetPipelineLayout(),
+			0, 1, sets, dynamicOffsetCount, offsets);
 	}
 	else if (backEnd.glState.vertexLayout == LAYOUT_DRAW_SHADOW_VERT_SKINNED)
 	{
-		uint32 dynamicOffsetCount = 2;
+		//TODO
+		return;
+
+		uint32 dynamicOffsetCount = 3;
 		const uint32_t offsets[] = {
-			rpm->GetCurrentVertUniformOffset(), 0
+			rpm->GetCurrentVertUniformOffset(), 0, 0
 		};
 
-		vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vkPipelineLayoutShadow,
-			0, 1, &vkDescriptorSetShadowSkinned, dynamicOffsetCount, offsets);
+		vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, Vk_GetPipelineLayout(),
+			0, 1, sets, dynamicOffsetCount, offsets);
 	}
 	else if (backEnd.glState.vertexLayout == LAYOUT_DRAW_SHADOW_VERT)
 	{
-		//TODO;
+		//TODO
+		return;
 	}
 
 	vkCmdDrawIndexed(cmd, r_singleTriangle.GetBool() ? 3 : surf->numIndexes,
@@ -422,7 +440,7 @@ int idRenderBackendVk::DrawShaderPasses(const drawSurf_t * const * const drawSur
 					if ( ( stageGLState & GLS_OVERRIDE ) != 0 ) {
 						// This is a hack... Only SWF Guis set GLS_OVERRIDE
 						// Old style guis do not, and we don't want them to use the new GUI renederProg
-						renderProgManager->BindShader_BinkGUI();
+						//renderProgManager->BindShader_BinkGUI();
 					} else {
 						renderProgManager->BindShader_Bink();
 					}
@@ -1372,8 +1390,10 @@ void idRenderBackendVk::FillDepthBufferGeneric(const drawSurf_t * const * drawSu
 				GL_State( surfGLState );
 			} else {
 				if ( drawSurf->jointCache ) {
+					backEnd.glState.vertexLayout = LAYOUT_DRAW_SHADOW_VERT_SKINNED;
 					renderProgManager->BindShader_DepthSkinned();
 				} else {
+					backEnd.glState.vertexLayout = LAYOUT_DRAW_SHADOW_VERT;
 					renderProgManager->BindShader_Depth();
 				}
 				GL_State( surfGLState | GLS_ALPHAMASK );

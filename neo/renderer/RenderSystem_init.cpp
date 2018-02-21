@@ -2774,3 +2774,8 @@ float idRenderSystemLocal::GetPhysicalScreenWidthInCentimeters() const {
 float idRenderSystemVk::GetPhysicalScreenWidthInCentimeters() const {
 	return 0.0f;
 }
+
+void idRenderSystemVk::QueueImagePurge(idImage* image)
+{
+	purgeQueue.Append(image);
+}

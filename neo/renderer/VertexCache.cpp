@@ -393,6 +393,22 @@ void idVertexCacheVk::Init( bool restart ) {
 	AllocGeoBufferSet( staticData, STATIC_VERTEX_MEMORY, STATIC_INDEX_MEMORY, 0 );
 
 	MapGeoBufferSet( frameData[listNum] );
+
+	//TODO: correctly allocate/sync joint buffers
+	idJointBufferVk* jb = (idJointBufferVk*)vertexCache->frameData[0].jointBuffer;
+	VkDescriptorBufferInfo buf = {};
+	buf.buffer = jb->GetBuffer();
+	buf.range = VK_WHOLE_SIZE;
+
+	VkWriteDescriptorSet write = {};
+	write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	write.descriptorCount = 1;
+	write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
+	write.dstBinding = 2;
+	write.dstSet = Vk_UniformDescriptorSet();
+	write.pBufferInfo = &buf;
+
+	vkUpdateDescriptorSets(Vk_GetDevice(), 1, &write, 0, 0);
 }
 
 /*

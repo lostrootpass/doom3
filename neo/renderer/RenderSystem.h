@@ -314,6 +314,9 @@ public:
 
 	// consoles switch stereo 3D eye views each 60 hz frame
 	virtual int				GetFrameCount() const = 0;
+
+	//Queues up images to be purged at the end of the frame
+	virtual void QueueImagePurge(idImage* image) {};
 };
 
 extern idRenderSystem *			renderSystem;

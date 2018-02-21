@@ -8,3 +8,4 @@
 /neo/ipch
 *.opendb
 *.user
+/base/renderprogs/glsl

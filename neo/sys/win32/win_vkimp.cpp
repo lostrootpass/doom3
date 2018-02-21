@@ -57,9 +57,10 @@ VkSemaphore renderingFinishedSemaphore;
 
 uint32_t activeCommandBufferIdx = -1;
 
-std::vector<VkDescriptorSetLayout> descriptorLayouts;
+VkDescriptorSetLayout uniformSetLayout;
+VkDescriptorSetLayout imageSetLayout;
 
-const uint32_t MAX_IMAGE_DESC_SETS = 1024;
+const uint32_t MAX_IMAGE_DESC_SETS = 8192;
 
 static void CreateVulkanContextOnHWND(HWND hwnd, bool isDebug)
 {
@@ -564,74 +565,105 @@ static void Vk_RecordAllCommandBuffers()
 	info.commandPool = vkCommandPool;
 
 	VkCheck(vkAllocateCommandBuffers(vkDevice, &info, commandBuffers.data()));
-
-//	for(size_t i = 0; i < framebuffers.size(); ++i)
-//	{
-//		Vk_RecordCommandBuffer(framebuffers[i].framebuffer, commandBuffers[i]);
-//	}
 }
 
 static void Vk_CreatePipelineLayout()
 {
-	descriptorLayouts.resize(2);
+	//Uniform layouts (set 0)
 
 	VkDescriptorSetLayoutBinding bindings[3] = {};
+	//set 0 binding 0 - vertex uniforms
 	bindings[0].binding = 0;
 	bindings[0].descriptorCount = 1;
 	bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
 	bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
+	//set 0 binding 1 - fragment uniforms
 	bindings[1].binding = 1;
 	bindings[1].descriptorCount = 1;
 	bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
 	bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-	bindings[2].binding = 0;
+	
+	//set 0 binding 2 - joints
+	bindings[2].binding = 2;
 	bindings[2].descriptorCount = 1;
-	bindings[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	bindings[2].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+	bindings[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
+	bindings[2].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
 	VkDescriptorSetLayoutCreateInfo layoutInfo = {};
 	layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-	layoutInfo.bindingCount = 2;
+	layoutInfo.bindingCount = 3;
 	layoutInfo.pBindings = bindings;
 
-	VkCheck(vkCreateDescriptorSetLayout(vkDevice, &layoutInfo, nullptr, &descriptorLayouts[0]));
+	VkCheck(vkCreateDescriptorSetLayout(vkDevice, &layoutInfo, nullptr, &uniformSetLayout));
+
+
+	//Image layouts
+	
+	//For images, rather than have one set contain all our bindings, use one
+	//binding per set and multiple sets. This makes it easier to rebind multiple
+	//images on the fly for the shaders that take multiple texture inputs
+	//and avoids having to risk breaking the existing GL_SelectTexture behaviour
+	//Considering we're never binding more than a small number of images, this
+	//is guaranteed to stay under the set binding limit.
+
+	//binding 0 - combined image sampler
+	bindings[0].binding = 0;
+	bindings[0].descriptorCount = 1;
+	bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	bindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
 	layoutInfo.bindingCount = 1;
-	layoutInfo.pBindings = &bindings[2];
-	VkCheck(vkCreateDescriptorSetLayout(vkDevice, &layoutInfo, nullptr, &descriptorLayouts[1]));
+	layoutInfo.pBindings = &bindings[0];
+	VkCheck(vkCreateDescriptorSetLayout(vkDevice, &layoutInfo, nullptr, &imageSetLayout));
 
-	VkDescriptorPoolSize sizes[2] = {};
+	VkDescriptorPoolSize sizes[3] = {};
 	sizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-	sizes[0].descriptorCount = 2;
+	sizes[0].descriptorCount = 16;
 
 	sizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	sizes[1].descriptorCount = MAX_IMAGE_DESC_SETS;
 
+	sizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
+	sizes[2].descriptorCount = 16;
+
 	VkDescriptorPoolCreateInfo poolCreateInfo = {};
 	poolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	poolCreateInfo.pPoolSizes = sizes;
-	poolCreateInfo.poolSizeCount = 2;
+	poolCreateInfo.poolSizeCount = 3;
 	poolCreateInfo.maxSets = MAX_IMAGE_DESC_SETS;
-
 
 	VkCheck(vkCreateDescriptorPool(vkDevice, &poolCreateInfo, nullptr, &descriptorPool));
 
+	const uint32_t SET_COUNT = 4;
+	VkDescriptorSet layouts[] = {
+		//set 0 - uniforms
+		uniformSetLayout,
+
+		//set 1, set 2, set 3 - texture bindings
+		imageSetLayout,
+		imageSetLayout,
+		imageSetLayout
+	};
+
+	VkPipelineLayoutCreateInfo layoutCreateInfo = {};
+	layoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+	layoutCreateInfo.pSetLayouts = layouts;
+	layoutCreateInfo.setLayoutCount = SET_COUNT;
+
+	VkCheck(vkCreatePipelineLayout(vkDevice, &layoutCreateInfo, nullptr, &vkPipelineLayout));
+}
+
+static void Vk_CreateUniformDescriptorSet()
+{
+	//Allocate the uniform set here
 	VkDescriptorSetAllocateInfo allocInfo = {};
 	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 	allocInfo.descriptorPool = descriptorPool;
 	allocInfo.descriptorSetCount = 1;
-	allocInfo.pSetLayouts = &descriptorLayouts[0];
+	allocInfo.pSetLayouts = &uniformSetLayout;
 
 	VkCheck(vkAllocateDescriptorSets(vkDevice, &allocInfo, &vkDescriptorSet));
-
-	VkPipelineLayoutCreateInfo layoutCreateInfo = {};
-	layoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-	layoutCreateInfo.pSetLayouts = descriptorLayouts.data();
-	layoutCreateInfo.setLayoutCount = (uint32_t)descriptorLayouts.size();
-
-	VkCheck(vkCreatePipelineLayout(vkDevice, &layoutCreateInfo, nullptr, &vkPipelineLayout));
 }
 
 static void Vk_RegisterDebugger()
@@ -744,6 +776,7 @@ static bool Vk_InitDriver(VkImpParams_t params)
 	Vk_InitDevice();
 	Vk_InitCommandPool();
 	Vk_CreatePipelineLayout();
+	Vk_CreateUniformDescriptorSet();
 	Vk_CreateRenderPass();
 	Vk_CreateSwapChain();
 	Vk_RecordAllCommandBuffers();
@@ -1030,14 +1063,26 @@ VkImage Vk_AllocAndCreateImage(const VkImageCreateInfo& info, VkDeviceMemory& me
 
 	VkCheck(vkCreateImage(vkDevice, &info, nullptr, &image));
 
+	static VkDeviceMemory imageMemPool = VK_NULL_HANDLE;
+	//TODO: this has to be a big mempool for images (or several pools?)
+	//will quickly go over hardware allocation limits if one alloc per image
+	//freeing individual images and reallocing blocks will be a hassle though
 	VkMemoryRequirements memReq;
 	vkGetImageMemoryRequirements(vkDevice, image, &memReq);
 
-	VkMemoryAllocateInfo alloc = { VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
-	alloc.allocationSize = memReq.size;
-	alloc.memoryTypeIndex = Vk_GetMemoryTypeIndex(memReq.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-	VkCheck(vkAllocateMemory(vkDevice, &alloc, nullptr, &memory));
-	VkCheck(vkBindImageMemory(vkDevice, image, memory, 0));
+	if (imageMemPool == VK_NULL_HANDLE)
+	{
+		VkMemoryAllocateInfo alloc = { VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
+		//alloc.allocationSize = memReq.size;
+		alloc.allocationSize = 1024 * 1024 * 256; //256MB texture memory?
+		alloc.memoryTypeIndex = Vk_GetMemoryTypeIndex(memReq.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		VkCheck(vkAllocateMemory(vkDevice, &alloc, nullptr, &imageMemPool));
+	}
+
+	static VkDeviceSize memPoolOffset = 0;
+	VkCheck(vkBindImageMemory(vkDevice, image, imageMemPool, memPoolOffset));
+
+	memPoolOffset += (memReq.size + memReq.alignment) & -memReq.alignment;
 
 	return image;
 }
@@ -1143,9 +1188,13 @@ void Vk_DestroyBuffer(VkBuffer buffer)
 	vkDestroyBuffer(vkDevice, buffer, nullptr);
 }
 
+void Vk_FreeMemory(VkDeviceMemory memory)
+{
+
+}
+
 VkPipeline Vk_CreatePipeline(VkGraphicsPipelineCreateInfo& info)
 {
-	info.layout = vkPipelineLayout;
 	info.renderPass = vkRenderPass;
 
 	VkPipeline pipeline;
@@ -1220,7 +1269,7 @@ VkDescriptorSet Vk_AllocDescriptorSetForImage()
 	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 	allocInfo.descriptorPool = descriptorPool;
 	allocInfo.descriptorSetCount = 1;
-	allocInfo.pSetLayouts = &descriptorLayouts[1];
+	allocInfo.pSetLayouts = &imageSetLayout;
 
 	VkCheck(vkAllocateDescriptorSets(vkDevice, &allocInfo, &set));
 

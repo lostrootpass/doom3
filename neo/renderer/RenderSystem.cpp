@@ -891,7 +891,20 @@ void idRenderSystemVk::SwapCommandBuffers_FinishRendering(
 	vertexCache->frameData[vertexCache->listNum].vertexBuffer->Sync();
 	vertexCache->frameData[vertexCache->listNum].indexBuffer->Sync();
 	vertexCache->frameData[vertexCache->listNum].jointBuffer->Sync();
+	vertexCache->staticData.vertexBuffer->Sync();
+	vertexCache->staticData.indexBuffer->Sync();
+	//TODO: There is no static joint cache but we allocate one anyway???
+	//vertexCache->staticData.jointBuffer->Sync();
 	Vk_EndRenderPass();
+
+	//Need to do this here to avoid invalidating the command buffers
+	for (int i = 0; i < purgeQueue.Num(); ++i)
+	{
+		purgeQueue[i]->ActuallyPurgeImage();
+	}
+
+	purgeQueue.Clear();
+
 	Vk_FlipPresent();
 #endif
 }
@@ -983,12 +996,6 @@ const emptyCommand_t * idRenderSystemLocal::SwapCommandBuffers_FinishCommandBuff
 
 const emptyCommand_t * idRenderSystemVk::SwapCommandBuffers_FinishCommandBuffers() {
 #ifdef DOOM3_VULKAN
-	//TODO: update uniform buffer here?
-	renderProgManager->CommitUniforms();
-
-	//update joint buffer here
-
-
 	Vk_StartRenderPass();
 #endif
 	return idRenderSystemLocal::SwapCommandBuffers_FinishCommandBuffers();

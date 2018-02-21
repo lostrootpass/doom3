@@ -115,9 +115,11 @@ GL_PolygonOffset
 void GL_PolygonOffset( float scale, float bias ) {
 	backEnd.glState.polyOfsScale = scale;
 	backEnd.glState.polyOfsBias = bias;
+#ifndef DOOM3_VULKAN
 	if ( backEnd.glState.glStateBits & GLS_POLYGON_OFFSET ) {
 		qglPolygonOffset( scale, bias );
 	}
+#endif
 }
 
 /*

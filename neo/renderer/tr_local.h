@@ -943,6 +943,11 @@ public:
 	virtual void GetCroppedViewport(idScreenRect * viewport) override;
 
 	virtual void PerformResolutionScaling(int& newWidth, int& newHeight) override;
+
+	virtual void QueueImagePurge(idImage* image);
+
+private:
+	idList<idImage*> purgeQueue;
 };
 
 extern backEndState_t		backEnd;
@@ -1205,6 +1210,7 @@ void Vk_SetImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout,
 	VkImageLayout newLayout, VkImageSubresourceRange& range);
 void Vk_DestroyImageAndView(VkImage image, VkImageView imageView);
 void Vk_DestroyBuffer(VkBuffer buffer);
+void Vk_FreeMemory(VkDeviceMemory memory);
 VkCommandBuffer Vk_ActiveCommandBuffer();
 VkCommandBuffer Vk_StartRenderPass();
 void Vk_EndRenderPass();
