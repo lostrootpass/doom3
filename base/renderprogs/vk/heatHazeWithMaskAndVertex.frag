@@ -40,9 +40,9 @@ layout(set = 0, binding = 0) uniform UBO {
 };
 
 vec2 vposToScreenPosTexCoord (vec2 vpos ) {return vpos. xy * _fa_[0 /* rpWindowCoord */] . xy ; }
-layout(set = 1, binding = 0) uniform sampler2D samp0;
-layout(set = 2, binding = 0) uniform sampler2D samp1;
-layout(set = 3, binding = 0) uniform sampler2D samp2;
+layout(set = 2, binding = 0) uniform sampler2D samp0;
+layout(set = 3, binding = 0) uniform sampler2D samp1;
+layout(set = 4, binding = 0) uniform sampler2D samp2;
 
 layout(location = 0) in vec4 fragCoord;
 layout(location = 1) in vec4 vofi_TexCoord0;

@@ -18,7 +18,7 @@ float dot4 (vec2 a , vec4 b ) {return dot ( vec4 ( a , 0 , 1 ) , b ) ; }
 
 layout(location = 0) in vec4 in_Position;
 layout(location = 2) in lowp vec4 in_Normal;
-layout(location = 1) in lowp vec4 in_Color;
+layout(location = 4) in lowp vec4 in_Color;
 
 layout(location = 0) out vec4 out_Position;
 layout(location = 1) out vec3 vofi_TexCoord0;

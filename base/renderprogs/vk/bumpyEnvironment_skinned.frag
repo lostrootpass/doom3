@@ -38,8 +38,8 @@ float dot3 (vec3 a , vec3 b ) {return dot ( a , b ) ; }
 float dot3 (vec3 a , vec4 b ) {return dot ( a , b. xyz ) ; }
 float dot3 (vec4 a , vec3 b ) {return dot ( a. xyz , b ) ; }
 float dot3 (vec4 a , vec4 b ) {return dot ( a. xyz , b. xyz ) ; }
-layout(set = 1, binding = 0) uniform samplerCube samp0;
-layout(set = 2, binding = 0) uniform sampler2D samp1;
+layout(set = 2, binding = 0) uniform samplerCube samp0;
+layout(set = 3, binding = 0) uniform sampler2D samp1;
 
 layout(location = 0) in vec4 fragCoord;
 layout(location = 1) in vec2 vofi_TexCoord0;

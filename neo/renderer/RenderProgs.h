@@ -356,6 +356,7 @@ public:
 	virtual void EndFrame() override;
 
 	VkPipeline GetPipelineForState(uint64 state);
+	void DestroyPipelines();
 	size_t		GetCurrentVertUniformOffset() const;
 	size_t		GetCurrentFragUniformOffset() const;
 

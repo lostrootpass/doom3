@@ -78,12 +78,6 @@ void idRenderBackendVk::DrawElementsWithCounters(const drawSurf_t* surf)
 
 	VkBuffer vkBuf = ((idVertexBufferVk*)vertexBuffer)->GetBuffer();
 
-	//TODO: move the sync call elsewhere -- too expensive to do this for every call
-	//but needs to be moved to somewhere we can guarantee that we're "done" with the buffer
-	//need to check if the buffer gets updated after draw calls start, might need
-	//to do partial buffer syncs each call. slow, but better than full syncs each call.
-	//((idVertexBufferVk*)vertexBuffer)->Sync();
-
 	//renderdoc buffer view vertex format:
 	//float x; float y; float z; half s; half t; byte normal[4]; byte tangent[4]; byte color[4]; byte color2[4];
 	vkCmdBindVertexBuffers(cmd, 0, 1, &vkBuf, &vertOffset);
@@ -104,8 +98,6 @@ void idRenderBackendVk::DrawElementsWithCounters(const drawSurf_t* surf)
 	const int indexOffset = (int)( ibHandle >> VERTCACHE_OFFSET_SHIFT ) & VERTCACHE_OFFSET_MASK;
 	vkBuf = ((idIndexBufferVk*)indexBuffer)->GetBuffer();
 
-	//((idIndexBufferVk*)indexBuffer)->Sync();
-	//GL indices are byte though
 	vkCmdBindIndexBuffer(cmd, vkBuf, (VkDeviceSize)indexOffset, VK_INDEX_TYPE_UINT16);
 
 	RENDERLOG_PRINTF( "Binding Buffers: %p:%i %p:%i\n", vertexBuffer, vertOffset, indexBuffer, indexOffset );
@@ -120,34 +112,6 @@ void idRenderBackendVk::DrawElementsWithCounters(const drawSurf_t* surf)
 		}
 	}
 
-
-	if ( surf->jointCache ) {
-		//TODO
-		return;
-
-		idJointBuffer jointBuffer;
-		if ( !vertexCache->GetJointBuffer( surf->jointCache, &jointBuffer ) ) {
-			idLib::Warning( "RB_DrawElementsWithCounters, jointBuffer == NULL" );
-			return;
-		}
-		assert( ( jointBuffer.GetOffset() & ( glConfig.uniformBufferOffsetAlignment - 1 ) ) == 0 );
-
-		const GLuint ubo = reinterpret_cast< GLuint >( jointBuffer.GetAPIObject() );
-		//qglBindBufferRange( GL_UNIFORM_BUFFER, 0, ubo, jointBuffer.GetOffset(), jointBuffer.GetNumJoints() * sizeof( idJointMat ) );
-
-		//if (vertexCache->CacheIsStatic(surf->jointCache))
-		//{
-		//	idJointBufferVk* jb = (idJointBufferVk*)vertexCache->staticData.jointBuffer;
-		//	jb->Sync();
-		//}
-		//else
-		//{
-		//	idJointBufferVk* jb = (idJointBufferVk*)vertexCache->frameData[vertexCache->drawListNum].jointBuffer;
-		//	jb->Sync();
-		//}
-	}
-
-	//TODO: find out how to set this properly
 	backEnd.glState.vertexLayout = LAYOUT_DRAW_VERT;
 
 	idRenderProgManagerVk* rpm = (idRenderProgManagerVk*)renderProgManager;
@@ -156,20 +120,30 @@ void idRenderBackendVk::DrawElementsWithCounters(const drawSurf_t* surf)
 	//Don't try to draw things we haven't ported shaders for yet.
 	if (pipeline == VK_NULL_HANDLE)
 		return;
+
 	Vk_UsePipeline(pipeline);
 
 	rpm->CommitUniforms();
-	VkDescriptorSet sets[] = { Vk_UniformDescriptorSet() };
+	VkDescriptorSet sets[] = { 
+		Vk_UniformDescriptorSet(),
+		Vk_JointBufferSetForFrame(vertexCache->drawListNum)
+	};
 
 	if (backEnd.glState.vertexLayout == LAYOUT_DRAW_VERT)
 	{
+		uint32_t jointOffset = 0;
+		if(surf->jointCache)
+			jointOffset = (int)( surf->jointCache >> VERTCACHE_OFFSET_SHIFT ) & VERTCACHE_OFFSET_MASK;
+		
 		uint32_t dynamicOffsetCount = 3;
 		const uint32_t offsets[] = {
-			rpm->GetCurrentVertUniformOffset(), rpm->GetCurrentFragUniformOffset(), 0
+			rpm->GetCurrentVertUniformOffset(),
+			rpm->GetCurrentFragUniformOffset(),
+			jointOffset
 		};
 
 		vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, Vk_GetPipelineLayout(),
-			0, 1, sets, dynamicOffsetCount, offsets);
+			0, 2, sets, dynamicOffsetCount, offsets);
 	}
 	else if (backEnd.glState.vertexLayout == LAYOUT_DRAW_SHADOW_VERT_SKINNED)
 	{
@@ -187,10 +161,6 @@ void idRenderBackendVk::DrawElementsWithCounters(const drawSurf_t* surf)
 	else if (backEnd.glState.vertexLayout == LAYOUT_DRAW_SHADOW_VERT)
 	{
 		//TODO
-		return;
-	}
-	else
-	{
 		return;
 	}
 
@@ -1303,8 +1273,7 @@ void idRenderBackendVk::BasicFog(const drawSurf_t *drawSurfs, const idPlane fogP
 		}
 
 		
-		idRenderSystemLocal* rs = (idRenderSystemLocal*)renderSystem;
-		rs->renderBackend->DrawElementsWithCounters( drawSurf );
+		DrawElementsWithCounters( drawSurf );
 	}
 }
 

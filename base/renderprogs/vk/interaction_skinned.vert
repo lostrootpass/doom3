@@ -18,7 +18,7 @@ float dot3 (vec4 a , vec4 b ) {return dot ( a. xyz , b. xyz ) ; }
 float dot4 (vec4 a , vec4 b ) {return dot ( a , b ) ; }
 float dot4 (vec2 a , vec4 b ) {return dot ( vec4 ( a , 0 , 1 ) , b ) ; }
 
-layout(set = 0, binding = 2) readonly buffer matrixbuffer {
+layout(set = 1, binding = 0) readonly buffer matrixbuffer {
 	vec4 matrices[408];
 };
 

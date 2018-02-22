@@ -1227,6 +1227,9 @@ VkDevice Vk_GetDevice();
 VkDescriptorSet Vk_AllocDescriptorSetForImage();
 VkPipelineLayout Vk_GetPipelineLayout();
 VkDescriptorSet Vk_UniformDescriptorSet();
+VkDescriptorSet Vk_AllocateJointBufferSetForFrame(int idx, geoBufferSet_t& gbs);
+VkDescriptorSet Vk_JointBufferSetForFrame(int idx);
+void Vk_FreeDescriptorSet(const VkDescriptorSet set);
 #endif
 
 /*

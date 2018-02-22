@@ -39,7 +39,7 @@ layout(set = 0, binding = 1) uniform UBO {
     vec4 _fa_[1];
 };
 
-layout(set = 1, binding = 0) uniform sampler2D samp0;
+layout(set = 2, binding = 0) uniform sampler2D samp0;
 
 layout(location = 0) in vec4 inFragCoord;
 layout(location = 1) in vec2 vofi_TexCoord0;

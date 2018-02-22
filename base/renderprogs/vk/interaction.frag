@@ -58,11 +58,11 @@ vec3 ConvertYCoCgToRGB (vec4 YCoCg ) {
 	return rgbColor ;
 }
 vec4 idtex2Dproj (sampler2D samp , vec4 texCoords ) {return tex2Dproj ( samp , texCoords. xyw ) ; }
-layout(set = 1, binding = 0) uniform sampler2D samp0;
-layout(set = 2, binding = 0) uniform sampler2D samp1;
-layout(set = 3, binding = 0) uniform sampler2D samp2;
-layout(set = 4, binding = 0) uniform sampler2D samp3;
-layout(set = 5, binding = 0) uniform sampler2D samp4;
+layout(set = 2, binding = 0) uniform sampler2D samp0;
+layout(set = 3, binding = 0) uniform sampler2D samp1;
+layout(set = 4, binding = 0) uniform sampler2D samp2;
+layout(set = 5, binding = 0) uniform sampler2D samp3;
+layout(set = 6, binding = 0) uniform sampler2D samp4;
 
 layout(location = 0) in vec4 fragCoord;
 layout(location = 1) in vec4 vofi_TexCoord0;

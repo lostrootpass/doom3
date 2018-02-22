@@ -15,14 +15,14 @@ layout(set = 0, binding = 0) uniform UBO {
 float dot4 (vec4 a , vec4 b ) {return dot ( a , b ) ; }
 float dot4 (vec2 a , vec4 b ) {return dot ( vec4 ( a , 0 , 1 ) , b ) ; }
 vec4 swizzleColor (vec4 c ) {return c ; }
-layout(set = 0, binding = 2) readonly buffer matrixbuffer {
+layout(set = 1, binding = 0) readonly buffer matrixbuffer {
 	vec4 matrices[408];
 };
 
 layout(location = 0) in vec4 in_Position;
 layout(location = 1) in mediump vec2 in_TexCoord;
-layout(location = 2) in lowp vec4 in_Color;
-layout(location = 3) in lowp vec4 in_Color2;
+layout(location = 4) in lowp vec4 in_Color;
+layout(location = 5) in lowp vec4 in_Color2;
 
 layout(location = 0) out vec4 out_Position;
 layout(location = 1) out vec2 vofi_TexCoord0;

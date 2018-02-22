@@ -34,7 +34,7 @@ vec4 tex2Dlod( sampler2D samp, vec4 texcoord ) { return textureLod( samp, texcoo
 vec4 tex3Dlod( sampler3D samp, vec4 texcoord ) { return textureLod( samp, texcoord.xyz, texcoord.w ); }
 vec4 texCUBElod( samplerCube samp, vec4 texcoord ) { return textureLod( samp, texcoord.xyz, texcoord.w ); }
 
-layout(set = 1, binding = 0) uniform samplerCube samp0;
+layout(set = 2, binding = 0) uniform samplerCube samp0;
 
 layout(location = 0) in vec4 fragCoord;
 layout(location = 1) in vec3 vofi_TexCoord0;

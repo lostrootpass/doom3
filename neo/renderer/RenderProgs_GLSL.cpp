@@ -1508,7 +1508,7 @@ idRenderProgManagerVk::~idRenderProgManagerVk
 ================================================================================================
 */
 idRenderProgManagerVk::~idRenderProgManagerVk() {
-
+	DestroyPipelines();
 }
 
 void idRenderProgManagerVk::BindShader(int vIndex, int fIndex) {
@@ -1809,9 +1809,6 @@ void idRenderProgManagerVk::Init()
 		}
 	}
 
-	//TODO: Technically allocating a 16KB fixed-size uniform buffer is ~fine~
-	//but it would be better if we allocated according to needs and resized
-	//though the exact amount of uniform memory needed is not known at startup
 	Vk_CreateUniformBuffer(uniformStagingMemory, uniformStagingBuffer, 
 		uniformMemory, uniformBuffer, UNIFORM_BUFFER_SIZE);
 
@@ -2229,6 +2226,16 @@ VkPipeline idRenderProgManagerVk::GetPipelineForState(uint64 stateBits)
 	pipelines.push_back({stateBits, pipeline, currentRenderProgram});
 
 	return pipeline;
+}
+
+void idRenderProgManagerVk::DestroyPipelines()
+{
+	for (CachedPipeline p : pipelines)
+	{
+		vkDestroyPipeline(Vk_GetDevice(), p.pipeline, nullptr);
+	}
+
+	pipelines.clear();
 }
 
 size_t idRenderProgManagerVk::GetCurrentVertUniformOffset() const

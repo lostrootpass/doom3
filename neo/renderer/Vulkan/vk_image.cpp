@@ -14,6 +14,8 @@ Contains the Image implementation for OpenGL.
 #include <vulkan/vulkan.h>
 #include <vector>
 
+const int VK_IMAGE_SET_OFFSET = 2;
+
 void idImage::FinaliseImageUpload()
 {
 	VkImageViewType target = VK_IMAGE_VIEW_TYPE_2D;
@@ -424,6 +426,7 @@ void idImage::PurgeImage()
 void idImage::ActuallyPurgeImage() {
 	if (texnum != TEXTURE_NOT_LOADED) {
 		Vk_DestroyImageAndView(image, imageView);
+		Vk_FreeDescriptorSet(descriptorSet);
 		texnum = TEXTURE_NOT_LOADED;
 	}
 
@@ -479,19 +482,13 @@ void idImage::Bind() {
 	tmu_t * tmu = &backEnd.glState.tmu[texUnit];
 	// bind the texture
 	if ( opts.textureType == TT_2D ) {
-		if ( tmu->current2DMap != texnum ) {
 			tmu->current2DMap = texnum;
-
-		}
 	} else if ( opts.textureType == TT_CUBIC ) {
-		if ( tmu->currentCubeMap != texnum ) {
 			tmu->currentCubeMap = texnum;
-			//qglBindMultiTextureEXT( GL_TEXTURE0_ARB + texUnit, GL_TEXTURE_CUBE_MAP_EXT, texnum );
-		}
 	}
 
 	vkCmdBindDescriptorSets(Vk_ActiveCommandBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS,
-		Vk_GetPipelineLayout(), texUnit + 1, 1, &descriptorSet, 0, nullptr);
+		Vk_GetPipelineLayout(), texUnit + VK_IMAGE_SET_OFFSET, 1, &descriptorSet, 0, nullptr);
 }
 
 /*

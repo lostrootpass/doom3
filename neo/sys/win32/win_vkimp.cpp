@@ -24,6 +24,7 @@ VkRenderPass vkRenderPass = VK_NULL_HANDLE;
 VkPipelineLayout vkPipelineLayout = VK_NULL_HANDLE;
 VkDescriptorSet vkDescriptorSet = VK_NULL_HANDLE;
 VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
+VkDescriptorSet vkJointDescriptorSets[VERTCACHE_NUM_FRAMES];
 
 VkImage depthImage = VK_NULL_HANDLE;
 VkImageView depthView = VK_NULL_HANDLE;
@@ -59,6 +60,7 @@ uint32_t activeCommandBufferIdx = -1;
 
 VkDescriptorSetLayout uniformSetLayout;
 VkDescriptorSetLayout imageSetLayout;
+VkDescriptorSetLayout jointSetLayout;
 
 const uint32_t MAX_IMAGE_DESC_SETS = 8192;
 
@@ -586,19 +588,22 @@ static void Vk_CreatePipelineLayout()
 	bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
 	bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 	
-	//set 0 binding 2 - joints
-	bindings[2].binding = 2;
-	bindings[2].descriptorCount = 1;
-	bindings[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
-	bindings[2].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-
 	VkDescriptorSetLayoutCreateInfo layoutInfo = {};
 	layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-	layoutInfo.bindingCount = 3;
+	layoutInfo.bindingCount = 2;
 	layoutInfo.pBindings = bindings;
 
 	VkCheck(vkCreateDescriptorSetLayout(vkDevice, &layoutInfo, nullptr, &uniformSetLayout));
 
+	//set 1 binding 0 - joints
+	bindings[0].binding = 0;
+	bindings[0].descriptorCount = 1;
+	bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
+	bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+	layoutInfo.bindingCount = 1;
+
+	VkCheck(vkCreateDescriptorSetLayout(vkDevice, &layoutInfo, nullptr, &jointSetLayout));
 
 	//Image layouts
 	
@@ -634,15 +639,19 @@ static void Vk_CreatePipelineLayout()
 	poolCreateInfo.pPoolSizes = sizes;
 	poolCreateInfo.poolSizeCount = 3;
 	poolCreateInfo.maxSets = MAX_IMAGE_DESC_SETS;
+	poolCreateInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
 
 	VkCheck(vkCreateDescriptorPool(vkDevice, &poolCreateInfo, nullptr, &descriptorPool));
 
-	const uint32_t SET_COUNT = 6;
+	const uint32_t SET_COUNT = 7;
 	VkDescriptorSet layouts[] = {
 		//set 0 - uniforms
 		uniformSetLayout,
 
-		//sets 1-5 - texture bindings
+		//set 1 - joint bindings
+		jointSetLayout,
+
+		//sets 2-6 - texture bindings
 		imageSetLayout,
 		imageSetLayout,
 		imageSetLayout,
@@ -668,6 +677,21 @@ static void Vk_CreateUniformDescriptorSet()
 	allocInfo.pSetLayouts = &uniformSetLayout;
 
 	VkCheck(vkAllocateDescriptorSets(vkDevice, &allocInfo, &vkDescriptorSet));
+}
+
+static void Vk_CreateJointDescriptorSets()
+{
+	VkDescriptorSetLayout layouts[] = {
+		jointSetLayout, jointSetLayout
+	};
+
+	VkDescriptorSetAllocateInfo allocInfo = {};
+	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	allocInfo.descriptorPool = descriptorPool;
+	allocInfo.descriptorSetCount = VERTCACHE_NUM_FRAMES;
+	allocInfo.pSetLayouts = &layouts[0];
+
+	VkCheck(vkAllocateDescriptorSets(vkDevice, &allocInfo, &vkJointDescriptorSets[0]));
 }
 
 static void Vk_RegisterDebugger()
@@ -781,6 +805,7 @@ static bool Vk_InitDriver(VkImpParams_t params)
 	Vk_InitCommandPool();
 	Vk_CreatePipelineLayout();
 	Vk_CreateUniformDescriptorSet();
+	Vk_CreateJointDescriptorSets();
 	Vk_CreateRenderPass();
 	Vk_CreateSwapChain();
 	Vk_RecordAllCommandBuffers();
@@ -987,15 +1012,21 @@ void VkImp_Shutdown()
 	}
 	framebuffers.clear();
 
+	vkFreeDescriptorSets(vkDevice, descriptorPool, VERTCACHE_NUM_FRAMES, vkJointDescriptorSets);
+	vkFreeDescriptorSets(vkDevice, descriptorPool, 1, &vkDescriptorSet);
+	vkDestroyDescriptorSetLayout(vkDevice, uniformSetLayout, nullptr);
+	vkDestroyDescriptorSetLayout(vkDevice, imageSetLayout, nullptr);
+	vkDestroyDescriptorSetLayout(vkDevice, jointSetLayout, nullptr);
+	vkDestroyDescriptorPool(vkDevice, descriptorPool, nullptr);
 	vkDestroySemaphore(vkDevice, imageAvailableSemaphore, nullptr);
 	vkDestroySemaphore(vkDevice, renderingFinishedSemaphore, nullptr);
-	vkDestroySwapchainKHR(vkDevice, vkSwapchain, nullptr);
 	vkDestroyImageView(vkDevice, depthView, nullptr);
 	vkDestroyImage(vkDevice, depthImage, nullptr);
 	vkFreeMemory(vkDevice, depthMemory, nullptr);
 	vkDestroyRenderPass(vkDevice, vkRenderPass, nullptr);
 	vkDestroyPipelineLayout(vkDevice, vkPipelineLayout, nullptr);
 	vkDestroyCommandPool(vkDevice, vkCommandPool, nullptr);
+	vkDestroySwapchainKHR(vkDevice, vkSwapchain, nullptr);
 	vkDestroyDevice(vkDevice, nullptr);
 	vkDestroySurfaceKHR(vkInstance, vkSurface, nullptr);
 	
@@ -1288,6 +1319,37 @@ VkPipelineLayout Vk_GetPipelineLayout()
 VkDescriptorSet Vk_UniformDescriptorSet()
 {
 	return vkDescriptorSet;
+}
+
+VkDescriptorSet Vk_AllocateJointBufferSetForFrame(int idx, geoBufferSet_t& gbs)
+{
+	idJointBufferVk* jb = (idJointBufferVk*)gbs.jointBuffer;
+	VkDescriptorBufferInfo buf = {};
+	buf.buffer = jb->GetBuffer();
+	buf.range = VK_WHOLE_SIZE;
+
+	VkWriteDescriptorSet write = {};
+	write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	write.descriptorCount = 1;
+	write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
+	write.dstBinding = 0;
+	write.dstSet = vkJointDescriptorSets[idx];
+	write.pBufferInfo = &buf;
+
+	vkUpdateDescriptorSets(Vk_GetDevice(), 1, &write, 0, 0);
+	
+	return vkJointDescriptorSets[idx];
+}
+
+VkDescriptorSet Vk_JointBufferSetForFrame(int idx)
+{
+	assert(idx < VERTCACHE_NUM_FRAMES);
+	return vkJointDescriptorSets[idx];
+}
+
+void Vk_FreeDescriptorSet(const VkDescriptorSet set)
+{
+	vkFreeDescriptorSets(vkDevice, descriptorPool, 1, &set);
 }
 
 #endif

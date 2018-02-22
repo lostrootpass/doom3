@@ -39,27 +39,15 @@ layout(set = 0, binding = 1) uniform UBO {
 	vec4 _fa_[1];
 };
 
-vec2 vposToScreenPosTexCoord (vec2 vpos ) {return vpos. xy * _fa_[0 /* rpWindowCoord */] . xy ; }
 layout(set = 2, binding = 0) uniform sampler2D samp0;
 layout(set = 3, binding = 0) uniform sampler2D samp1;
-layout(set = 4, binding = 0) uniform sampler2D samp2;
 
 layout(location = 0) in vec4 fragCoord;
-layout(location = 1) in vec4 vofi_TexCoord0;
-layout(location = 2) in vec4 vofi_TexCoord1;
-layout(location = 3) in vec4 vofi_TexCoord2;
+layout(location = 1) in vec2 vofi_TexCoord0;
+layout(location = 2) in vec2 vofi_TexCoord1;
 
 layout(location = 0) out vec4 fragColor;
 
 void main() {
-	vec4 mask = tex2D ( samp2 , vofi_TexCoord0 . xy ) ;
-	mask. xy -= 0.01 ;
-	clip ( mask ) ;
-	vec4 bumpMap = ( tex2D ( samp1 , vofi_TexCoord1 . xy ) * 2.0 ) - 1.0 ;
-	vec2 localNormal = bumpMap. wy ;
-	localNormal *= mask. xy ;
-	vec2 screenTexCoord = vposToScreenPosTexCoord ( fragCoord . xy ) ;
-	screenTexCoord += ( localNormal * vofi_TexCoord2 . xy ) ;
-	screenTexCoord = saturate ( screenTexCoord ) ;
-	fragColor = tex2D ( samp0 , screenTexCoord ) ;
+	fragColor = tex2D ( samp0 , vofi_TexCoord0 ) * tex2D ( samp1 , vofi_TexCoord1 ) * _fa_[0 /* rpColor */] ;
 }
