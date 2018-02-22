@@ -7,9 +7,8 @@ vec3 saturate( vec3 v ) { return clamp( v, 0.0, 1.0 ); }
 vec4 saturate( vec4 v ) { return clamp( v, 0.0, 1.0 ); }
 vec4 tex2Dlod( sampler2D samp, vec4 texcoord ) { return textureLod( samp, texcoord.xy, texcoord.w ); }
 
-
 layout(set = 0, binding = 0) uniform UBO {
-	vec4 _va_[9];
+	vec4 _va_[16];
 };
 
 float dot3 (vec3 a , vec3 b ) {return dot ( a , b ) ; }
@@ -18,6 +17,7 @@ float dot3 (vec4 a , vec3 b ) {return dot ( a. xyz , b ) ; }
 float dot3 (vec4 a , vec4 b ) {return dot ( a. xyz , b. xyz ) ; }
 float dot4 (vec4 a , vec4 b ) {return dot ( a , b ) ; }
 float dot4 (vec2 a , vec4 b ) {return dot ( vec4 ( a , 0 , 1 ) , b ) ; }
+
 layout(set = 0, binding = 2) readonly buffer matrixbuffer {
 	vec4 matrices[408];
 };
@@ -30,12 +30,14 @@ layout(location = 4) in lowp vec4 in_Color;
 layout(location = 5) in lowp vec4 in_Color2;
 
 layout(location = 0) out vec4 out_Position;
-layout(location = 1) out vec2 vofi_TexCoord0;
-layout(location = 2) out vec3 vofi_TexCoord1;
-layout(location = 3) out vec3 vofi_TexCoord2;
-layout(location = 4) out vec3 vofi_TexCoord3;
-layout(location = 5) out vec3 vofi_TexCoord4;
-layout(location = 6) out vec4 frontColor;
+layout(location = 1) out vec4 vofi_TexCoord0;
+layout(location = 2) out vec4 vofi_TexCoord1;
+layout(location = 3) out vec4 vofi_TexCoord2;
+layout(location = 4) out vec4 vofi_TexCoord3;
+layout(location = 5) out vec4 vofi_TexCoord4;
+layout(location = 6) out vec4 vofi_TexCoord5;
+layout(location = 7) out vec4 vofi_TexCoord6;
+layout(location = 8) out vec4 frontColor;
 
 out gl_PerVertex
 {
@@ -87,23 +89,38 @@ void main() {
 	modelPosition. y = dot4 ( matY , in_Position ) ;
 	modelPosition. z = dot4 ( matZ , in_Position ) ;
 	modelPosition. w = 1.0 ;
-	out_Position . x = dot4 ( modelPosition , _va_[2 /* rpMVPmatrixX */] ) ;
-	out_Position . y = dot4 ( modelPosition , _va_[3 /* rpMVPmatrixY */] ) ;
-	out_Position . z = dot4 ( modelPosition , _va_[4 /* rpMVPmatrixZ */] ) ;
-	out_Position . w = dot4 ( modelPosition , _va_[5 /* rpMVPmatrixW */] ) ;
-	vofi_TexCoord0 = in_TexCoord . xy ;
-	vec4 toEye = _va_[0 /* rpLocalViewOrigin */] - modelPosition ;
-	vofi_TexCoord1 . x = dot3 ( toEye , _va_[6 /* rpModelMatrixX */] ) ;
-	vofi_TexCoord1 . y = dot3 ( toEye , _va_[7 /* rpModelMatrixY */] ) ;
-	vofi_TexCoord1 . z = dot3 ( toEye , _va_[8 /* rpModelMatrixZ */] ) ;
-	vofi_TexCoord2 . x = dot3 ( tangent , _va_[6 /* rpModelMatrixX */] ) ;
-	vofi_TexCoord3 . x = dot3 ( tangent , _va_[7 /* rpModelMatrixY */] ) ;
-	vofi_TexCoord4 . x = dot3 ( tangent , _va_[8 /* rpModelMatrixZ */] ) ;
-	vofi_TexCoord2 . y = dot3 ( binormal , _va_[6 /* rpModelMatrixX */] ) ;
-	vofi_TexCoord3 . y = dot3 ( binormal , _va_[7 /* rpModelMatrixY */] ) ;
-	vofi_TexCoord4 . y = dot3 ( binormal , _va_[8 /* rpModelMatrixZ */] ) ;
-	vofi_TexCoord2 . z = dot3 ( normal , _va_[6 /* rpModelMatrixX */] ) ;
-	vofi_TexCoord3 . z = dot3 ( normal , _va_[7 /* rpModelMatrixY */] ) ;
-	vofi_TexCoord4 . z = dot3 ( normal , _va_[8 /* rpModelMatrixZ */] ) ;
-	frontColor = _va_[1 /* rpColor */] ;
+	out_Position . x = dot4 ( modelPosition , _va_[12 /* rpMVPmatrixX */] ) ;
+	out_Position . y = dot4 ( modelPosition , _va_[13 /* rpMVPmatrixY */] ) ;
+	out_Position . z = dot4 ( modelPosition , _va_[14 /* rpMVPmatrixZ */] ) ;
+	out_Position . w = dot4 ( modelPosition , _va_[15 /* rpMVPmatrixW */] ) ;
+	vec4 defaultTexCoord = vec4 ( 0.0 , 0.5 , 0.0 , 1.0 ) ;
+	vec4 toLight = _va_[0 /* rpLocalLightOrigin */] - modelPosition ;
+	vofi_TexCoord0 . x = dot3 ( tangent , toLight ) ;
+	vofi_TexCoord0 . y = dot3 ( binormal , toLight ) ;
+	vofi_TexCoord0 . z = dot3 ( normal , toLight ) ;
+	vofi_TexCoord0 . w = 1.0 ;
+	vofi_TexCoord1 = defaultTexCoord ;
+	vofi_TexCoord1 . x = dot4 ( in_TexCoord . xy , _va_[6 /* rpBumpMatrixS */] ) ;
+	vofi_TexCoord1 . y = dot4 ( in_TexCoord . xy , _va_[7 /* rpBumpMatrixT */] ) ;
+	vofi_TexCoord2 = defaultTexCoord ;
+	vofi_TexCoord2 . x = dot4 ( modelPosition , _va_[5 /* rpLightFalloffS */] ) ;
+	vofi_TexCoord3 . x = dot4 ( modelPosition , _va_[2 /* rpLightProjectionS */] ) ;
+	vofi_TexCoord3 . y = dot4 ( modelPosition , _va_[3 /* rpLightProjectionT */] ) ;
+	vofi_TexCoord3 . z = 0.0 ;
+	vofi_TexCoord3 . w = dot4 ( modelPosition , _va_[4 /* rpLightProjectionQ */] ) ;
+	vofi_TexCoord4 = defaultTexCoord ;
+	vofi_TexCoord4 . x = dot4 ( in_TexCoord . xy , _va_[8 /* rpDiffuseMatrixS */] ) ;
+	vofi_TexCoord4 . y = dot4 ( in_TexCoord . xy , _va_[9 /* rpDiffuseMatrixT */] ) ;
+	vofi_TexCoord5 = defaultTexCoord ;
+	vofi_TexCoord5 . x = dot4 ( in_TexCoord . xy , _va_[10 /* rpSpecularMatrixS */] ) ;
+	vofi_TexCoord5 . y = dot4 ( in_TexCoord . xy , _va_[11 /* rpSpecularMatrixT */] ) ;
+	toLight = normalize ( toLight ) ;
+	vec4 toView = normalize ( _va_[1 /* rpLocalViewOrigin */] - modelPosition ) ;
+	vec4 halfAngleVector = toLight + toView ;
+	vofi_TexCoord6 . x = dot3 ( tangent , halfAngleVector ) ;
+	vofi_TexCoord6 . y = dot3 ( binormal , halfAngleVector ) ;
+	vofi_TexCoord6 . z = dot3 ( normal , halfAngleVector ) ;
+	vofi_TexCoord6 . w = 1.0 ;
+	frontColor = vec4 ( 1.0 , 1.0 , 1.0 , 1.0 ) ;
+	gl_Position = out_Position;
 }

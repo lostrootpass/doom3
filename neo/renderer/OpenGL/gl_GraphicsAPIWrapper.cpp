@@ -60,6 +60,7 @@ rendered is a mirored view.
 ====================
 */
 void GL_Cull( int cullType ) {
+#ifndef DOOM3_VULKAN
 	if ( backEnd.glState.faceCulling == cullType ) {
 		return;
 	}
@@ -85,6 +86,7 @@ void GL_Cull( int cullType ) {
 			}
 		}
 	}
+#endif
 
 	backEnd.glState.faceCulling = cullType;
 }
@@ -95,7 +97,9 @@ GL_Scissor
 ====================
 */
 void GL_Scissor( int x /* left*/, int y /* bottom */, int w, int h ) {
+#ifndef DOOM3_VULKAN
 	qglScissor( x, y, w, h );
+#endif
 }
 
 /*
@@ -104,7 +108,9 @@ GL_Viewport
 ====================
 */
 void GL_Viewport( int x /* left */, int y /* bottom */, int w, int h ) {
+#ifndef DOOM3_VULKAN
 	qglViewport( x, y, w, h );
+#endif
 }
 
 /*
@@ -132,12 +138,14 @@ void GL_DepthBoundsTest( const float zmin, const float zmax ) {
 		return;
 	}
 
+#ifndef DOOM3_VULKAN
 	if ( zmin == 0.0f && zmax == 0.0f ) {
 		qglDisable( GL_DEPTH_BOUNDS_TEST_EXT );
 	} else {
 		qglEnable( GL_DEPTH_BOUNDS_TEST_EXT );
 		qglDepthBoundsEXT( zmin, zmax );
 	}
+#endif
 }
 
 /*
@@ -206,6 +214,7 @@ GL_Clear
 ========================
 */
 void GL_Clear( bool color, bool depth, bool stencil, byte stencilValue, float r, float g, float b, float a ) {
+#ifndef DOOM3_VULKAN
 	int clearFlags = 0;
 	if ( color ) {
 		qglClearColor( r, g, b, a );
@@ -219,6 +228,7 @@ void GL_Clear( bool color, bool depth, bool stencil, byte stencilValue, float r,
 		clearFlags |= GL_STENCIL_BUFFER_BIT;
 	}
 	qglClear( clearFlags );
+#endif
 }
 
 /*
@@ -232,6 +242,10 @@ may touch, including the editor.
 void GL_SetDefaultState() {
 	RENDERLOG_PRINTF( "--- GL_SetDefaultState ---\n" );
 
+#ifdef DOOM3_VULKAN
+	memset( &backEnd.glState, 0, sizeof( backEnd.glState ) );
+	GL_State( 0, true );
+#else
 	qglClearDepth( 1.0f );
 
 	// make sure our GL state vector is set correctly
@@ -263,6 +277,7 @@ void GL_SetDefaultState() {
 	if ( r_useScissor.GetBool() ) {
 		qglScissor( 0, 0, renderSystem->GetWidth(), renderSystem->GetHeight() );
 	}
+#endif
 }
 
 #ifndef DOOM3_VULKAN

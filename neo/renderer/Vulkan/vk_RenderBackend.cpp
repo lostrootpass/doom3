@@ -122,6 +122,9 @@ void idRenderBackendVk::DrawElementsWithCounters(const drawSurf_t* surf)
 
 
 	if ( surf->jointCache ) {
+		//TODO
+		return;
+
 		idJointBuffer jointBuffer;
 		if ( !vertexCache->GetJointBuffer( surf->jointCache, &jointBuffer ) ) {
 			idLib::Warning( "RB_DrawElementsWithCounters, jointBuffer == NULL" );
@@ -145,10 +148,15 @@ void idRenderBackendVk::DrawElementsWithCounters(const drawSurf_t* surf)
 	}
 
 	//TODO: find out how to set this properly
-	//backEnd.glState.vertexLayout = LAYOUT_DRAW_VERT;
+	backEnd.glState.vertexLayout = LAYOUT_DRAW_VERT;
 
 	idRenderProgManagerVk* rpm = (idRenderProgManagerVk*)renderProgManager;
-	Vk_UsePipeline(rpm->GetPipelineForState(backEnd.glState.glStateBits));
+	VkPipeline pipeline = rpm->GetPipelineForState(backEnd.glState.glStateBits);
+
+	//Don't try to draw things we haven't ported shaders for yet.
+	if (pipeline == VK_NULL_HANDLE)
+		return;
+	Vk_UsePipeline(pipeline);
 
 	rpm->CommitUniforms();
 	VkDescriptorSet sets[] = { Vk_UniformDescriptorSet() };
@@ -181,6 +189,10 @@ void idRenderBackendVk::DrawElementsWithCounters(const drawSurf_t* surf)
 		//TODO
 		return;
 	}
+	else
+	{
+		return;
+	}
 
 	vkCmdDrawIndexed(cmd, r_singleTriangle.GetBool() ? 3 : surf->numIndexes,
 		1, 0, 0, 0);
@@ -188,6 +200,140 @@ void idRenderBackendVk::DrawElementsWithCounters(const drawSurf_t* surf)
 
 void idRenderBackendVk::DrawInteractions()
 {
+	if ( r_skipInteractions.GetBool() ) {
+		return;
+	}
+
+	renderLog.OpenMainBlock( MRB_DRAW_INTERACTIONS );
+	renderLog.OpenBlock( "RB_DrawInteractions" );
+
+	GL_SelectTexture( 0 );
+
+
+	const bool useLightDepthBounds = r_useLightDepthBounds.GetBool();
+
+	//
+	// for each light, perform shadowing and adding
+	//
+	for ( const viewLight_t * vLight = backEnd.viewDef->viewLights; vLight != NULL; vLight = vLight->next ) {
+		// do fogging later
+		if ( vLight->lightShader->IsFogLight() ) {
+			continue;
+		}
+		if ( vLight->lightShader->IsBlendLight() ) {
+			continue;
+		}
+
+		if ( vLight->localInteractions == NULL && vLight->globalInteractions == NULL && vLight->translucentInteractions == NULL ) {
+			continue;
+		}
+
+		const idMaterial * lightShader = vLight->lightShader;
+		renderLog.OpenBlock( lightShader->GetName() );
+
+		// set the depth bounds for the whole light
+		if ( useLightDepthBounds ) {
+			GL_DepthBoundsTest( vLight->scissorRect.zmin, vLight->scissorRect.zmax );
+		}
+
+		// only need to clear the stencil buffer and perform stencil testing if there are shadows
+		const bool performStencilTest = ( vLight->globalShadows != NULL || vLight->localShadows != NULL );
+
+		// mirror flips the sense of the stencil select, and I don't want to risk accidentally breaking it
+		// in the normal case, so simply disable the stencil select in the mirror case
+		const bool useLightStencilSelect = ( r_useLightStencilSelect.GetBool() && backEnd.viewDef->isMirror == false );
+
+		if ( performStencilTest ) {
+			if ( useLightStencilSelect ) {
+				// write a stencil mask for the visible light bounds to hi-stencil
+				StencilSelectLight( vLight );
+			} else {
+				// always clear whole S-Cull tiles
+				idScreenRect rect;
+				rect.x1 = ( vLight->scissorRect.x1 +  0 ) & ~15;
+				rect.y1 = ( vLight->scissorRect.y1 +  0 ) & ~15;
+				rect.x2 = ( vLight->scissorRect.x2 + 15 ) & ~15;
+				rect.y2 = ( vLight->scissorRect.y2 + 15 ) & ~15;
+
+				if ( !backEnd.currentScissor.Equals( rect ) && r_useScissor.GetBool() ) {
+					GL_Scissor( backEnd.viewDef->viewport.x1 + rect.x1,
+								backEnd.viewDef->viewport.y1 + rect.y1,
+								rect.x2 + 1 - rect.x1,
+								rect.y2 + 1 - rect.y1 );
+					backEnd.currentScissor = rect;
+				}
+				GL_State( GLS_DEFAULT );	// make sure stencil mask passes for the clear
+				GL_Clear( false, false, true, STENCIL_SHADOW_TEST_VALUE, 0.0f, 0.0f, 0.0f, 0.0f );
+			}
+		}
+
+		if ( vLight->globalShadows != NULL ) {
+			renderLog.OpenBlock( "Global Light Shadows" );
+			StencilShadowPass( vLight->globalShadows, vLight );
+			renderLog.CloseBlock();
+		}
+
+		if ( vLight->localInteractions != NULL ) {
+			renderLog.OpenBlock( "Local Light Interactions" );
+			RenderInteractions( vLight->localInteractions, vLight, GLS_DEPTHFUNC_EQUAL, performStencilTest, useLightDepthBounds );
+			renderLog.CloseBlock();
+		}
+
+		if ( vLight->localShadows != NULL ) {
+			renderLog.OpenBlock( "Local Light Shadows" );
+			StencilShadowPass( vLight->localShadows, vLight );
+			renderLog.CloseBlock();
+		}
+
+		if ( vLight->globalInteractions != NULL ) {
+			renderLog.OpenBlock( "Global Light Interactions" );
+			RenderInteractions( vLight->globalInteractions, vLight, GLS_DEPTHFUNC_EQUAL, performStencilTest, useLightDepthBounds );
+			renderLog.CloseBlock();
+		}
+
+
+		if ( vLight->translucentInteractions != NULL && !r_skipTranslucent.GetBool() ) {
+			renderLog.OpenBlock( "Translucent Interactions" );
+
+			// Disable the depth bounds test because translucent surfaces don't work with
+			// the depth bounds tests since they did not write depth during the depth pass.
+			if ( useLightDepthBounds ) {
+				GL_DepthBoundsTest( 0.0f, 0.0f );
+			}
+
+			// The depth buffer wasn't filled in for translucent surfaces, so they
+			// can never be constrained to perforated surfaces with the depthfunc equal.
+
+			// Translucent surfaces do not receive shadows. This is a case where a
+			// shadow buffer solution would work but stencil shadows do not because
+			// stencil shadows only affect surfaces that contribute to the view depth
+			// buffer and translucent surfaces do not contribute to the view depth buffer.
+
+			RenderInteractions( vLight->translucentInteractions, vLight, GLS_DEPTHFUNC_LESS, false, false );
+
+			renderLog.CloseBlock();
+		}
+
+		renderLog.CloseBlock();
+	}
+
+	// disable stencil shadow test
+	GL_State( GLS_DEFAULT );
+
+	// unbind texture units
+	for ( int i = 0; i < 5; i++ ) {
+		GL_SelectTexture( i );
+		globalImages->BindNull();
+	}
+	GL_SelectTexture( 0 );
+
+	// reset depth bounds
+	if ( useLightDepthBounds ) {
+		GL_DepthBoundsTest( 0.0f, 0.0f );
+	}
+
+	renderLog.CloseBlock();
+	renderLog.CloseMainBlock();
 }
 
 int idRenderBackendVk::DrawShaderPasses(const drawSurf_t * const * const drawSurfs, const int numDrawSurfs, const float guiStereoScreenOffset, const int stereoEye)
@@ -486,7 +632,6 @@ int idRenderBackendVk::DrawShaderPasses(const drawSurf_t * const * const drawSur
 			PrepareStageTexturing( pStage, surf );
 
 			// draw it
-			backEnd.glState.vertexLayout = LAYOUT_DRAW_VERT;
 			DrawElementsWithCounters( surf );
 
 			FinishStageTexturing( pStage, surf );
@@ -548,7 +693,7 @@ void idRenderBackendVk::DrawView(const void* data, const int stereoEye)
 	// restore the context for 2D drawing if we were stubbing it out
 	if ( r_skipRenderContext.GetBool() && backEnd.viewDef->viewEntitys ) {
 		//GLimp_ActivateContext();
-		//GL_SetDefaultState();
+		GL_SetDefaultState();
 	}
 
 	// optionally draw a box colored based on the eye number
@@ -830,10 +975,8 @@ void idRenderBackendVk::FillDepthBufferFast(drawSurf_t **drawSurfs, int numDrawS
 		renderLog.OpenBlock( shader->GetName() );
 
 		if ( surf->jointCache ) {
-			backEnd.glState.vertexLayout = LAYOUT_DRAW_SHADOW_VERT_SKINNED;
 			renderProgManager->BindShader_DepthSkinned();
 		} else {
-			backEnd.glState.vertexLayout = LAYOUT_DRAW_SHADOW_VERT;
 			renderProgManager->BindShader_Depth();
 		}
 
@@ -860,12 +1003,52 @@ void idRenderBackendVk::FillDepthBufferFast(drawSurf_t **drawSurfs, int numDrawS
 
 void idRenderBackendVk::FinishStageTexturing(const shaderStage_t *pStage, const drawSurf_t *surf)
 {
+	if ( pStage->texture.cinematic ) {
+		// unbind the extra bink textures
+		GL_SelectTexture( 1 );
+		globalImages->BindNull();
+		GL_SelectTexture( 2 );
+		globalImages->BindNull();
+		GL_SelectTexture( 0 );
+	}
 
+	if ( pStage->texture.texgen == TG_REFLECT_CUBE ) {
+		// see if there is also a bump map specified
+		const shaderStage_t *bumpStage = surf->material->GetBumpStage();
+		if ( bumpStage != NULL ) {
+			// per-pixel reflection mapping with bump mapping
+			GL_SelectTexture( 1 );
+			globalImages->BindNull();
+			GL_SelectTexture( 0 );
+		} else {
+			// per-pixel reflection mapping without bump mapping
+		}
+		renderProgManager->Unbind();
+	}
 }
 
 void idRenderBackendVk::FogAllLights()
 {
+	if ( r_skipFogLights.GetBool() || r_showOverDraw.GetInteger() != 0 
+		 || backEnd.viewDef->isXraySubview /* don't fog in xray mode*/ ) {
+		return;
+	}
+	renderLog.OpenMainBlock( MRB_FOG_ALL_LIGHTS );
+	renderLog.OpenBlock( "RB_FogAllLights" );
 
+	// force fog plane to recalculate
+	backEnd.currentSpace = NULL;
+
+	for ( viewLight_t * vLight = backEnd.viewDef->viewLights; vLight != NULL; vLight = vLight->next ) {
+		if ( vLight->lightShader->IsFogLight() ) {
+			FogPass( vLight->globalInteractions, vLight->localInteractions, vLight );
+		} else if ( vLight->lightShader->IsBlendLight() ) {
+			BlendLight( vLight->globalInteractions, vLight->localInteractions, vLight );
+		}
+	}
+
+	renderLog.CloseBlock();
+	renderLog.CloseMainBlock();
 }
 
 void idRenderBackendVk::PostProcess(const void* data)
@@ -1072,6 +1255,57 @@ void idRenderBackendVk::BakeTextureMatrixIntoTexgen(idPlane lightProject[3], con
 
 void idRenderBackendVk::BasicFog(const drawSurf_t *drawSurfs, const idPlane fogPlanes[4], const idRenderMatrix * inverseBaseLightProject)
 {
+	backEnd.currentSpace = NULL;
+
+	for ( const drawSurf_t * drawSurf = drawSurfs; drawSurf != NULL; drawSurf = drawSurf->nextOnLight ) {
+		if ( drawSurf->scissorRect.IsEmpty() ) {
+			continue;	// !@# FIXME: find out why this is sometimes being hit!
+						// temporarily jump over the scissor and draw so the gl error callback doesn't get hit
+		}
+
+		if ( !backEnd.currentScissor.Equals( drawSurf->scissorRect ) && r_useScissor.GetBool() ) {
+			// change the scissor
+			GL_Scissor( backEnd.viewDef->viewport.x1 + drawSurf->scissorRect.x1,
+						backEnd.viewDef->viewport.y1 + drawSurf->scissorRect.y1,
+						drawSurf->scissorRect.x2 + 1 - drawSurf->scissorRect.x1,
+						drawSurf->scissorRect.y2 + 1 - drawSurf->scissorRect.y1 );
+			backEnd.currentScissor = drawSurf->scissorRect;
+		}
+
+		if ( drawSurf->space != backEnd.currentSpace ) {
+			idPlane localFogPlanes[4];
+			if ( inverseBaseLightProject == NULL ) {
+				SetMVP( drawSurf->space->mvp );
+				for ( int i = 0; i < 4; i++ ) {
+					R_GlobalPlaneToLocal( drawSurf->space->modelMatrix, fogPlanes[i], localFogPlanes[i] );
+				}
+			} else {
+				idRenderMatrix invProjectMVPMatrix;
+				idRenderMatrix::Multiply( backEnd.viewDef->worldSpace.mvp, *inverseBaseLightProject, invProjectMVPMatrix );
+				SetMVP( invProjectMVPMatrix );
+				for ( int i = 0; i < 4; i++ ) {
+					inverseBaseLightProject->InverseTransformPlane( fogPlanes[i], localFogPlanes[i], false );
+				}
+			}
+
+			SetVertexParm( RENDERPARM_TEXGEN_0_S, localFogPlanes[0].ToFloatPtr() );
+			SetVertexParm( RENDERPARM_TEXGEN_0_T, localFogPlanes[1].ToFloatPtr() );
+			SetVertexParm( RENDERPARM_TEXGEN_1_T, localFogPlanes[2].ToFloatPtr() );
+			SetVertexParm( RENDERPARM_TEXGEN_1_S, localFogPlanes[3].ToFloatPtr() );
+
+			backEnd.currentSpace = ( inverseBaseLightProject == NULL ) ? drawSurf->space : NULL;
+		}
+
+		if ( drawSurf->jointCache ) {
+			renderProgManager->BindShader_FogSkinned();
+		} else {
+			renderProgManager->BindShader_Fog();
+		}
+
+		
+		idRenderSystemLocal* rs = (idRenderSystemLocal*)renderSystem;
+		rs->renderBackend->DrawElementsWithCounters( drawSurf );
+	}
 }
 
 void idRenderBackendVk::BlendLight(const drawSurf_t *drawSurfs, const viewLight_t * vLight)
@@ -1390,10 +1624,8 @@ void idRenderBackendVk::FillDepthBufferGeneric(const drawSurf_t * const * drawSu
 				GL_State( surfGLState );
 			} else {
 				if ( drawSurf->jointCache ) {
-					backEnd.glState.vertexLayout = LAYOUT_DRAW_SHADOW_VERT_SKINNED;
 					renderProgManager->BindShader_DepthSkinned();
 				} else {
-					backEnd.glState.vertexLayout = LAYOUT_DRAW_SHADOW_VERT;
 					renderProgManager->BindShader_Depth();
 				}
 				GL_State( surfGLState | GLS_ALPHAMASK );
@@ -1416,6 +1648,96 @@ void idRenderBackendVk::FillDepthBufferGeneric(const drawSurf_t * const * drawSu
 
 void idRenderBackendVk::FogPass(const drawSurf_t * drawSurfs, const drawSurf_t * drawSurfs2, const viewLight_t * vLight)
 {
+	renderLog.OpenBlock( vLight->lightShader->GetName() );
+
+	// find the current color and density of the fog
+	const idMaterial * lightShader = vLight->lightShader;
+	const float * regs = vLight->shaderRegisters;
+	// assume fog shaders have only a single stage
+	const shaderStage_t * stage = lightShader->GetStage( 0 );
+
+	float lightColor[4];
+	lightColor[0] = regs[ stage->color.registers[0] ];
+	lightColor[1] = regs[ stage->color.registers[1] ];
+	lightColor[2] = regs[ stage->color.registers[2] ];
+	lightColor[3] = regs[ stage->color.registers[3] ];
+
+	GL_Color( lightColor );
+
+	// calculate the falloff planes
+	float a;
+
+	// if they left the default value on, set a fog distance of 500
+	if ( lightColor[3] <= 1.0f ) {
+		a = -0.5f / DEFAULT_FOG_DISTANCE;
+	} else {
+		// otherwise, distance = alpha color
+		a = -0.5f / lightColor[3];
+	}
+
+	// texture 0 is the falloff image
+	GL_SelectTexture( 0 );
+	globalImages->fogImage->Bind();
+
+	// texture 1 is the entering plane fade correction
+	GL_SelectTexture( 1 );
+	globalImages->fogEnterImage->Bind();
+
+	// S is based on the view origin
+	const float s = vLight->fogPlane.Distance( backEnd.viewDef->renderView.vieworg );
+
+	const float FOG_SCALE = 0.001f;
+
+	idPlane fogPlanes[4];
+
+	// S-0
+	fogPlanes[0][0] = a * backEnd.viewDef->worldSpace.modelViewMatrix[0*4+2];
+	fogPlanes[0][1] = a * backEnd.viewDef->worldSpace.modelViewMatrix[1*4+2];
+	fogPlanes[0][2] = a * backEnd.viewDef->worldSpace.modelViewMatrix[2*4+2];
+	fogPlanes[0][3] = a * backEnd.viewDef->worldSpace.modelViewMatrix[3*4+2] + 0.5f;
+
+	// T-0
+	fogPlanes[1][0] = 0.0f;//a * backEnd.viewDef->worldSpace.modelViewMatrix[0*4+0];
+	fogPlanes[1][1] = 0.0f;//a * backEnd.viewDef->worldSpace.modelViewMatrix[1*4+0];
+	fogPlanes[1][2] = 0.0f;//a * backEnd.viewDef->worldSpace.modelViewMatrix[2*4+0];
+	fogPlanes[1][3] = 0.5f;//a * backEnd.viewDef->worldSpace.modelViewMatrix[3*4+0] + 0.5f;
+
+	// T-1 will get a texgen for the fade plane, which is always the "top" plane on unrotated lights
+	fogPlanes[2][0] = FOG_SCALE * vLight->fogPlane[0];
+	fogPlanes[2][1] = FOG_SCALE * vLight->fogPlane[1];
+	fogPlanes[2][2] = FOG_SCALE * vLight->fogPlane[2];
+	fogPlanes[2][3] = FOG_SCALE * vLight->fogPlane[3] + FOG_ENTER;
+
+	// S-1
+	fogPlanes[3][0] = 0.0f;
+	fogPlanes[3][1] = 0.0f;
+	fogPlanes[3][2] = 0.0f;
+	fogPlanes[3][3] = FOG_SCALE * s + FOG_ENTER;
+
+	// draw it
+	GL_State( GLS_DEPTHMASK | GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA | GLS_DEPTHFUNC_EQUAL );
+	BasicFog( drawSurfs, fogPlanes, NULL );
+	BasicFog( drawSurfs2, fogPlanes, NULL );
+
+	// the light frustum bounding planes aren't in the depth buffer, so use depthfunc_less instead
+	// of depthfunc_equal
+	GL_State( GLS_DEPTHMASK | GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA | GLS_DEPTHFUNC_LESS );
+	GL_Cull( CT_BACK_SIDED );
+
+	backEnd.zeroOneCubeSurface.space = &backEnd.viewDef->worldSpace;
+	backEnd.zeroOneCubeSurface.scissorRect = backEnd.viewDef->scissor;
+	BasicFog( &backEnd.zeroOneCubeSurface, fogPlanes, &vLight->inverseBaseLightProject );
+
+	GL_Cull( CT_FRONT_SIDED );
+
+	GL_SelectTexture( 1 );
+	globalImages->BindNull();
+
+	GL_SelectTexture( 0 );
+
+	renderProgManager->Unbind();
+
+	renderLog.CloseBlock();
 }
 
 void idRenderBackendVk::GetShaderTextureMatrix(const float *shaderRegisters, const textureStage_t *texture, float matrix[16])
@@ -1852,6 +2174,53 @@ void idRenderBackendVk::SetupInteractionStage(const shaderStage_t *surfaceStage,
 
 void idRenderBackendVk::StencilSelectLight(const viewLight_t * vLight)
 {
+	renderLog.OpenBlock( "Stencil Select" );
+
+	// enable the light scissor
+	if ( !backEnd.currentScissor.Equals( vLight->scissorRect ) && r_useScissor.GetBool() ) {
+		GL_Scissor( backEnd.viewDef->viewport.x1 + vLight->scissorRect.x1, 
+					backEnd.viewDef->viewport.y1 + vLight->scissorRect.y1,
+					vLight->scissorRect.x2 + 1 - vLight->scissorRect.x1,
+					vLight->scissorRect.y2 + 1 - vLight->scissorRect.y1 );
+		backEnd.currentScissor = vLight->scissorRect;
+	}
+
+	// clear stencil buffer to 0 (not drawable)
+	uint64 glStateMinusStencil = GL_GetCurrentStateMinusStencil();
+	GL_State( glStateMinusStencil | GLS_STENCIL_FUNC_ALWAYS | GLS_STENCIL_MAKE_REF( STENCIL_SHADOW_TEST_VALUE ) | GLS_STENCIL_MAKE_MASK( STENCIL_SHADOW_MASK_VALUE ) );	// make sure stencil mask passes for the clear
+	GL_Clear( false, false, true, 0, 0.0f, 0.0f, 0.0f, 0.0f );	// clear to 0 for stencil select
+
+	// set the depthbounds
+	GL_DepthBoundsTest( vLight->scissorRect.zmin, vLight->scissorRect.zmax );
+
+
+	GL_State( GLS_COLORMASK | GLS_ALPHAMASK | GLS_DEPTHMASK | GLS_DEPTHFUNC_LESS | GLS_STENCIL_FUNC_ALWAYS | GLS_STENCIL_MAKE_REF( STENCIL_SHADOW_TEST_VALUE ) | GLS_STENCIL_MAKE_MASK( STENCIL_SHADOW_MASK_VALUE ) );
+	GL_Cull( CT_TWO_SIDED );
+
+	renderProgManager->BindShader_Depth();
+
+	// set the matrix for deforming the 'zeroOneCubeModel' into the frustum to exactly cover the light volume
+	idRenderMatrix invProjectMVPMatrix;
+	idRenderMatrix::Multiply( backEnd.viewDef->worldSpace.mvp, vLight->inverseBaseLightProject, invProjectMVPMatrix );
+	SetMVP( invProjectMVPMatrix );
+
+	// two-sided stencil test
+	//qglStencilOpSeparate( GL_FRONT, GL_KEEP, GL_REPLACE, GL_ZERO );
+	//qglStencilOpSeparate( GL_BACK, GL_KEEP, GL_ZERO, GL_REPLACE );
+
+	DrawElementsWithCounters( &backEnd.zeroOneCubeSurface );
+
+	// reset stencil state
+
+	GL_Cull( CT_FRONT_SIDED );
+
+	renderProgManager->Unbind();
+
+
+	// unset the depthbounds
+	GL_DepthBoundsTest( 0.0f, 0.0f );
+
+	renderLog.CloseBlock();
 }
 
 void idRenderBackendVk::StencilShadowPass(const drawSurf_t *drawSurfs, const viewLight_t * vLight)

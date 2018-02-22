@@ -202,6 +202,10 @@ public:
 	virtual int			FindProgram( const char* name, int vIndex, int fIndex )=0;
 	virtual void		ZeroUniforms()=0;
 
+
+	virtual void BeginFrame() {};
+	virtual void EndFrame() {};
+
 protected:
 	virtual void	LoadVertexShader( int index )=0;
 	virtual void	LoadFragmentShader( int index )=0;
@@ -348,6 +352,9 @@ public:
 
 	virtual void Init() override;
 
+	virtual void BeginFrame() override;
+	virtual void EndFrame() override;
+
 	VkPipeline GetPipelineForState(uint64 state);
 	size_t		GetCurrentVertUniformOffset() const;
 	size_t		GetCurrentFragUniformOffset() const;
@@ -377,6 +384,12 @@ private:
 	VkBuffer uniformBuffer;
 
 	int totalUniformCount;
+
+	size_t currentVertOffset;
+	size_t currentFragOffset;
+	size_t nextVertOffset;
+
+	void* uniformPtr;
 };
 #endif
 

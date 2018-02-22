@@ -497,7 +497,7 @@ static void Vk_RecordCommandBuffer(VkFramebuffer framebuffer, VkCommandBuffer cm
 	
 	VkClearValue clearValues[] = {
 		{ 0.0f, 0.0f, 0.5f, 1.0f }, //Clear color
-		{ 1.0f, 0 } //Depth stencil
+		{ 1.0f, STENCIL_SHADOW_TEST_VALUE } //Depth stencil
 	};
 
 	VkExtent2D extent = surfaceCaps.currentExtent;
@@ -548,6 +548,8 @@ void Vk_EndRenderPass()
 		return;
 
 	vkCmdEndRenderPass(cmd);
+
+	renderProgManager->EndFrame();
 
 	VkCheck(vkEndCommandBuffer(cmd));
 }
@@ -635,12 +637,14 @@ static void Vk_CreatePipelineLayout()
 
 	VkCheck(vkCreateDescriptorPool(vkDevice, &poolCreateInfo, nullptr, &descriptorPool));
 
-	const uint32_t SET_COUNT = 4;
+	const uint32_t SET_COUNT = 6;
 	VkDescriptorSet layouts[] = {
 		//set 0 - uniforms
 		uniformSetLayout,
 
-		//set 1, set 2, set 3 - texture bindings
+		//sets 1-5 - texture bindings
+		imageSetLayout,
+		imageSetLayout,
 		imageSetLayout,
 		imageSetLayout,
 		imageSetLayout

@@ -1491,13 +1491,14 @@ void idRenderProgManagerGL::Unbind() {
 				Vulkan
 **********************************************/
 
-
+const int UNIFORM_BUFFER_SIZE = 65536 * 16;
 /*
 ================================================================================================
 idRenderProgManagerVk::idRenderProgManagerVk
 ================================================================================================
 */
-idRenderProgManagerVk::idRenderProgManagerVk() : idRenderProgManager() {
+idRenderProgManagerVk::idRenderProgManagerVk() : idRenderProgManager(),
+currentVertOffset(0), currentFragOffset(0), nextVertOffset(0), uniformPtr(nullptr) {
 
 }
 
@@ -1556,59 +1557,50 @@ void idRenderProgManagerVk::SetUniformValue(const renderParm_t rp, const float *
 
 void idRenderProgManagerVk::CommitUniforms() {
 	ALIGNTYPE16 idVec4 localVectors[RENDERPARM_USER + MAX_GLSL_USER_PARMS];
-
-	size_t size = totalUniformCount * sizeof(idVec4);
-	void* ptr = Vk_MapMemory(uniformStagingMemory, 0, size, 0);
-	size_t vertexUniformSize = 0, fragUniformSize = 0;
-
-	for (int progID = 0; progID < vertexShaders.Num(); ++progID)
+	
+	currentVertOffset = nextVertOffset;
+	
+	const glslProgram_t & prog = glslPrograms[currentRenderProgram];
+	
+	size_t thisUniform = 0;
+	const idList<int> & vertexUniforms = vertexShaders[prog.vertexShaderIndex].uniforms;
+	if (vertexUniforms.Num())
 	{
-		const glslProgram_t & prog = glslPrograms[progID];
-
-		if (r_useUniformArrays.GetBool()) {
-				const idList<int> & vertexUniforms = vertexShaders[progID].uniforms;
-				if (prog.vertexUniformArray != -1 && vertexUniforms.Num() > 0) {
-					for (int i = 0; i < vertexUniforms.Num(); i++) {
-						localVectors[i] = glslUniforms[vertexUniforms[i]];
-					}
-
-					size_t thisUniform = vertexUniforms.Num() * sizeof(idVec4);
-					memcpy(ptr, localVectors->ToFloatPtr(), thisUniform);
-
-					thisUniform = (thisUniform + 0x100) & -0x100;
-					ptr = (char*)ptr + thisUniform;
-					vertexUniformSize += thisUniform;
-				}
+		for (int i = 0; i < vertexUniforms.Num(); ++i)
+		{
+			localVectors[i] = glslUniforms[vertexUniforms[i]];
 		}
+
+
+		thisUniform = vertexUniforms.Num() * sizeof(idVec4);
+		memcpy(uniformPtr, localVectors->ToFloatPtr(), thisUniform);
+
+		thisUniform = (thisUniform + 0x100) & -0x100;
+		uniformPtr = (char*)uniformPtr + thisUniform;
 	}
 
-	for (int progID = 0; progID < fragmentShaders.Num(); ++progID)
+	currentFragOffset = currentVertOffset + thisUniform;
+	thisUniform = 0;
+
+	const idList<int> & fragmentUniforms = fragmentShaders[prog.fragmentShaderIndex].uniforms;
+	if (fragmentUniforms.Num())
 	{
-		const glslProgram_t & prog = glslPrograms[progID];
-			const idList<int> & fragmentUniforms = fragmentShaders[progID].uniforms;
-			if (prog.fragmentUniformArray != -1 && fragmentUniforms.Num() > 0) {
-				for (int i = 0; i < fragmentUniforms.Num(); i++) {
-					localVectors[i] = glslUniforms[fragmentUniforms[i]];
-				}
+		for (int i = 0; i < fragmentUniforms.Num(); ++i)
+		{
+			localVectors[i] = glslUniforms[fragmentUniforms[i]];
+		}
 
-				size_t thisUniform = fragmentUniforms.Num() * sizeof(idVec4);
-				memcpy(ptr, localVectors->ToFloatPtr(), thisUniform);
 
-				thisUniform = (thisUniform + 0x100) & -0x100;
-				ptr = (char*)ptr + thisUniform;
-				fragUniformSize += thisUniform;
-			}
+		thisUniform = fragmentUniforms.Num() * sizeof(idVec4);
+		memcpy(uniformPtr, localVectors->ToFloatPtr(), thisUniform);
+
+		thisUniform = (thisUniform + 0x100) & -0x100;
+		uniformPtr = (char*)uniformPtr + thisUniform;
 	}
+	
+	nextVertOffset = currentFragOffset + thisUniform;
 
-	Vk_UnmapMemory(uniformStagingMemory);
-
-	//TODO: perf!
-	VkCommandBuffer cmd = Vk_StartOneShotCommandBuffer();
-	VkBufferCopy copy = {};
-	copy.size = vertexUniformSize + fragUniformSize;
-
-	vkCmdCopyBuffer(cmd, uniformStagingBuffer, uniformBuffer, 1, &copy);
-	Vk_SubmitOneShotCommandBuffer(cmd);
+	assert(nextVertOffset < UNIFORM_BUFFER_SIZE);
 }
 
 int idRenderProgManagerVk::FindProgram(const char* name, int vIndex, int fIndex) {
@@ -1820,19 +1812,18 @@ void idRenderProgManagerVk::Init()
 	//TODO: Technically allocating a 16KB fixed-size uniform buffer is ~fine~
 	//but it would be better if we allocated according to needs and resized
 	//though the exact amount of uniform memory needed is not known at startup
-	bufferSize = 16384;
 	Vk_CreateUniformBuffer(uniformStagingMemory, uniformStagingBuffer, 
-		uniformMemory, uniformBuffer, bufferSize);
+		uniformMemory, uniformBuffer, UNIFORM_BUFFER_SIZE);
 
 	VkDescriptorBufferInfo bufferInfo[2];
 	bufferInfo[0] = {};
 	bufferInfo[0].buffer = uniformBuffer;
 	bufferInfo[0].offset = 0;
-	bufferInfo[0].range = vertexSize;
+	bufferInfo[0].range = VK_WHOLE_SIZE;
 
 	bufferInfo[1] = {};
 	bufferInfo[1].buffer = uniformBuffer;
-	bufferInfo[1].offset = vertexSize;
+	bufferInfo[1].offset = 0;
 	bufferInfo[1].range = VK_WHOLE_SIZE;
 
 	VkWriteDescriptorSet write[2];
@@ -2088,12 +2079,14 @@ VkPipeline idRenderProgManagerVk::GetPipelineForState(uint64 stateBits)
 	size_t sz[MAX_VTX_ATTRS];
 	VkFormat fmt[MAX_VTX_ATTRS];
 	size_t offsets[MAX_VTX_ATTRS];
+	size_t stride = 0;
 	int vtxAttrCount = -1;
 
 	switch (backEnd.glState.vertexLayout)
 	{
 	case LAYOUT_DRAW_VERT:
 		vtxAttrCount = 6;
+		stride = sizeof(idDrawVert);
 
 		sz[0] = sizeof(idDrawVert::xyz);
 		fmt[0] = VK_FORMAT_R32G32B32_SFLOAT;
@@ -2122,7 +2115,8 @@ VkPipeline idRenderProgManagerVk::GetPipelineForState(uint64 stateBits)
 
 	case LAYOUT_DRAW_SHADOW_VERT:
 		vtxAttrCount = 1;
-		
+		stride = sizeof(idShadowVert);
+
 		sz[0] = sizeof(idShadowVert::xyzw);
 		fmt[0] = VK_FORMAT_R32G32B32A32_SFLOAT;
 		offsets[0] = SHADOWVERT_XYZW_OFFSET;
@@ -2130,6 +2124,7 @@ VkPipeline idRenderProgManagerVk::GetPipelineForState(uint64 stateBits)
 
 	case LAYOUT_DRAW_SHADOW_VERT_SKINNED:
 		vtxAttrCount = 3;
+		stride = sizeof(idShadowVertSkinned);
 
 		sz[0] = sizeof(idShadowVertSkinned::xyzw);
 		fmt[0] = VK_FORMAT_R32G32B32A32_SFLOAT;
@@ -2149,11 +2144,7 @@ VkPipeline idRenderProgManagerVk::GetPipelineForState(uint64 stateBits)
 		break;
 	}
 
-	vbs.stride = 0;
-	for (int i = 0; i < vtxAttrCount; ++i)
-	{
-		vbs.stride += sz[i];
-	}
+	vbs.stride = stride;
 	vbs.stride = vbs.stride + 15 & -16;
 	
 	VkVertexInputAttributeDescription vtxAttrs[MAX_VTX_ATTRS] = {};
@@ -2229,6 +2220,9 @@ VkPipeline idRenderProgManagerVk::GetPipelineForState(uint64 stateBits)
 		//TODO
 		info.layout = Vk_GetPipelineLayout();
 		break;
+	default:
+		return VK_NULL_HANDLE;
+		break;
 	}
 
 	pipeline = Vk_CreatePipeline(info);
@@ -2239,26 +2233,32 @@ VkPipeline idRenderProgManagerVk::GetPipelineForState(uint64 stateBits)
 
 size_t idRenderProgManagerVk::GetCurrentVertUniformOffset() const
 {
-	size_t offset = 0;
-
-	for(int i = 0; i < glslPrograms[currentRenderProgram].vertexShaderIndex; ++i)
-	{
-		if(vertexShaders[i].uniforms.Num())
-			offset += ((vertexShaders[i].uniforms.Num() * sizeof(idVec4))) + 0x100 & -0x100;
-	}
-
-	return offset;
+	return currentVertOffset;
 }
 
 size_t idRenderProgManagerVk::GetCurrentFragUniformOffset() const
 {
-	size_t offset = 0;
+	return currentFragOffset;
+}
 
-	for(int i = 0; i < glslPrograms[currentRenderProgram].fragmentShaderIndex; ++i)
+void idRenderProgManagerVk::BeginFrame()
+{
+	uniformPtr = Vk_MapMemory(uniformStagingMemory, 0, UNIFORM_BUFFER_SIZE, 0);
+	currentFragOffset = currentVertOffset = nextVertOffset = 0;
+}
+
+void idRenderProgManagerVk::EndFrame()
+{
+	if (uniformPtr != nullptr)
 	{
-		if(fragmentShaders[i].uniforms.Num())
-			offset += ((fragmentShaders[i].uniforms.Num() * sizeof(idVec4))) + 0x100 & -0x100;
-	}
+		Vk_UnmapMemory(uniformStagingMemory);
+		uniformPtr = nullptr;
 
-	return offset;
+		VkBufferCopy copy = {};
+		copy.size = UNIFORM_BUFFER_SIZE;
+		VkCommandBuffer b = Vk_StartOneShotCommandBuffer();
+		vkCmdCopyBuffer(b, uniformStagingBuffer, uniformBuffer, 1, &copy);
+		//vkCmdCopyBuffer(Vk_ActiveCommandBuffer(), uniformStagingBuffer, uniformBuffer, 1, &copy);
+		Vk_SubmitOneShotCommandBuffer(b);
+	}
 }
