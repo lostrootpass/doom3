@@ -70,7 +70,7 @@ void idImage::FinaliseImageUpload()
 
 	VkImageSubresourceRange range = {};
 	range.layerCount = layerCount;
-	range.levelCount = 1;
+	range.levelCount = opts.numLevels;
 	range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 	Vk_SetImageLayout(image, format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, range);
 
@@ -267,7 +267,30 @@ void idImage::SubImageUpload(int mipLevel, int x, int y, int z, int width, int h
 
 	VkFlags flags = 0;
 	void* ptr = Vk_MapMemory(stagingMemory, offset, size, flags);
-	memcpy(ptr, pic, size);
+
+	//For RGB565 images only, swap byte order to simulate GL_UNPACK_SWAP_BYTES
+	//RGB565 images are always going to be the light projection textures
+	//Could probably do this without the alloc and swap the bytes on load instead
+	if (opts.format == FMT_RGB565)
+	{
+		uint16_t* img = (uint16_t*)pic;
+		uint16_t* copy = new uint16_t[size * 2]{ 0 };
+		uint8_t lo, hi;
+		for (VkDeviceSize i = 0; i < size/2; ++i)
+		{
+			lo = (img[i] & 0xff);
+			hi = (img[i] >> 8) & 0xff;
+			copy[i] = lo << 8 | hi;
+		}
+
+		memcpy(ptr, copy, size);
+		delete[] copy;
+	}
+	else
+	{
+		memcpy(ptr, pic, size);
+	}
+
 	Vk_UnmapMemory(stagingMemory);
 }
 
