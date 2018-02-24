@@ -1518,13 +1518,6 @@ void idRenderProgManagerVk::BindShader(int vIndex, int fIndex) {
 	currentVertexShader = vIndex;
 	currentFragmentShader = fIndex;
 
-	if(glslPrograms[vIndex].progId == INVALID_PROGID || 
-		vertexShaders[vIndex].progId == INVALID_PROGID ||
-		fragmentShaders[fIndex].progId == INVALID_PROGID)
-	{
-		//return;
-	}
-
 	// vIndex denotes the GLSL program
 	if ( vIndex >= 0 && vIndex < glslPrograms.Num() ) {
 		currentRenderProgram = vIndex;
@@ -1536,8 +1529,6 @@ void idRenderProgManagerVk::Unbind() {
 	currentVertexShader = -1;
 	currentFragmentShader = -1;
 	currentRenderProgram = INVALID_PROGID;
-
-	//
 }
 
 const char* idRenderProgManagerVk::GetParmName(int rp) const {
@@ -1582,20 +1573,24 @@ void idRenderProgManagerVk::CommitUniforms() {
 	currentFragOffset = currentVertOffset + thisUniform;
 	thisUniform = 0;
 
-	const idList<int> & fragmentUniforms = fragmentShaders[prog.fragmentShaderIndex].uniforms;
-	if (fragmentUniforms.Num())
+	//We're always guaranteed to have a vertex shader, but shadow passes don't use fragshaders
+	if (prog.fragmentShaderIndex > -1)
 	{
-		for (int i = 0; i < fragmentUniforms.Num(); ++i)
+		const idList<int> & fragmentUniforms = fragmentShaders[prog.fragmentShaderIndex].uniforms;
+		if (fragmentUniforms.Num())
 		{
-			localVectors[i] = glslUniforms[fragmentUniforms[i]];
+			for (int i = 0; i < fragmentUniforms.Num(); ++i)
+			{
+				localVectors[i] = glslUniforms[fragmentUniforms[i]];
+			}
+
+
+			thisUniform = fragmentUniforms.Num() * sizeof(idVec4);
+			memcpy(uniformPtr, localVectors->ToFloatPtr(), thisUniform);
+
+			thisUniform = (thisUniform + 0x100) & -0x100;
+			uniformPtr = (char*)uniformPtr + thisUniform;
 		}
-
-
-		thisUniform = fragmentUniforms.Num() * sizeof(idVec4);
-		memcpy(uniformPtr, localVectors->ToFloatPtr(), thisUniform);
-
-		thisUniform = (thisUniform + 0x100) & -0x100;
-		uniformPtr = (char*)uniformPtr + thisUniform;
 	}
 	
 	nextVertOffset = currentFragOffset + thisUniform;
@@ -1782,6 +1777,60 @@ void idRenderProgManagerVk::LoadProgram(const int programIndex, const int vertex
 	prog.vertexUniformArray = uniformBuffer;
 }
 
+static VkStencilOp StencilFailOp(uint64_t stateBits)
+{
+	VkStencilOp sFail = VK_STENCIL_OP_KEEP;
+
+	switch ( stateBits & GLS_STENCIL_OP_FAIL_BITS ) {
+		case GLS_STENCIL_OP_FAIL_KEEP:		sFail = VK_STENCIL_OP_KEEP; break;
+		case GLS_STENCIL_OP_FAIL_ZERO:		sFail = VK_STENCIL_OP_ZERO; break;
+		case GLS_STENCIL_OP_FAIL_REPLACE:	sFail = VK_STENCIL_OP_REPLACE; break;
+		case GLS_STENCIL_OP_FAIL_INCR:		sFail = VK_STENCIL_OP_INCREMENT_AND_CLAMP; break;
+		case GLS_STENCIL_OP_FAIL_DECR:		sFail = VK_STENCIL_OP_DECREMENT_AND_CLAMP; break;
+		case GLS_STENCIL_OP_FAIL_INVERT:	sFail = VK_STENCIL_OP_INVERT; break;
+		case GLS_STENCIL_OP_FAIL_INCR_WRAP: sFail = VK_STENCIL_OP_INCREMENT_AND_WRAP; break;
+		case GLS_STENCIL_OP_FAIL_DECR_WRAP: sFail = VK_STENCIL_OP_DECREMENT_AND_WRAP; break;
+	}
+
+	return sFail;
+}
+
+static VkStencilOp DepthFailOp(uint64_t stateBits)
+{
+	VkStencilOp zFail = VK_STENCIL_OP_KEEP;
+
+	switch ( stateBits & GLS_STENCIL_OP_ZFAIL_BITS ) {
+		case GLS_STENCIL_OP_ZFAIL_KEEP:		zFail = VK_STENCIL_OP_KEEP; break;
+		case GLS_STENCIL_OP_ZFAIL_ZERO:		zFail = VK_STENCIL_OP_ZERO; break;
+		case GLS_STENCIL_OP_ZFAIL_REPLACE:	zFail = VK_STENCIL_OP_REPLACE; break;
+		case GLS_STENCIL_OP_ZFAIL_INCR:		zFail = VK_STENCIL_OP_INCREMENT_AND_CLAMP; break;
+		case GLS_STENCIL_OP_ZFAIL_DECR:		zFail = VK_STENCIL_OP_DECREMENT_AND_CLAMP; break;
+		case GLS_STENCIL_OP_ZFAIL_INVERT:	zFail = VK_STENCIL_OP_INVERT; break;
+		case GLS_STENCIL_OP_ZFAIL_INCR_WRAP:zFail = VK_STENCIL_OP_INCREMENT_AND_WRAP; break;
+		case GLS_STENCIL_OP_ZFAIL_DECR_WRAP:zFail = VK_STENCIL_OP_DECREMENT_AND_WRAP; break;
+	}
+
+	return zFail;
+}
+
+static VkStencilOp StencilPassOp(uint64_t stateBits)
+{
+	VkStencilOp pass = VK_STENCIL_OP_KEEP;
+
+	switch ( stateBits & GLS_STENCIL_OP_PASS_BITS ) {
+		case GLS_STENCIL_OP_PASS_KEEP:		pass = VK_STENCIL_OP_KEEP; break;
+		case GLS_STENCIL_OP_PASS_ZERO:		pass = VK_STENCIL_OP_ZERO; break;
+		case GLS_STENCIL_OP_PASS_REPLACE:	pass = VK_STENCIL_OP_REPLACE; break;
+		case GLS_STENCIL_OP_PASS_INCR:		pass = VK_STENCIL_OP_INCREMENT_AND_CLAMP; break;
+		case GLS_STENCIL_OP_PASS_DECR:		pass = VK_STENCIL_OP_DECREMENT_AND_CLAMP; break;
+		case GLS_STENCIL_OP_PASS_INVERT:	pass = VK_STENCIL_OP_INVERT; break;
+		case GLS_STENCIL_OP_PASS_INCR_WRAP:	pass = VK_STENCIL_OP_INCREMENT_AND_WRAP; break;
+		case GLS_STENCIL_OP_PASS_DECR_WRAP:	pass = VK_STENCIL_OP_DECREMENT_AND_WRAP; break;
+	}
+
+	return pass;
+}
+
 void idRenderProgManagerVk::Init()
 {
 	idRenderProgManager::Init();
@@ -1849,23 +1898,27 @@ VkPipeline idRenderProgManagerVk::GetPipelineForState(uint64 stateBits)
 
 	const glslProgram_t& prog = glslPrograms[currentRenderProgram];
 	if (prog.progId == INVALID_PROGID ||
-	vertexShaders[prog.vertexShaderIndex].progId == INVALID_PROGID ||
-	fragmentShaders[prog.fragmentShaderIndex].progId == INVALID_PROGID)
+	vertexShaders[prog.vertexShaderIndex].progId == INVALID_PROGID)
 	{
-		return VK_NULL_HANDLE;
-	}
-
-	if (backEnd.glState.vertexLayout == LAYOUT_DRAW_SHADOW_VERT_SKINNED ||
-		backEnd.glState.vertexLayout == LAYOUT_DRAW_SHADOW_VERT)
-	{
-		//TODO
 		return VK_NULL_HANDLE;
 	}
 
 	for (CachedPipeline p : pipelines)
 	{
-		if (p.progId == currentRenderProgram && p.stateBits == stateBits)
-			return p.pipeline;
+		if (p.progId == currentRenderProgram && p.stateBits == stateBits 
+			&& p.cullType == backEnd.glState.faceCulling)
+		{
+			if(backEnd.glState.vertexLayout == LAYOUT_DRAW_VERT)
+				return p.pipeline;
+			else
+			{
+				if (p.stencilBack == backEnd.glState.shadowStencilBack &&
+					p.stencilFront == backEnd.glState.shadowStencilFront)
+				{
+					return p.pipeline;
+				}
+			}
+		}
 	}
 
 	//
@@ -1950,12 +2003,12 @@ VkPipeline idRenderProgManagerVk::GetPipelineForState(uint64 stateBits)
 	// polygon offset
 	//
 	VkBool32 depthBiasEnable = VK_FALSE;
-	float depthBias = 0.0f;
+	float constantFactor = 0.0f;
 	float depthSlope = 0.0f;
 	if (stateBits & GLS_POLYGON_OFFSET)
 	{
 		depthBiasEnable = VK_TRUE;
-		depthBias = backEnd.glState.polyOfsBias;
+		constantFactor = backEnd.glState.polyOfsBias;
 		depthSlope = backEnd.glState.polyOfsScale;
 	}
 
@@ -1963,8 +2016,10 @@ VkPipeline idRenderProgManagerVk::GetPipelineForState(uint64 stateBits)
 	// stencil
 	//
 	VkBool32 stencilEnabled = VK_FALSE;
+	uint32_t writeMask = 0;
 	if ( ( stateBits & ( GLS_STENCIL_FUNC_BITS | GLS_STENCIL_OP_BITS ) ) != 0 ) {
 		stencilEnabled = VK_TRUE;
+		writeMask = 0xff;
 	} 
 
 	uint32_t ref = uint32_t( ( stateBits & GLS_STENCIL_FUNC_REF_BITS ) >> GLS_STENCIL_FUNC_REF_SHIFT );
@@ -1982,42 +2037,6 @@ VkPipeline idRenderProgManagerVk::GetPipelineForState(uint64 stateBits)
 		case GLS_STENCIL_FUNC_ALWAYS:		func = VK_COMPARE_OP_ALWAYS; break;
 	}
 
-	VkStencilOp sFail = VK_STENCIL_OP_KEEP;
-	VkStencilOp zFail = VK_STENCIL_OP_KEEP;
-	VkStencilOp pass = VK_STENCIL_OP_KEEP;
-
-	switch ( stateBits & GLS_STENCIL_OP_FAIL_BITS ) {
-		case GLS_STENCIL_OP_FAIL_KEEP:		sFail = VK_STENCIL_OP_KEEP; break;
-		case GLS_STENCIL_OP_FAIL_ZERO:		sFail = VK_STENCIL_OP_ZERO; break;
-		case GLS_STENCIL_OP_FAIL_REPLACE:	sFail = VK_STENCIL_OP_REPLACE; break;
-		case GLS_STENCIL_OP_FAIL_INCR:		sFail = VK_STENCIL_OP_INCREMENT_AND_CLAMP; break;
-		case GLS_STENCIL_OP_FAIL_DECR:		sFail = VK_STENCIL_OP_DECREMENT_AND_CLAMP; break;
-		case GLS_STENCIL_OP_FAIL_INVERT:	sFail = VK_STENCIL_OP_INVERT; break;
-		case GLS_STENCIL_OP_FAIL_INCR_WRAP: sFail = VK_STENCIL_OP_INCREMENT_AND_WRAP; break;
-		case GLS_STENCIL_OP_FAIL_DECR_WRAP: sFail = VK_STENCIL_OP_DECREMENT_AND_WRAP; break;
-	}
-	switch ( stateBits & GLS_STENCIL_OP_ZFAIL_BITS ) {
-		case GLS_STENCIL_OP_ZFAIL_KEEP:		zFail = VK_STENCIL_OP_KEEP; break;
-		case GLS_STENCIL_OP_ZFAIL_ZERO:		zFail = VK_STENCIL_OP_ZERO; break;
-		case GLS_STENCIL_OP_ZFAIL_REPLACE:	zFail = VK_STENCIL_OP_REPLACE; break;
-		case GLS_STENCIL_OP_ZFAIL_INCR:		zFail = VK_STENCIL_OP_INCREMENT_AND_CLAMP; break;
-		case GLS_STENCIL_OP_ZFAIL_DECR:		zFail = VK_STENCIL_OP_DECREMENT_AND_CLAMP; break;
-		case GLS_STENCIL_OP_ZFAIL_INVERT:	zFail = VK_STENCIL_OP_INVERT; break;
-		case GLS_STENCIL_OP_ZFAIL_INCR_WRAP:zFail = VK_STENCIL_OP_INCREMENT_AND_WRAP; break;
-		case GLS_STENCIL_OP_ZFAIL_DECR_WRAP:zFail = VK_STENCIL_OP_DECREMENT_AND_WRAP; break;
-	}
-	switch ( stateBits & GLS_STENCIL_OP_PASS_BITS ) {
-		case GLS_STENCIL_OP_PASS_KEEP:		pass = VK_STENCIL_OP_KEEP; break;
-		case GLS_STENCIL_OP_PASS_ZERO:		pass = VK_STENCIL_OP_ZERO; break;
-		case GLS_STENCIL_OP_PASS_REPLACE:	pass = VK_STENCIL_OP_REPLACE; break;
-		case GLS_STENCIL_OP_PASS_INCR:		pass = VK_STENCIL_OP_INCREMENT_AND_CLAMP; break;
-		case GLS_STENCIL_OP_PASS_DECR:		pass = VK_STENCIL_OP_DECREMENT_AND_CLAMP; break;
-		case GLS_STENCIL_OP_PASS_INVERT:	pass = VK_STENCIL_OP_INVERT; break;
-		case GLS_STENCIL_OP_PASS_INCR_WRAP:	pass = VK_STENCIL_OP_INCREMENT_AND_WRAP; break;
-		case GLS_STENCIL_OP_PASS_DECR_WRAP:	pass = VK_STENCIL_OP_DECREMENT_AND_WRAP; break;
-	}
-
-
 	VkPipeline pipeline = VK_NULL_HANDLE;
 
 	VkPipelineShaderStageCreateInfo stages[2] = {};
@@ -2026,10 +2045,16 @@ VkPipeline idRenderProgManagerVk::GetPipelineForState(uint64 stateBits)
 	stages[0].pName = "main";
 	stages[0].module = vertexShaders[prog.vertexShaderIndex].progId;
 
-	stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-	stages[1].pName = "main";
-	stages[1].module = fragmentShaders[prog.fragmentShaderIndex].progId;
+	uint32_t stageCount = 1;
+	if (backEnd.glState.vertexLayout == LAYOUT_DRAW_VERT || r_showShadows.GetInteger() > 0)
+	{
+		stageCount = 2;
+
+		stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+		stages[1].pName = "main";
+		stages[1].module = fragmentShaders[prog.fragmentShaderIndex].progId;
+	}
 
 	VkPipelineColorBlendAttachmentState cba = {};
 	cba.blendEnable = VK_TRUE;
@@ -2058,14 +2083,35 @@ VkPipeline idRenderProgManagerVk::GetPipelineForState(uint64 stateBits)
 	mss.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
 	mss.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
+	VkCullModeFlags cullType = VK_CULL_MODE_NONE;
+	if (backEnd.glState.faceCulling == CT_TWO_SIDED)
+	{
+		cullType = VK_CULL_MODE_NONE;
+	}
+	else if (backEnd.glState.faceCulling == CT_BACK_SIDED)
+	{
+		if (backEnd.viewDef->isMirror)
+			cullType = VK_CULL_MODE_FRONT_BIT;
+		else
+			cullType = VK_CULL_MODE_BACK_BIT;
+	}
+	else
+	{
+		if (backEnd.viewDef->isMirror)
+			cullType = VK_CULL_MODE_BACK_BIT;
+		else
+			cullType = VK_CULL_MODE_FRONT_BIT;
+	}
+
 	VkPipelineRasterizationStateCreateInfo rs = {};
 	rs.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-	rs.cullMode = VK_CULL_MODE_NONE;
+	rs.cullMode = cullType;
 	rs.polygonMode = polygonMode;
 	rs.lineWidth = 1.0f;
 	rs.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 	rs.depthBiasEnable = depthBiasEnable;
-	rs.depthBiasConstantFactor = depthBias;
+	rs.depthBiasConstantFactor = constantFactor;
+	rs.depthBiasClamp = 0.0f;
 	rs.depthBiasSlopeFactor = depthSlope;
 
 	VkVertexInputBindingDescription vbs = {};
@@ -2171,11 +2217,9 @@ VkPipeline idRenderProgManagerVk::GetPipelineForState(uint64 stateBits)
 	vps.pScissors = &sc;
 
 	VkStencilOpState stencilState = {};
-	stencilState.depthFailOp = zFail;
-	stencilState.passOp = pass;
-	stencilState.failOp = sFail;
 	stencilState.compareOp = func;
 	stencilState.compareMask = mask;
+	stencilState.writeMask = writeMask;
 	stencilState.reference = ref;
 
 	VkPipelineDepthStencilStateCreateInfo dss = {};
@@ -2184,17 +2228,50 @@ VkPipeline idRenderProgManagerVk::GetPipelineForState(uint64 stateBits)
 	dss.depthCompareOp = depthCompareOp;
 	dss.depthWriteEnable = depthWriteEnable;
 	dss.stencilTestEnable = stencilEnabled;
-	dss.front = stencilState;
+
+	if (backEnd.glState.vertexLayout == LAYOUT_DRAW_SHADOW_VERT ||
+		backEnd.glState.vertexLayout == LAYOUT_DRAW_SHADOW_VERT_SKINNED)
+	{
+		dss.depthBoundsTestEnable = VK_TRUE;
+	}
+
+	if (backEnd.glState.vertexLayout == LAYOUT_DRAW_VERT)
+	{
+		stencilState.depthFailOp = DepthFailOp(stateBits);
+		stencilState.passOp = StencilPassOp(stateBits);
+		stencilState.failOp = StencilFailOp(stateBits);
+		dss.back = stencilState;
+	}
+	else
+	{
+		stencilState.depthFailOp = DepthFailOp(backEnd.glState.shadowStencilFront);
+		stencilState.passOp = StencilPassOp(backEnd.glState.shadowStencilFront);
+		stencilState.failOp = StencilFailOp(backEnd.glState.shadowStencilFront);
+		dss.front = stencilState;
+
+		stencilState.depthFailOp = DepthFailOp(backEnd.glState.shadowStencilBack);
+		stencilState.passOp = StencilPassOp(backEnd.glState.shadowStencilBack);
+		stencilState.failOp = StencilFailOp(backEnd.glState.shadowStencilBack);
+		dss.back = stencilState;
+	}
 	
-	VkDynamicState dynStates[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+	VkDynamicState dynStates[] = { 
+		VK_DYNAMIC_STATE_VIEWPORT,
+		VK_DYNAMIC_STATE_SCISSOR,
+		//VK_DYNAMIC_STATE_STENCIL_COMPARE_MASK,
+		//VK_DYNAMIC_STATE_STENCIL_REFERENCE,
+		//VK_DYNAMIC_STATE_STENCIL_WRITE_MASK,
+		VK_DYNAMIC_STATE_DEPTH_BOUNDS,
+		VK_DYNAMIC_STATE_DEPTH_BIAS
+	};
 	VkPipelineDynamicStateCreateInfo dys = {};
 	dys.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-	dys.dynamicStateCount = 2;
+	dys.dynamicStateCount = 4;
 	dys.pDynamicStates = dynStates;
 
 	VkGraphicsPipelineCreateInfo info = {};
 	info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-	info.stageCount = 2;
+	info.stageCount = stageCount;
 	info.subpass = 0;
 	info.pStages = stages;
 	info.pColorBlendState = &cbs;
@@ -2214,7 +2291,6 @@ VkPipeline idRenderProgManagerVk::GetPipelineForState(uint64 stateBits)
 
 	case LAYOUT_DRAW_SHADOW_VERT:
 	case LAYOUT_DRAW_SHADOW_VERT_SKINNED:
-		//TODO
 		info.layout = Vk_GetPipelineLayout();
 		break;
 	default:
@@ -2223,7 +2299,20 @@ VkPipeline idRenderProgManagerVk::GetPipelineForState(uint64 stateBits)
 	}
 
 	pipeline = Vk_CreatePipeline(info);
-	pipelines.push_back({stateBits, pipeline, currentRenderProgram});
+	CachedPipeline p;
+	p.stateBits = stateBits;
+	p.pipeline = pipeline;
+	p.progId = currentRenderProgram;
+	p.cullType = backEnd.glState.faceCulling;
+
+	if (backEnd.glState.vertexLayout == LAYOUT_DRAW_SHADOW_VERT ||
+		backEnd.glState.vertexLayout == LAYOUT_DRAW_SHADOW_VERT_SKINNED)
+	{
+		p.stencilBack = backEnd.glState.shadowStencilBack;
+		p.stencilFront = backEnd.glState.shadowStencilFront;
+	}
+
+	pipelines.push_back(p);
 
 	return pipeline;
 }

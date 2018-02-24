@@ -628,6 +628,9 @@ struct glstate_t {
 	float				polyOfsBias;
 
 	uint64				glStateBits;
+
+	uint64				shadowStencilFront;
+	uint64				shadowStencilBack;
 };
 
 struct backEndCounters_t {
@@ -1230,6 +1233,7 @@ VkDescriptorSet Vk_UniformDescriptorSet();
 VkDescriptorSet Vk_AllocateJointBufferSetForFrame(int idx, geoBufferSet_t& gbs);
 VkDescriptorSet Vk_JointBufferSetForFrame(int idx);
 void Vk_FreeDescriptorSet(const VkDescriptorSet set);
+void Vk_ClearDepthStencilImage(bool depth, bool stencil, byte value);
 #endif
 
 /*

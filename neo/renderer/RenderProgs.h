@@ -373,8 +373,11 @@ private:
 	struct CachedPipeline
 	{
 		uint64 stateBits;
+		uint64 stencilFront;
+		uint64 stencilBack;
 		VkPipeline pipeline;
 		int progId;
+		int cullType;
 	};
 	std::vector<CachedPipeline> pipelines;
 

@@ -16,7 +16,7 @@ float dot4 (vec4 a , vec4 b ) {return dot ( a , b ) ; }
 float dot4 (vec2 a , vec4 b ) {return dot ( vec4 ( a , 0 , 1 ) , b ) ; }
 vec4 swizzleColor (vec4 c ) {return c ; }
 
-layout(set = 0, binding = 1) readonly buffer matrixbuffer {
+layout(set = 1, binding = 0) readonly buffer matrixbuffer {
 	vec4 matrices[408];
 };
 

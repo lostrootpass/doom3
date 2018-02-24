@@ -97,7 +97,14 @@ GL_Scissor
 ====================
 */
 void GL_Scissor( int x /* left*/, int y /* bottom */, int w, int h ) {
-#ifndef DOOM3_VULKAN
+#ifdef DOOM3_VULKAN
+	VkRect2D sc = { 
+		x,
+		Max(0, renderSystem->GetHeight() - y - h),
+		w, h
+	};
+	vkCmdSetScissor(Vk_ActiveCommandBuffer(), 0, 1, &sc);
+#else
 	qglScissor( x, y, w, h );
 #endif
 }
@@ -108,7 +115,14 @@ GL_Viewport
 ====================
 */
 void GL_Viewport( int x /* left */, int y /* bottom */, int w, int h ) {
-#ifndef DOOM3_VULKAN
+#ifdef DOOM3_VULKAN
+	VkViewport vp = { 
+		x,
+		Max(0, renderSystem->GetHeight() - y - h),
+		w,
+		h, 0.0f, 1.0f };
+	vkCmdSetViewport(Vk_ActiveCommandBuffer(), 0, 1, &vp);
+#else
 	qglViewport( x, y, w, h );
 #endif
 }
@@ -121,6 +135,8 @@ GL_PolygonOffset
 void GL_PolygonOffset( float scale, float bias ) {
 	backEnd.glState.polyOfsScale = scale;
 	backEnd.glState.polyOfsBias = bias;
+
+	vkCmdSetDepthBias(Vk_ActiveCommandBuffer(), bias, 0.0f, scale);
 #ifndef DOOM3_VULKAN
 	if ( backEnd.glState.glStateBits & GLS_POLYGON_OFFSET ) {
 		qglPolygonOffset( scale, bias );
@@ -138,7 +154,10 @@ void GL_DepthBoundsTest( const float zmin, const float zmax ) {
 		return;
 	}
 
-#ifndef DOOM3_VULKAN
+#ifdef DOOM3_VULKAN
+	float m = zmax == 0.0f ? 1.0f : zmax;
+	vkCmdSetDepthBounds(Vk_ActiveCommandBuffer(), zmin, m);
+#else
 	if ( zmin == 0.0f && zmax == 0.0f ) {
 		qglDisable( GL_DEPTH_BOUNDS_TEST_EXT );
 	} else {
@@ -214,7 +233,9 @@ GL_Clear
 ========================
 */
 void GL_Clear( bool color, bool depth, bool stencil, byte stencilValue, float r, float g, float b, float a ) {
-#ifndef DOOM3_VULKAN
+#ifdef DOOM3_VULKAN
+	Vk_ClearDepthStencilImage(depth, stencil, stencilValue);
+#else
 	int clearFlags = 0;
 	if ( color ) {
 		qglClearColor( r, g, b, a );
@@ -245,6 +266,11 @@ void GL_SetDefaultState() {
 #ifdef DOOM3_VULKAN
 	memset( &backEnd.glState, 0, sizeof( backEnd.glState ) );
 	GL_State( 0, true );
+
+	if ( r_useScissor.GetBool() ) {
+		GL_Scissor( 0, 0, renderSystem->GetWidth(), renderSystem->GetHeight() );
+		GL_Viewport(0, 0, renderSystem->GetWidth(), renderSystem->GetHeight());
+	}
 #else
 	qglClearDepth( 1.0f );
 

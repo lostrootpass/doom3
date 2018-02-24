@@ -138,6 +138,15 @@ static void Vk_PickPhysicalDevice()
 			{
 				physicalDevice = physicalDevices[i];
 				glConfig.maxTextureImageUnits = vkPhysicalDeviceProperties.limits.maxPerStageDescriptorSampledImages;
+				glConfig.depthBoundsTestAvailable = true;
+
+				VkFormatProperties props;
+				vkGetPhysicalDeviceFormatProperties(physicalDevice, VK_FORMAT_D32_SFLOAT_S8_UINT, &props);
+				//TODO: fall back to other formats.
+				if (!(props.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT))
+				{
+					idLib::FatalError("Depth stencil format not supported");
+				}
 
 				vkGetPhysicalDeviceFeatures(physicalDevice, &vkPhysicalDeviceFeatures);
 
@@ -303,7 +312,7 @@ static void Vk_CreateRenderPass()
 	VkAttachmentReference depthAttach = {};
 	depthAttach.attachment = 1;
 	depthAttach.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
+	
 	VkSubpassDescription depthPass = {};
 	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 	subpass.pDepthStencilAttachment = &depthAttach;
@@ -311,12 +320,13 @@ static void Vk_CreateRenderPass()
 	VkAttachmentDescription depthDesc = {};
 	depthDesc.samples = VK_SAMPLE_COUNT_1_BIT;
 	depthDesc.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-	depthDesc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	depthDesc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 	depthDesc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE;
 	depthDesc.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+	//depthDesc.initialLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
 	depthDesc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 	depthDesc.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-	depthDesc.format = VK_FORMAT_D32_SFLOAT;
+	depthDesc.format = VK_FORMAT_D32_SFLOAT_S8_UINT;
 
 
 	VkSubpassDependency dependency = {};
@@ -324,7 +334,11 @@ static void Vk_CreateRenderPass()
 	dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 	dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
 
-	dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	dependency.dstAccessMask = 
+		VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
+		VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
+		VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+		VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 	dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 	dependency.dstSubpass = 0;
 
@@ -418,7 +432,7 @@ static void Vk_CreateSwapChain()
 	{
 		VkImageCreateInfo info = {};
 		info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-		info.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+		info.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 		info.tiling = VK_IMAGE_TILING_OPTIMAL;
 		info.extent.width = surfaceCaps.currentExtent.width;
 		info.extent.height = surfaceCaps.currentExtent.height;
@@ -428,7 +442,7 @@ static void Vk_CreateSwapChain()
 		info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 		info.mipLevels = 1;
 		info.arrayLayers = 1;
-		info.format = VK_FORMAT_D32_SFLOAT;
+		info.format = VK_FORMAT_D32_SFLOAT_S8_UINT;
 		info.imageType = VK_IMAGE_TYPE_2D;
 
 		VkCheck(vkCreateImage(vkDevice, &info, nullptr, &depthImage));
@@ -445,16 +459,24 @@ static void Vk_CreateSwapChain()
 
 		VkImageViewCreateInfo view = {};
 		view.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-		view.format = VK_FORMAT_D32_SFLOAT;
+		view.format = VK_FORMAT_D32_SFLOAT_S8_UINT;
 		view.viewType = VK_IMAGE_VIEW_TYPE_2D;
 		view.image = depthImage;
-		view.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+		view.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
 		view.subresourceRange.baseMipLevel = 0;
 		view.subresourceRange.baseArrayLayer = 0;
 		view.subresourceRange.layerCount = 1;
 		view.subresourceRange.levelCount = 1;
 
 		VkCheck(vkCreateImageView(vkDevice, &view, nullptr, &depthView));
+
+		VkImageSubresourceRange range = {};
+		range.aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT | VK_IMAGE_ASPECT_DEPTH_BIT;
+		range.layerCount = 1;
+		range.levelCount = 1;
+		Vk_SetImageLayout(depthImage,
+			VK_FORMAT_D32_SFLOAT_S8_UINT, VK_IMAGE_LAYOUT_UNDEFINED,
+			VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, range);
 	}
 
 	//Create framebuffers
@@ -497,9 +519,11 @@ static void Vk_RecordCommandBuffer(VkFramebuffer framebuffer, VkCommandBuffer cm
 	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
 	VkCheck(vkBeginCommandBuffer(cmd, &beginInfo));
 	
+	VkClearValue colorClear, depthClear;
+	colorClear.color = { 0.0f, 0.0f, 0.5f, 1.0f };
+	depthClear.depthStencil = { 1.0f, STENCIL_SHADOW_TEST_VALUE };
 	VkClearValue clearValues[] = {
-		{ 0.0f, 0.0f, 0.5f, 1.0f }, //Clear color
-		{ 1.0f, STENCIL_SHADOW_TEST_VALUE } //Depth stencil
+		colorClear, depthClear
 	};
 
 	VkExtent2D extent = surfaceCaps.currentExtent;
@@ -518,6 +542,16 @@ static void Vk_RecordCommandBuffer(VkFramebuffer framebuffer, VkCommandBuffer cm
 
 	vkCmdSetViewport(cmd, 0, 1, &viewport);
 	vkCmdSetScissor(cmd, 0, 1, &scissor);
+	vkCmdSetDepthBias(cmd, backEnd.glState.polyOfsBias, 0.0f, backEnd.glState.polyOfsScale);
+
+	//VkImageSubresourceRange range = {};
+	//range.aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT | VK_IMAGE_ASPECT_DEPTH_BIT;
+	//range.layerCount = 1;
+	//range.levelCount = 1;
+	//Vk_SetImageLayout(depthImage,
+	//	VK_FORMAT_D32_SFLOAT_S8_UINT, VK_IMAGE_LAYOUT_UNDEFINED,
+	//	VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, range);
+	//Vk_ClearDepthStencilImage(STENCIL_SHADOW_TEST_VALUE);
 
 	vkCmdBeginRenderPass(cmd, &info, VK_SUBPASS_CONTENTS_INLINE);
 }
@@ -1350,6 +1384,36 @@ VkDescriptorSet Vk_JointBufferSetForFrame(int idx)
 void Vk_FreeDescriptorSet(const VkDescriptorSet set)
 {
 	vkFreeDescriptorSets(vkDevice, descriptorPool, 1, &set);
+}
+
+void Vk_ClearDepthStencilImage(bool depth, bool stencil, byte value)
+{
+	if (!depth && !stencil)
+		return;
+
+	VkClearAttachment attachment = {};
+	attachment.aspectMask = 0;
+
+	if (depth)
+	{
+		attachment.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+		attachment.clearValue.depthStencil.depth = 1.0f;
+	}
+
+	if (stencil)
+	{
+		attachment.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+		attachment.clearValue.depthStencil.stencil = value;
+	}
+
+	VkClearRect rect = {};
+	rect.layerCount = 1;
+	rect.rect = { 
+		0, 0,
+		(uint32_t)renderSystem->GetWidth(), (uint32_t)renderSystem->GetHeight()
+	};
+
+	vkCmdClearAttachments(Vk_ActiveCommandBuffer(), 1, &attachment, 1, &rect);
 }
 
 #endif

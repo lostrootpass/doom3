@@ -57,12 +57,23 @@ void idRenderBackendVk::CopyRender(const void* data)
 
 }
 
-void idRenderBackendVk::DrawElementsWithCounters(const drawSurf_t* surf)
+void idRenderBackendVk::DrawElementsWithCounters(const drawSurf_t* drawSurf)
+{
+	backEnd.glState.vertexLayout = LAYOUT_DRAW_VERT;
+	BindAndSubmitDrawcall(drawSurf);
+}
+
+void idRenderBackendVk::BindAndSubmitDrawcall(const drawSurf_t* surf)
 {
 	VkCommandBuffer cmd = Vk_ActiveCommandBuffer();
 
 	// get vertex buffer
-	const vertCacheHandle_t vbHandle = surf->ambientCache;
+	vertCacheHandle_t vbHandle = 0;
+	if (backEnd.glState.vertexLayout == LAYOUT_DRAW_VERT)
+		vbHandle = surf->ambientCache;
+	else
+		vbHandle = surf->shadowCache;
+
 	idVertexBuffer * vertexBuffer;
 	if ( vertexCache->CacheIsStatic( vbHandle ) ) {
 		vertexBuffer = (idVertexBuffer*)vertexCache->staticData.vertexBuffer;
@@ -112,8 +123,6 @@ void idRenderBackendVk::DrawElementsWithCounters(const drawSurf_t* surf)
 		}
 	}
 
-	backEnd.glState.vertexLayout = LAYOUT_DRAW_VERT;
-
 	idRenderProgManagerVk* rpm = (idRenderProgManagerVk*)renderProgManager;
 	VkPipeline pipeline = rpm->GetPipelineForState(backEnd.glState.glStateBits);
 
@@ -129,40 +138,20 @@ void idRenderBackendVk::DrawElementsWithCounters(const drawSurf_t* surf)
 		Vk_JointBufferSetForFrame(vertexCache->drawListNum)
 	};
 
-	if (backEnd.glState.vertexLayout == LAYOUT_DRAW_VERT)
-	{
-		uint32_t jointOffset = 0;
-		if(surf->jointCache)
-			jointOffset = (int)( surf->jointCache >> VERTCACHE_OFFSET_SHIFT ) & VERTCACHE_OFFSET_MASK;
-		
-		uint32_t dynamicOffsetCount = 3;
-		const uint32_t offsets[] = {
-			rpm->GetCurrentVertUniformOffset(),
-			rpm->GetCurrentFragUniformOffset(),
-			jointOffset
-		};
 
-		vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, Vk_GetPipelineLayout(),
-			0, 2, sets, dynamicOffsetCount, offsets);
-	}
-	else if (backEnd.glState.vertexLayout == LAYOUT_DRAW_SHADOW_VERT_SKINNED)
-	{
-		//TODO
-		return;
+	uint32_t jointOffset = 0;
+	if(surf->jointCache)
+		jointOffset = (int)( surf->jointCache >> VERTCACHE_OFFSET_SHIFT ) & VERTCACHE_OFFSET_MASK;
+	
+	const uint32_t dynamicOffsetCount = 3;
+	const uint32_t offsets[] = {
+		rpm->GetCurrentVertUniformOffset(),
+		rpm->GetCurrentFragUniformOffset(),
+		jointOffset
+	};
 
-		uint32 dynamicOffsetCount = 3;
-		const uint32_t offsets[] = {
-			rpm->GetCurrentVertUniformOffset(), 0, 0
-		};
-
-		vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, Vk_GetPipelineLayout(),
-			0, 1, sets, dynamicOffsetCount, offsets);
-	}
-	else if (backEnd.glState.vertexLayout == LAYOUT_DRAW_SHADOW_VERT)
-	{
-		//TODO
-		return;
-	}
+	vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, Vk_GetPipelineLayout(),
+		0, 2, sets, dynamicOffsetCount, offsets);
 
 	vkCmdDrawIndexed(cmd, r_singleTriangle.GetBool() ? 3 : surf->numIndexes,
 		1, 0, 0, 0);
@@ -403,10 +392,10 @@ int idRenderBackendVk::DrawShaderPasses(const drawSurf_t * const * const drawSur
 
 		// change the scissor if needed
 		if (!backEnd.currentScissor.Equals( surf->scissorRect ) && r_useScissor.GetBool() ) {
-			/*GL_Scissor( backEnd.viewDef->viewport.x1 + surf->scissorRect.x1, 
+			GL_Scissor( backEnd.viewDef->viewport.x1 + surf->scissorRect.x1, 
 						backEnd.viewDef->viewport.y1 + surf->scissorRect.y1,
 						surf->scissorRect.x2 + 1 - surf->scissorRect.x1,
-						surf->scissorRect.y2 + 1 - surf->scissorRect.y1 );*/
+						surf->scissorRect.y2 + 1 - surf->scissorRect.y1 );
 			backEnd.currentScissor = surf->scissorRect;
 		}
 
@@ -414,11 +403,11 @@ int idRenderBackendVk::DrawShaderPasses(const drawSurf_t * const * const drawSur
 		const float	*regs = surf->shaderRegisters;
 
 		// set face culling appropriately
-		/*if ( surf->space->isGuiSurface ) {
+		if ( surf->space->isGuiSurface ) {
 			GL_Cull( CT_TWO_SIDED );
 		} else {
 			GL_Cull( shader->GetCullType() );
-		}*/
+		}
 
 		uint64 surfGLState = surf->extraGLState;
 
@@ -616,7 +605,7 @@ int idRenderBackendVk::DrawShaderPasses(const drawSurf_t * const * const drawSur
 		renderLog.CloseBlock();
 	}
 
-	//GL_Cull( CT_FRONT_SIDED );
+	GL_Cull( CT_FRONT_SIDED );
 	GL_Color( 1.0f, 1.0f, 1.0f );
 
 	renderLog.CloseBlock();
@@ -669,16 +658,16 @@ void idRenderBackendVk::DrawView(const void* data, const int stereoEye)
 	// optionally draw a box colored based on the eye number
 	if ( r_drawEyeColor.GetBool() ) {
 		const idScreenRect & r = backEnd.viewDef->viewport;
-		//GL_Scissor( ( r.x1 + r.x2 ) / 2, ( r.y1 + r.y2 ) / 2, 32, 32 );
+		GL_Scissor( ( r.x1 + r.x2 ) / 2, ( r.y1 + r.y2 ) / 2, 32, 32 );
 		switch ( stereoEye ) {
 			case -1:
-				//GL_Clear( true, false, false, 0, 1.0f, 0.0f, 0.0f, 1.0f );
+				GL_Clear( true, false, false, 0, 1.0f, 0.0f, 0.0f, 1.0f );
 				break;
 			case 1:
-				//GL_Clear( true, false, false, 0, 0.0f, 1.0f, 0.0f, 1.0f );
+				GL_Clear( true, false, false, 0, 0.0f, 1.0f, 0.0f, 1.0f );
 				break;
 			default:
-				//GL_Clear( true, false, false, 0, 0.5f, 0.5f, 0.5f, 1.0f );
+				GL_Clear( true, false, false, 0, 0.5f, 0.5f, 0.5f, 1.0f );
 				break;
 		}
 	}
@@ -713,29 +702,16 @@ void idRenderBackendVk::DrawViewInternal(const viewDef_t* viewDef, const int ste
 	//-------------------------------------------------
 
 	// set the window clipping
-	VkViewport viewport = { 
-		viewDef->viewport.x1,
+	GL_Viewport( viewDef->viewport.x1,
 		viewDef->viewport.y1,
-		//viewDef->viewport.y2 + 1,
 		viewDef->viewport.x2 + 1 - viewDef->viewport.x1,
-		viewDef->viewport.y2 + 1 - viewDef->viewport.y1,
-		-1.0f, 1.0f 
-	};
+		viewDef->viewport.y2 + 1 - viewDef->viewport.y1 );
 
 	// the scissor may be smaller than the viewport for subviews
-	VkRect2D scissor = { backEnd.viewDef->viewport.x1 + viewDef->scissor.x1,
+	GL_Scissor( backEnd.viewDef->viewport.x1 + viewDef->scissor.x1,
 				backEnd.viewDef->viewport.y1 + viewDef->scissor.y1,
-				//viewDef->scissor.y2 + 1,
 				viewDef->scissor.x2 + 1 - viewDef->scissor.x1,
-				viewDef->scissor.y2 + 1 - viewDef->scissor.y1 };
-
-	//VkViewport viewport = { 0, 0, (float)extent.width, (float)extent.height, 0.0f, 1.0f };
-	//VkRect2D scissor = { 0, 0, extent.width, extent.height };
-
-	VkCommandBuffer cmd = Vk_ActiveCommandBuffer();
-	//vkCmdSetViewport(cmd, 0, 1, &viewport);
-	//vkCmdSetScissor(cmd, 0, 1, &scissor);
-
+				viewDef->scissor.y2 + 1 - viewDef->scissor.y1 );
 	backEnd.currentScissor = viewDef->scissor;
 
 	backEnd.glState.faceCulling = -1;		// force face culling to set next time
@@ -745,10 +721,10 @@ void idRenderBackendVk::DrawViewInternal(const viewDef_t* viewDef, const int ste
 
 
 	// Clear the depth buffer and clear the stencil to 128 for stencil shadows as well as gui masking
-	//GL_Clear( false, true, true, STENCIL_SHADOW_TEST_VALUE, 0.0f, 0.0f, 0.0f, 0.0f );
+	GL_Clear( false, true, true, STENCIL_SHADOW_TEST_VALUE, 0.0f, 0.0f, 0.0f, 0.0f );
 
 	// normal face culling
-	//GL_Cull( CT_FRONT_SIDED );
+	GL_Cull( CT_FRONT_SIDED );
 
 #ifdef USE_CORE_PROFILE
 	// bind one global Vertex Array Object (VAO)
@@ -2174,8 +2150,10 @@ void idRenderBackendVk::StencilSelectLight(const viewLight_t * vLight)
 	SetMVP( invProjectMVPMatrix );
 
 	// two-sided stencil test
-	//qglStencilOpSeparate( GL_FRONT, GL_KEEP, GL_REPLACE, GL_ZERO );
-	//qglStencilOpSeparate( GL_BACK, GL_KEEP, GL_ZERO, GL_REPLACE );
+	backEnd.glState.shadowStencilFront = 
+		GLS_STENCIL_OP_FAIL_KEEP | GLS_STENCIL_OP_ZFAIL_REPLACE | GLS_STENCIL_OP_PASS_ZERO;
+	backEnd.glState.shadowStencilBack =
+		GLS_STENCIL_OP_FAIL_KEEP | GLS_STENCIL_OP_ZFAIL_ZERO | GLS_STENCIL_OP_PASS_REPLACE;
 
 	DrawElementsWithCounters( &backEnd.zeroOneCubeSurface );
 
@@ -2194,4 +2172,220 @@ void idRenderBackendVk::StencilSelectLight(const viewLight_t * vLight)
 
 void idRenderBackendVk::StencilShadowPass(const drawSurf_t *drawSurfs, const viewLight_t * vLight)
 {
+	if ( r_skipShadows.GetBool() ) {
+		return;
+	}
+
+	if ( drawSurfs == NULL ) {
+		return;
+	}
+
+	RENDERLOG_PRINTF( "---------- RB_StencilShadowPass ----------\n" );
+
+	renderProgManager->BindShader_Shadow();
+
+	GL_SelectTexture( 0 );
+	globalImages->BindNull();
+
+	uint64 glState = 0;
+
+	// for visualizing the shadows
+	if ( r_showShadows.GetInteger() ) {
+		// set the debug shadow color
+		SetFragmentParm( RENDERPARM_COLOR, colorMagenta.ToFloatPtr() );
+		if ( r_showShadows.GetInteger() == 2 ) {
+			// draw filled in
+			glState = GLS_DEPTHMASK | GLS_SRCBLEND_ONE | GLS_DSTBLEND_ONE | GLS_DEPTHFUNC_LESS;
+		} else {
+			// draw as lines, filling the depth buffer
+			glState = GLS_SRCBLEND_ONE | GLS_DSTBLEND_ZERO | GLS_POLYMODE_LINE | GLS_DEPTHFUNC_ALWAYS;
+		}
+	} else {
+		// don't write to the color or depth buffer, just the stencil buffer
+		glState = GLS_DEPTHMASK | GLS_COLORMASK | GLS_ALPHAMASK | GLS_DEPTHFUNC_LESS;
+	}
+
+	GL_PolygonOffset( r_shadowPolygonFactor.GetFloat(), -r_shadowPolygonOffset.GetFloat() );
+
+	// the actual stencil func will be set in the draw code, but we need to make sure it isn't
+	// disabled here, and that the value will get reset for the interactions without looking
+	// like a no-change-required
+	GL_State( glState | GLS_STENCIL_OP_FAIL_KEEP | GLS_STENCIL_OP_ZFAIL_KEEP | GLS_STENCIL_OP_PASS_INCR | 
+		GLS_STENCIL_MAKE_REF( STENCIL_SHADOW_TEST_VALUE ) | GLS_STENCIL_MAKE_MASK( STENCIL_SHADOW_MASK_VALUE ) | GLS_POLYGON_OFFSET );
+
+	// Two Sided Stencil reduces two draw calls to one for slightly faster shadows
+	GL_Cull( CT_TWO_SIDED );
+
+
+	// process the chain of shadows with the current rendering state
+	backEnd.currentSpace = NULL;
+
+
+	for ( const drawSurf_t * drawSurf = drawSurfs; drawSurf != NULL; drawSurf = drawSurf->nextOnLight ) {
+		if ( drawSurf->scissorRect.IsEmpty() ) {
+			continue;	// !@# FIXME: find out why this is sometimes being hit!
+						// temporarily jump over the scissor and draw so the gl error callback doesn't get hit
+		}
+
+		// make sure the shadow volume is done
+		if ( drawSurf->shadowVolumeState != SHADOWVOLUME_DONE ) {
+			assert( drawSurf->shadowVolumeState == SHADOWVOLUME_UNFINISHED || drawSurf->shadowVolumeState == SHADOWVOLUME_DONE );
+
+			uint64 start = Sys_Microseconds();
+			while ( drawSurf->shadowVolumeState == SHADOWVOLUME_UNFINISHED ) {
+				Sys_Yield();
+			}
+			uint64 end = Sys_Microseconds();
+
+			backEnd.pc.shadowMicroSec += end - start;
+		}
+
+		if ( drawSurf->numIndexes == 0 ) {
+			continue;	// a job may have created an empty shadow volume
+		}
+
+		if ( !backEnd.currentScissor.Equals( drawSurf->scissorRect ) && r_useScissor.GetBool() ) {
+			// change the scissor
+			GL_Scissor( backEnd.viewDef->viewport.x1 + drawSurf->scissorRect.x1,
+						backEnd.viewDef->viewport.y1 + drawSurf->scissorRect.y1,
+						drawSurf->scissorRect.x2 + 1 - drawSurf->scissorRect.x1,
+						drawSurf->scissorRect.y2 + 1 - drawSurf->scissorRect.y1 );
+			backEnd.currentScissor = drawSurf->scissorRect;
+		}
+
+		if ( drawSurf->space != backEnd.currentSpace ) {
+			// change the matrix
+			SetMVP( drawSurf->space->mvp );
+
+			// set the local light position to allow the vertex program to project the shadow volume end cap to infinity
+			idVec4 localLight( 0.0f );
+			R_GlobalPointToLocal( drawSurf->space->modelMatrix, vLight->globalLightOrigin, localLight.ToVec3() );
+			SetVertexParm( RENDERPARM_LOCALLIGHTORIGIN, localLight.ToFloatPtr() );
+
+			backEnd.currentSpace = drawSurf->space;
+		}
+
+		if ( r_showShadows.GetInteger() == 0 ) {
+			if ( drawSurf->jointCache ) {
+				renderProgManager->BindShader_ShadowSkinned();
+			} else {
+				renderProgManager->BindShader_Shadow();
+			}
+		} else {
+			if ( drawSurf->jointCache ) {
+				renderProgManager->BindShader_ShadowDebugSkinned();
+			} else {
+				renderProgManager->BindShader_ShadowDebug();
+			}
+		}
+
+		// set depth bounds per shadow
+		if ( r_useShadowDepthBounds.GetBool() ) {
+			GL_DepthBoundsTest( drawSurf->scissorRect.zmin, drawSurf->scissorRect.zmax );
+		}
+
+		// Determine whether or not the shadow volume needs to be rendered with Z-pass or
+		// Z-fail. It is worthwhile to spend significant resources to reduce the number of
+		// cases where shadow volumes need to be rendered with Z-fail because Z-fail
+		// rendering can be significantly slower even on today's hardware. For instance,
+		// on NVIDIA hardware Z-fail rendering causes the Z-Cull to be used in reverse:
+		// Z-near becomes Z-far (trivial accept becomes trivial reject). Using the Z-Cull
+		// in reverse is far less efficient because the Z-Cull only stores Z-near per 16x16
+		// pixels while the Z-far is stored per 4x2 pixels. (The Z-near coallesce buffer
+		// which has 4x4 granularity is only used when updating the depth which is not the
+		// case for shadow volumes.) Note that it is also important to NOT use a Z-Cull
+		// reconstruct because that would clear the Z-near of the Z-Cull which results in
+		// no trivial rejection for Z-fail stencil shadow rendering.
+
+		const bool renderZPass = ( drawSurf->renderZFail == 0 ) || r_forceZPassStencilShadows.GetBool();
+
+
+		if ( renderZPass ) {
+			// Z-pass
+			backEnd.glState.shadowStencilFront = 
+				GLS_STENCIL_OP_FAIL_KEEP | GLS_STENCIL_OP_ZFAIL_KEEP | GLS_STENCIL_OP_PASS_INCR;
+			backEnd.glState.shadowStencilBack =
+				GLS_STENCIL_OP_FAIL_KEEP | GLS_STENCIL_OP_ZFAIL_KEEP | GLS_STENCIL_OP_PASS_DECR;
+
+		} else if ( r_useStencilShadowPreload.GetBool() ) {
+			// preload + Z-pass
+			backEnd.glState.shadowStencilFront =
+				GLS_STENCIL_OP_FAIL_KEEP | GLS_STENCIL_OP_ZFAIL_DECR | GLS_STENCIL_OP_PASS_DECR;
+			backEnd.glState.shadowStencilBack =
+				GLS_STENCIL_OP_FAIL_KEEP | GLS_STENCIL_OP_ZFAIL_INCR | GLS_STENCIL_OP_PASS_INCR;
+		} else {
+			// Z-fail
+		}
+
+
+		// get vertex buffer
+		const vertCacheHandle_t vbHandle = drawSurf->shadowCache;
+		idVertexBuffer * vertexBuffer;
+		if ( vertexCache->CacheIsStatic( vbHandle ) ) {
+			vertexBuffer = (idVertexBuffer*)vertexCache->staticData.vertexBuffer;
+		} else {
+			const uint64 frameNum = (int)( vbHandle >> VERTCACHE_FRAME_SHIFT ) & VERTCACHE_FRAME_MASK;
+			if ( frameNum != ( ( vertexCache->currentFrame - 1 ) & VERTCACHE_FRAME_MASK ) ) {
+				idLib::Warning( "RB_DrawElementsWithCounters, vertexBuffer == NULL" );
+				continue;
+			}
+			vertexBuffer = (idVertexBuffer*)vertexCache->frameData[vertexCache->drawListNum].vertexBuffer;
+		}
+		const int vertOffset = (int)( vbHandle >> VERTCACHE_OFFSET_SHIFT ) & VERTCACHE_OFFSET_MASK;
+
+		// get index buffer
+		const vertCacheHandle_t ibHandle = drawSurf->indexCache;
+		idIndexBuffer * indexBuffer;
+		if ( vertexCache->CacheIsStatic( ibHandle ) ) {
+			indexBuffer = (idIndexBuffer*)vertexCache->staticData.indexBuffer;
+		} else {
+			const uint64 frameNum = (int)( ibHandle >> VERTCACHE_FRAME_SHIFT ) & VERTCACHE_FRAME_MASK;
+			if ( frameNum != ( ( vertexCache->currentFrame - 1 ) & VERTCACHE_FRAME_MASK ) ) {
+				idLib::Warning( "RB_DrawElementsWithCounters, indexBuffer == NULL" );
+				continue;
+			}
+			indexBuffer = (idIndexBuffer*)vertexCache->frameData[vertexCache->drawListNum].indexBuffer;
+		}
+		const uint64 indexOffset = (int)( ibHandle >> VERTCACHE_OFFSET_SHIFT ) & VERTCACHE_OFFSET_MASK;
+
+		RENDERLOG_PRINTF( "Binding Buffers: %p %p\n", vertexBuffer, indexBuffer );
+
+
+		if ( backEnd.glState.currentIndexBuffer != (GLuint)indexBuffer->GetAPIObject() || !r_useStateCaching.GetBool() ) {
+			backEnd.glState.currentIndexBuffer = (GLuint)indexBuffer->GetAPIObject();
+		}
+
+		if ( drawSurf->jointCache ) {
+			assert( renderProgManager->ShaderUsesJoints() );
+			backEnd.glState.vertexLayout = LAYOUT_DRAW_SHADOW_VERT_SKINNED;
+		} else {
+			backEnd.glState.vertexLayout = LAYOUT_DRAW_SHADOW_VERT;
+		}
+
+		BindAndSubmitDrawcall(drawSurf);
+
+		if ( !renderZPass && r_useStencilShadowPreload.GetBool() ) {
+			// render again with Z-pass
+
+			backEnd.glState.shadowStencilFront = 
+				GLS_STENCIL_OP_FAIL_KEEP | GLS_STENCIL_OP_ZFAIL_KEEP | GLS_STENCIL_OP_PASS_INCR;
+			backEnd.glState.shadowStencilBack =
+				GLS_STENCIL_OP_FAIL_KEEP | GLS_STENCIL_OP_ZFAIL_KEEP | GLS_STENCIL_OP_PASS_DECR;
+
+			BindAndSubmitDrawcall(drawSurf);
+		}
+	}	
+
+	// cleanup the shadow specific rendering state
+
+	GL_Cull( CT_FRONT_SIDED );
+
+	// reset depth bounds
+	if ( r_useShadowDepthBounds.GetBool() ) {
+		if ( r_useLightDepthBounds.GetBool() ) {
+			GL_DepthBoundsTest( vLight->scissorRect.zmin, vLight->scissorRect.zmax );
+		} else {
+			GL_DepthBoundsTest( 0.0f, 0.0f );
+		}
+	}
 }

@@ -37,6 +37,9 @@ public:
 	virtual void SetupInteractionStage(const shaderStage_t *surfaceStage, const float *surfaceRegs, const float lightColor[4], idVec4 matrix[2], float color[4]) override;
 	virtual void StencilSelectLight(const viewLight_t * vLight) override;
 	virtual void StencilShadowPass(const drawSurf_t *drawSurfs, const viewLight_t * vLight) override;
+
+private:
+	void BindAndSubmitDrawcall(const drawSurf_t* surf);
 };
 
 #endif
