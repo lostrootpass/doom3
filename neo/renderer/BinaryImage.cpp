@@ -169,7 +169,10 @@ void idBinaryImage::Load2DFromMemory( int width, int height, const byte * pic_co
 				img.data[ i * 2 + 1 ] = color & 0xFF;
 			}
 		} else {
-			fileData.format = textureFormat = FMT_RGBA8;
+			if (textureFormat == FMT_BGRA8)
+				fileData.format = FMT_BGRA8;
+			else
+				fileData.format = textureFormat = FMT_RGBA8;
 			img.Alloc( scaledWidth * scaledHeight * 4 );
 			for ( int i = 0; i < img.dataSize; i++ ) {
 				img.data[ i ] = pic[ i ];

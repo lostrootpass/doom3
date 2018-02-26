@@ -40,6 +40,7 @@ int BitsForFormat( textureFormat_t format ) {
 	switch ( format ) {
 		case FMT_NONE:		return 0;
 		case FMT_RGBA8:		return 32;
+		case FMT_BGRA8:		return 32;
 		case FMT_XRGB8:		return 32;
 		case FMT_RGB565:	return 16;
 		case FMT_L8A8:		return 16;
@@ -114,6 +115,9 @@ ID_INLINE void idImage::DeriveOpts() {
 			case TD_LOOKUP_TABLE_RGB1:
 			case TD_LOOKUP_TABLE_RGBA:
 				opts.format = FMT_RGBA8;
+				break;
+			case TD_LOOKUP_TABLE_BGRA:
+				opts.format = FMT_BGRA8;
 				break;
 			default:
 				assert( false );

@@ -1215,7 +1215,10 @@ void Vk_DestroyImageAndView(VkImage image, VkImageView imageView);
 void Vk_DestroyBuffer(VkBuffer buffer);
 void Vk_FreeMemory(VkDeviceMemory memory);
 VkCommandBuffer Vk_ActiveCommandBuffer();
+VkCommandBuffer Vk_StartFrame();
+VkCommandBuffer Vk_StartOffscrenRenderPass();
 VkCommandBuffer Vk_StartRenderPass();
+void Vk_EndFrame();
 void Vk_EndRenderPass();
 uint32_t Vk_GetMemoryTypeIndex(uint32_t bits, VkMemoryPropertyFlags flags);
 VkPipeline Vk_CreatePipeline(VkGraphicsPipelineCreateInfo& info);
@@ -1233,7 +1236,8 @@ VkDescriptorSet Vk_UniformDescriptorSet();
 VkDescriptorSet Vk_AllocateJointBufferSetForFrame(int idx, geoBufferSet_t& gbs);
 VkDescriptorSet Vk_JointBufferSetForFrame(int idx);
 void Vk_FreeDescriptorSet(const VkDescriptorSet set);
-void Vk_ClearDepthStencilImage(bool depth, bool stencil, byte value);
+void Vk_ClearAttachments(uint32_t mask, byte stencilValue = 0);
+VkImage Vk_ActiveColorBuffer();
 #endif
 
 /*

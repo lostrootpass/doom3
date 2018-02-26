@@ -2382,12 +2382,20 @@ void idRenderSystemVk::Shutdown() {
 		globalImages->PurgeAllImages();
 	}
 
+	for (int i = 0; i < purgeQueue.Num(); ++i)
+	{
+		purgeQueue[i]->ActuallyPurgeImage();
+	}
+
+	purgeQueue.Clear();
+
+
 	renderModelManager->Shutdown();
 
 	idCinematic::ShutdownCinematic( );
 
 	globalImages->Shutdown();
-
+	
 	// free frame memory
 	R_ShutdownFrameData();
 

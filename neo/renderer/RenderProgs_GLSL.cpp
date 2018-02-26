@@ -961,6 +961,18 @@ idRenderProgManagerVk::KillAllShaders()
 */
 void idRenderProgManagerVk::KillAllShaders() {
 	Unbind();
+
+	DestroyPipelines();
+
+	for (int i = 0; i < vertexShaders.Num(); ++i)
+	{
+		vkDestroyShaderModule(Vk_GetDevice(), vertexShaders[i].progId, nullptr);
+	}
+
+	for (int i = 0; i < fragmentShaders.Num(); ++i)
+	{
+		vkDestroyShaderModule(Vk_GetDevice(), fragmentShaders[i].progId, nullptr);
+	}
 }
 
 /*
@@ -1508,7 +1520,7 @@ idRenderProgManagerVk::~idRenderProgManagerVk
 ================================================================================================
 */
 idRenderProgManagerVk::~idRenderProgManagerVk() {
-	DestroyPipelines();
+
 }
 
 void idRenderProgManagerVk::BindShader(int vIndex, int fIndex) {

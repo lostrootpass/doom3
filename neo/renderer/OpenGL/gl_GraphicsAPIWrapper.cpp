@@ -234,7 +234,12 @@ GL_Clear
 */
 void GL_Clear( bool color, bool depth, bool stencil, byte stencilValue, float r, float g, float b, float a ) {
 #ifdef DOOM3_VULKAN
-	Vk_ClearDepthStencilImage(depth, stencil, stencilValue);
+	uint32_t mask = 0;
+	mask |= (color ? VK_IMAGE_ASPECT_COLOR_BIT : 0);
+	mask |= (depth ? VK_IMAGE_ASPECT_DEPTH_BIT : 0);
+	mask |= (stencil ? VK_IMAGE_ASPECT_STENCIL_BIT : 0);
+
+	Vk_ClearAttachments(mask, stencilValue);
 #else
 	int clearFlags = 0;
 	if ( color ) {

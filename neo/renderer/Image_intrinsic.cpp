@@ -131,6 +131,18 @@ static void R_RGBA8Image( idImage *image ) {
 	image->GenerateImage( (byte *)data, DEFAULT_SIZE, DEFAULT_SIZE, TF_DEFAULT, TR_REPEAT, TD_LOOKUP_TABLE_RGBA );
 }
 
+static void R_BufferSampleImage(idImage* image) {
+	size_t size = 4 * renderSystem->GetWidth() * renderSystem->GetHeight();
+	byte* data = new byte[size];
+
+	memset(data, 0, size);
+
+	image->GenerateImage(data, renderSystem->GetWidth(), renderSystem->GetHeight(),
+		TF_LINEAR, TR_CLAMP, TD_LOOKUP_TABLE_BGRA);
+
+	delete[] data;
+}
+
 static void R_DepthImage( idImage *image ) {
 	byte	data[DEFAULT_SIZE][DEFAULT_SIZE][4];
 
@@ -415,7 +427,7 @@ void idImageManager::CreateIntrinsicImages() {
 	scratchImage = ImageFromFunction("_scratch", R_RGBA8Image );
 	scratchImage2 = ImageFromFunction("_scratch2", R_RGBA8Image );
 	accumImage = ImageFromFunction("_accum", R_RGBA8Image );
-	currentRenderImage = ImageFromFunction("_currentRender", R_RGBA8Image );
+	currentRenderImage = ImageFromFunction("_currentRender", R_BufferSampleImage );
 	currentDepthImage = ImageFromFunction("_currentDepth", R_DepthImage );
 
 	// save a copy of this for material comparison, because currentRenderImage may get

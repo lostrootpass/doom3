@@ -895,6 +895,7 @@ void idRenderSystemVk::SwapCommandBuffers_FinishRendering(
 	//TODO: There is no static joint cache but we allocate one anyway???
 	//vertexCache->staticData.jointBuffer->Sync();
 	Vk_EndRenderPass();
+	Vk_EndFrame();
 
 	//Need to do this here to avoid invalidating the command buffers
 	for (int i = 0; i < purgeQueue.Num(); ++i)
@@ -995,7 +996,10 @@ const emptyCommand_t * idRenderSystemLocal::SwapCommandBuffers_FinishCommandBuff
 
 const emptyCommand_t * idRenderSystemVk::SwapCommandBuffers_FinishCommandBuffers() {
 #ifdef DOOM3_VULKAN
+	Vk_StartFrame();
 	Vk_StartRenderPass();
+	Vk_ClearAttachments(VK_IMAGE_ASPECT_COLOR_BIT);
+
 	renderProgManager->BeginFrame();
 #endif
 	return idRenderSystemLocal::SwapCommandBuffers_FinishCommandBuffers();

@@ -58,7 +58,7 @@ void main() {
 	vec4 bumpMap = ( tex2D ( samp1 , vofi_TexCoord1 . xy ) * 2.0 ) - 1.0 ;
 	vec2 localNormal = bumpMap. wy ;
 	localNormal *= mask. xy ;
-	vec2 screenTexCoord = vposToScreenPosTexCoord ( fragCoord . xy ) ;
+	vec2 screenTexCoord = vposToScreenPosTexCoord ( gl_FragCoord . xy ) ;
 	screenTexCoord += ( localNormal * vofi_TexCoord2 . xy ) ;
 	screenTexCoord = saturate ( screenTexCoord ) ;
 	fragColor = tex2D ( samp0 , screenTexCoord ) ;

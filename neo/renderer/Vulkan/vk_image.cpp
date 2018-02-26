@@ -53,8 +53,17 @@ void idImage::FinaliseImageUpload()
 		copy.imageSubresource.layerCount = layerCount;
 		copy.imageSubresource.mipLevel = i;
 		copy.bufferOffset = offset;
-		copy.bufferImageHeight = (mipHeight + 3) & ~3;// opts.height;
-		copy.bufferRowLength = (mipWidth + 3) & ~3;// opts.width;
+
+		if (opts.format == FMT_BGRA8)
+		{
+			copy.bufferImageHeight = opts.height;
+			copy.bufferRowLength = opts.width;
+		}
+		else
+		{
+			copy.bufferImageHeight = (mipHeight + 3) & ~3;// opts.height;
+			copy.bufferRowLength = (mipWidth + 3) & ~3;// opts.width;
+		}
 
 		copies.push_back(copy);
 		offset += (mipWidth * mipHeight * BitsForFormat(opts.format)) / 8;
@@ -67,6 +76,7 @@ void idImage::FinaliseImageUpload()
 
 	Vk_DestroyBuffer(stagingBuffer);
 	Vk_FreeMemory(stagingMemory);
+	stagingMemory = stagingBuffer = VK_NULL_HANDLE;
 
 	VkImageSubresourceRange range = {};
 	range.layerCount = layerCount;
@@ -199,7 +209,7 @@ void idImage::FinaliseImageUpload()
 		descriptorSet = Vk_AllocDescriptorSetForImage();
 
 	VkDescriptorImageInfo imageInfo = {};
-	imageInfo.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	imageInfo.imageView = imageView;
 	imageInfo.sampler = sampler;
 
@@ -328,6 +338,9 @@ void idImage::AllocImage() {
 	case FMT_RGBA8:
 		format = VK_FORMAT_R8G8B8A8_UNORM;
 		break;
+	case FMT_BGRA8:
+		format = VK_FORMAT_B8G8R8A8_UNORM;
+		break;
 	case FMT_XRGB8:
 		format = VK_FORMAT_R8G8B8_UNORM;
 		break;
@@ -403,6 +416,7 @@ void idImage::AllocImage() {
 	buff.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	buff.size = size;
 
+	//TODO: don't do this for every image!
 	stagingBuffer = Vk_CreateAndBindBuffer(buff, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingMemory);
 
 	VkImageCreateInfo info = {};
@@ -448,9 +462,11 @@ void idImage::PurgeImage()
 
 void idImage::ActuallyPurgeImage() {
 	if (texnum != TEXTURE_NOT_LOADED) {
+		vkDestroySampler(Vk_GetDevice(), sampler, nullptr);
 		Vk_DestroyImageAndView(image, imageView);
 		Vk_FreeDescriptorSet(descriptorSet);
 		texnum = TEXTURE_NOT_LOADED;
+		image = imageView = sampler = VK_NULL_HANDLE;
 	}
 
 	// clear all the current binding caches, so the next bind will do a real one
@@ -520,7 +536,60 @@ CopyFramebuffer
 ====================
 */
 void idImage::CopyFramebuffer(int x, int y, int imageWidth, int imageHeight) {
+	//Consider this more of a "pause" than an "end" - 
+	//after we copy, we resume rendering to the same backbuffer w/o clearing
+	Vk_EndRenderPass();
 
+	VkImage img = Vk_ActiveColorBuffer();
+
+	VkImageSubresourceRange range = {};
+	range.layerCount = 1;
+	range.levelCount = 1;
+	range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+
+	VkImageMemoryBarrier prep = {};
+	prep.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	prep.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	prep.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+	prep.image = image;
+	prep.subresourceRange = range;
+	prep.srcAccessMask = 0;
+	prep.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+	vkCmdPipelineBarrier(Vk_ActiveCommandBuffer(),
+		VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+		VK_PIPELINE_STAGE_TRANSFER_BIT,
+		VK_DEPENDENCY_BY_REGION_BIT,
+		0, nullptr, 0, nullptr, 1, &prep);
+
+	VkImageCopy region = {};
+	region.extent = { (uint32_t)opts.width, (uint32_t)opts.height, 1};
+	region.dstSubresource.layerCount = 1;
+	region.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	region.srcSubresource.layerCount = 1;
+	region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+
+	vkCmdCopyImage(Vk_ActiveCommandBuffer(), 
+		img, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+		image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		1, &region);
+
+	VkImageMemoryBarrier barrier = {};
+	barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+	barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	barrier.image = image;
+	barrier.subresourceRange = range;
+	barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+	barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+	vkCmdPipelineBarrier(Vk_ActiveCommandBuffer(),
+		VK_PIPELINE_STAGE_TRANSFER_BIT,
+		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+		VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 0, nullptr, 1, &barrier);
+
+	//Restart the render pass to continue rendering, but don't clear.
+	Vk_StartRenderPass();
 }
 
 

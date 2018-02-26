@@ -54,6 +54,7 @@ typedef enum {
 	TD_LOOKUP_TABLE_RGBA,	// RGBA lookup table
 	TD_COVERAGE,			// coverage map for fill depth pass when YCoCG is used
 	TD_DEPTH,				// depth buffer copy for motion blur
+	TD_LOOKUP_TABLE_BGRA,	// BGRA lookup table
 } textureUsage_t;
 
 typedef enum {

@@ -545,7 +545,7 @@ int idRenderBackendVk::DrawShaderPasses(const drawSurf_t * const * const drawSur
 					if ( ( stageGLState & GLS_OVERRIDE ) != 0 ) {
 						// This is a hack... Only SWF Guis set GLS_OVERRIDE
 						// Old style guis do not, and we don't want them to use the new GUI renederProg
-						//renderProgManager->BindShader_BinkGUI();
+						renderProgManager->BindShader_BinkGUI();
 					} else {
 						renderProgManager->BindShader_Bink();
 					}
@@ -726,11 +726,6 @@ void idRenderBackendVk::DrawViewInternal(const viewDef_t* viewDef, const int ste
 	// normal face culling
 	GL_Cull( CT_FRONT_SIDED );
 
-#ifdef USE_CORE_PROFILE
-	// bind one global Vertex Array Object (VAO)
-	//qglBindVertexArray( glConfig.global_vao );
-#endif
-
 	//------------------------------------
 	// sets variables that can be used by all programs
 	//------------------------------------
@@ -817,7 +812,7 @@ void idRenderBackendVk::DrawViewInternal(const viewDef_t* viewDef, const int ste
 		RENDERLOG_PRINTF( "Resolve to %i x %i buffer\n", w, h );
 
 		GL_SelectTexture( 0 );
-
+	
 		// resolve the screen
 		globalImages->currentRenderImage->CopyFramebuffer( x, y, w, h );
 		backEnd.currentRenderCopied = true;

@@ -402,6 +402,8 @@ idVertexCacheVk::Shutdown
 ==============
 */
 void idVertexCacheVk::Shutdown() {
+	vkDeviceWaitIdle(Vk_GetDevice());
+
 	for ( int i = 0; i < VERTCACHE_NUM_FRAMES; i++ ) {
 		frameData[i].vertexBuffer->FreeBufferObject();
 		frameData[i].indexBuffer->FreeBufferObject();
