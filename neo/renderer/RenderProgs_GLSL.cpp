@@ -1918,7 +1918,8 @@ VkPipeline idRenderProgManagerVk::GetPipelineForState(uint64 stateBits)
 	for (CachedPipeline p : pipelines)
 	{
 		if (p.progId == currentRenderProgram && p.stateBits == stateBits 
-			&& p.cullType == backEnd.glState.faceCulling)
+			&& p.cullType == backEnd.glState.faceCulling
+			&& p.isMirror == backEnd.viewDef->isMirror)
 		{
 			if(backEnd.glState.vertexLayout == LAYOUT_DRAW_VERT)
 				return p.pipeline;
@@ -2069,7 +2070,7 @@ VkPipeline idRenderProgManagerVk::GetPipelineForState(uint64 stateBits)
 	}
 
 	VkPipelineColorBlendAttachmentState cba = {};
-	cba.blendEnable = VK_TRUE;
+	cba.blendEnable = blendEnable;
 	cba.colorWriteMask = colorWriteMask;
 	
 	cba.colorBlendOp = VK_BLEND_OP_ADD;
@@ -2100,19 +2101,22 @@ VkPipeline idRenderProgManagerVk::GetPipelineForState(uint64 stateBits)
 	{
 		cullType = VK_CULL_MODE_NONE;
 	}
-	else if (backEnd.glState.faceCulling == CT_BACK_SIDED)
-	{
-		if (backEnd.viewDef->isMirror)
-			cullType = VK_CULL_MODE_FRONT_BIT;
-		else
-			cullType = VK_CULL_MODE_BACK_BIT;
-	}
 	else
 	{
-		if (backEnd.viewDef->isMirror)
-			cullType = VK_CULL_MODE_BACK_BIT;
+		if (backEnd.glState.faceCulling == CT_BACK_SIDED)
+		{
+			if (backEnd.viewDef->isMirror)
+				cullType = VK_CULL_MODE_FRONT_BIT;
+			else
+				cullType = VK_CULL_MODE_BACK_BIT;
+		}
 		else
-			cullType = VK_CULL_MODE_FRONT_BIT;
+		{
+			if (backEnd.viewDef->isMirror)
+				cullType = VK_CULL_MODE_BACK_BIT;
+			else
+				cullType = VK_CULL_MODE_FRONT_BIT;
+		}
 	}
 
 	VkPipelineRasterizationStateCreateInfo rs = {};
@@ -2252,6 +2256,8 @@ VkPipeline idRenderProgManagerVk::GetPipelineForState(uint64 stateBits)
 		stencilState.depthFailOp = DepthFailOp(stateBits);
 		stencilState.passOp = StencilPassOp(stateBits);
 		stencilState.failOp = StencilFailOp(stateBits);
+
+		dss.front = stencilState;
 		dss.back = stencilState;
 	}
 	else
@@ -2316,6 +2322,7 @@ VkPipeline idRenderProgManagerVk::GetPipelineForState(uint64 stateBits)
 	p.pipeline = pipeline;
 	p.progId = currentRenderProgram;
 	p.cullType = backEnd.glState.faceCulling;
+	p.isMirror = backEnd.viewDef->isMirror;
 
 	if (backEnd.glState.vertexLayout == LAYOUT_DRAW_SHADOW_VERT ||
 		backEnd.glState.vertexLayout == LAYOUT_DRAW_SHADOW_VERT_SKINNED)

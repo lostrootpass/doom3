@@ -378,6 +378,7 @@ private:
 		VkPipeline pipeline;
 		int progId;
 		int cullType;
+		bool isMirror;
 	};
 	std::vector<CachedPipeline> pipelines;
 
