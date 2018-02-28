@@ -16,6 +16,49 @@ Contains the Image implementation for OpenGL.
 
 const int VK_IMAGE_SET_OFFSET = 2;
 
+static inline size_t ByteSize(uint32_t w, uint32_t h, const idImageOpts& opts)
+{
+	return (w * h * BitsForFormat(opts.format)) / 8;
+}
+
+static inline size_t PadAlign(uint32_t offset)
+{
+	return (offset + 3) & ~3;
+}
+
+static inline size_t MipOffset(int mipLevel, const idImageOpts& opts)
+{
+	uint32_t w = 0, h = 0;
+	size_t offset = 0;
+
+	for (int i = 0; i < mipLevel; ++i)
+	{
+		w = Max(opts.width >> i, 1);
+		h = Max(opts.height >> i, 1);
+		offset += PadAlign(ByteSize(w, h, opts));
+	}
+
+	return offset;
+}
+
+static inline size_t FaceOffset(int z, const idImageOpts& opts)
+{
+	uint32_t mipWidth = 0, mipHeight = 0;
+	size_t offset = 0;
+
+	for (int i = 0; i < z; ++i)
+	{
+		for (int k = 0; k < opts.numLevels; ++k)
+		{
+			mipWidth = Max(opts.width >> k, 1);
+			mipHeight = Max(opts.height >> k, 1);
+			offset += PadAlign(ByteSize(mipWidth, mipHeight, opts));
+		}
+	}
+
+	return offset;
+}
+
 void idImage::FinaliseImageUpload()
 {
 	VkImageViewType target = VK_IMAGE_VIEW_TYPE_2D;
@@ -33,42 +76,46 @@ void idImage::FinaliseImageUpload()
 			idLib::FatalError( "%s: bad texture type %d", GetName(), opts.textureType );
 			return;
 	}
+	
 
 	VkExtent3D extent = { 
-		(uint32_t)opts.width, (uint32_t)opts.height, 1 //(uint32_t)opts.numLevels
+		(uint32_t)opts.width, (uint32_t)opts.height, 1
 	};
 	
 	std::vector<VkBufferImageCopy> copies;
 	VkDeviceSize offset = 0;
 
-	for(int i = 0; i < opts.numLevels; ++i)
+	const uint32_t numFaces = opts.textureType == TT_CUBIC ? 6 : 1;
+	for (uint32_t f = 0; f < numFaces; ++f)
 	{
-		uint32_t mipWidth = Max(opts.width >> i, 1);
-		uint32_t mipHeight = Max(opts.height >> i, 1);
-
-		VkBufferImageCopy copy = {};
-		copy.imageExtent = { mipWidth, mipHeight, 1 };
-		copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		copy.imageSubresource.baseArrayLayer = 0;
-		copy.imageSubresource.layerCount = layerCount;
-		copy.imageSubresource.mipLevel = i;
-		copy.bufferOffset = offset;
-
-		if (opts.format == FMT_BGRA8)
+		for (int i = 0; i < opts.numLevels; ++i)
 		{
-			copy.bufferImageHeight = opts.height;
-			copy.bufferRowLength = opts.width;
-		}
-		else
-		{
-			copy.bufferImageHeight = (mipHeight + 3) & ~3;// opts.height;
-			copy.bufferRowLength = (mipWidth + 3) & ~3;// opts.width;
-		}
+			uint32_t mipWidth = Max(opts.width >> i, 1);
+			uint32_t mipHeight = Max(opts.height >> i, 1);
 
-		copies.push_back(copy);
-		offset += (mipWidth * mipHeight * BitsForFormat(opts.format)) / 8;
-		offset = (offset + 3) & ~3;
-	}	
+			VkBufferImageCopy copy = {};
+			copy.imageExtent = { mipWidth, mipHeight, 1 };
+			copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			copy.imageSubresource.baseArrayLayer = f;
+			copy.imageSubresource.layerCount = 1;
+			copy.imageSubresource.mipLevel = i;
+			copy.bufferOffset = offset;
+
+			if (opts.format == FMT_BGRA8)
+			{
+				copy.bufferImageHeight = opts.height;
+				copy.bufferRowLength = opts.width;
+			}
+			else
+			{
+				copy.bufferImageHeight = (mipHeight + 3) & ~3;// opts.height;
+				copy.bufferRowLength = (mipWidth + 3) & ~3;// opts.width;
+			}
+
+			copies.push_back(copy);
+			offset += PadAlign(ByteSize(mipWidth, mipHeight, opts));
+		}
+	}
 
 	VkCommandBuffer cmd = Vk_StartOneShotCommandBuffer();
 	vkCmdCopyBufferToImage(cmd, stagingBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, (uint32_t)copies.size(), copies.data());
@@ -259,24 +306,17 @@ void idImage::SubImageUpload(int mipLevel, int x, int y, int z, int width, int h
 		assert( x + width <= opts.width && y + height <= opts.height );
 	}
 
-	uint32_t mipWidth = 0;
-	uint32_t mipHeight = 0;
-	VkDeviceSize size = (width * height * BitsForFormat(opts.format)) / 8;
-	VkDeviceSize offset = 0;
-
+	VkDeviceSize size = PadAlign(ByteSize(width, height, opts));
 	size = Max(size, (VkDeviceSize)compressedSize);
 
 	if (size == 0) return;
 
-	for (int i = 0; i < mipLevel; ++i)
-	{
-		mipWidth = Max(opts.width >> i, 1);
-		mipHeight = Max(opts.height >> i, 1);
-		offset += (mipWidth * mipHeight * BitsForFormat(opts.format)) / 8;
-	}
+	//All the mips for each face are stored next to each other, so run through
+	//them and figure out the offset for the whole face to use as a start point
+	//then we can further offset to the specific mip we want.
+	VkDeviceSize offset = FaceOffset(z, opts) + MipOffset(mipLevel, opts);
 
-	VkFlags flags = 0;
-	void* ptr = Vk_MapMemory(stagingMemory, offset, size, flags);
+	void* ptr = Vk_MapMemory(stagingMemory, offset, size, 0);
 
 	//For RGB565 images only, swap byte order to simulate GL_UNPACK_SWAP_BYTES
 	//RGB565 images are always going to be the light projection textures
