@@ -80,6 +80,17 @@ VkDescriptorSetLayout jointSetLayout;
 
 std::vector<VkDescriptorSet> destructionQueue;
 
+struct ImageMemBlock
+{
+	VkDeviceSize size = 0 ;
+	VkImage image = VK_NULL_HANDLE;
+
+	uintptr_t startAddress = 0;
+	ImageMemBlock* next = nullptr;
+};
+
+ImageMemBlock* imageMemPool = nullptr;
+
 const uint32_t MAX_IMAGE_DESC_SETS = 8192;
 
 static void CreateVulkanContextOnHWND(HWND hwnd, bool isDebug)
@@ -1445,26 +1456,70 @@ VkImage Vk_AllocAndCreateImage(const VkImageCreateInfo& info, VkDeviceMemory& me
 
 	VkCheck(vkCreateImage(vkDevice, &info, nullptr, &image));
 
-	static VkDeviceMemory imageMemPool = VK_NULL_HANDLE;
-	//TODO: this has to be a big mempool for images (or several pools?)
-	//will quickly go over hardware allocation limits if one alloc per image
-	//freeing individual images and reallocing blocks will be a hassle though
+	static VkDeviceMemory imageDeviceMemory = VK_NULL_HANDLE;
 	VkMemoryRequirements memReq;
 	vkGetImageMemoryRequirements(vkDevice, image, &memReq);
 
-	if (imageMemPool == VK_NULL_HANDLE)
+	if (imageDeviceMemory == VK_NULL_HANDLE)
 	{
 		VkMemoryAllocateInfo alloc = { VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
-		//alloc.allocationSize = memReq.size;
 		alloc.allocationSize = 1024 * 1024 * 256; //256MB texture memory?
-		alloc.memoryTypeIndex = Vk_GetMemoryTypeIndex(memReq.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-		VkCheck(vkAllocateMemory(vkDevice, &alloc, nullptr, &imageMemPool));
+		alloc.memoryTypeIndex = Vk_GetMemoryTypeIndex(memReq.memoryTypeBits,
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		VkCheck(vkAllocateMemory(vkDevice, &alloc, nullptr, &imageDeviceMemory));
 	}
+	
+	VkDeviceSize size = (memReq.size + memReq.alignment) & -memReq.alignment;
+	
+	ImageMemBlock*& block = imageMemPool;
+	ImageMemBlock* prev = nullptr;
+	bool found = false;
 
-	static VkDeviceSize memPoolOffset = 0;
-	VkCheck(vkBindImageMemory(vkDevice, image, imageMemPool, memPoolOffset));
+	do 
+	{
+		size_t end = 0;
 
-	memPoolOffset += (memReq.size + memReq.alignment) & -memReq.alignment;
+		if(block != nullptr)
+			end = block->startAddress + block->size;
+
+		if (block == nullptr || block->next == nullptr)
+		{
+			//End of the list so just assume that there's enough space in the pool?
+			found = true;
+		}
+		else
+		{
+			//Check if there's enough space to squeeze in somewhere previously freed
+			size_t diff = block->next->startAddress - end;
+			if (size < diff)
+			{
+				found = true;
+			}
+		}
+
+		if (!found)
+		{
+			prev = block;
+			block = block->next;
+		}
+		else
+		{
+			prev = block;
+			block = new ImageMemBlock;
+			block->startAddress = end;
+
+			if (prev)
+			{
+				block->next = prev->next;
+				prev->next = block;
+			}
+		}
+	} while (!found);
+
+	VkCheck(vkBindImageMemory(vkDevice, image, imageDeviceMemory, block->startAddress));
+
+	block->size = size;
+	block->image = image;
 
 	return image;
 }
@@ -1563,8 +1618,25 @@ void Vk_SetImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout,
 
 void Vk_DestroyImageAndView(VkImage image, VkImageView imageView)
 {
-	vkDestroyImageView(vkDevice, imageView, nullptr);
-	vkDestroyImage(vkDevice, image, nullptr);
+	ImageMemBlock*& block = imageMemPool;
+
+	while (block != nullptr && block->next != nullptr && block->next->image != image)
+	{
+		block = block->next;
+	}
+
+	if (block->next)
+	{
+		if (block->next->image == image)
+		{
+			vkDestroyImageView(vkDevice, imageView, nullptr);
+			vkDestroyImage(vkDevice, image, nullptr);
+		}
+
+		ImageMemBlock* next = block->next->next;
+		delete block->next;
+		block->next = block->next->next;
+	}
 }
 
 void Vk_DestroyBuffer(VkBuffer buffer)
