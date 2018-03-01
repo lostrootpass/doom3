@@ -170,6 +170,11 @@ private:
 	void				AllocImage();
 	void				DeriveOpts();
 
+#ifdef DOOM3_VULKAN
+	bool AllocImageInternal(VkImage& newImage, VkImageView& newView);
+	void UpdateDescriptorSet();
+#endif
+
 	// parameters that define this image
 	idStr				imgName;				// game path, including extension (except for cube maps), may be an image program
 	cubeFiles_t			cubeFiles;				// If this is a cube map, and if so, what kind
@@ -206,8 +211,8 @@ private:
 	VkImage image;
 	VkImageView imageView;
 	VkFormat format;
-	VkSampler sampler;
-	VkDescriptorSet descriptorSet;
+	VkSampler sampler = VK_NULL_HANDLE;
+	VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
 #endif
 
 };

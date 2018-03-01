@@ -129,7 +129,8 @@ void idImage::FinaliseImageUpload()
 	range.layerCount = layerCount;
 	range.levelCount = opts.numLevels;
 	range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	Vk_SetImageLayout(image, format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, range);
+	Vk_SetImageLayout(image, format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, range);
 
 	VkComponentSwizzle r, g, b, a;
 	if ( opts.colorFormat == CFM_GREEN_ALPHA ) {
@@ -222,18 +223,8 @@ void idImage::FinaliseImageUpload()
 			common->FatalError( "%s: bad texture repeat %d", GetName(), repeat );
 	}
 
-	VkImageViewCreateInfo view = {};
-	view.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-	view.components = { r, g, b, a };
-	view.image = image;
-	view.viewType = target;
-	view.format = format;
-	view.subresourceRange = range;
 
-	imageView = Vk_CreateImageView(view);
-	texnum = (GLuint)imageView;
 
-	//if (sampler == VK_NULL_HANDLE)
 	{
 		VkSamplerCreateInfo samplerCreateInfo = {};
 		samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -252,23 +243,7 @@ void idImage::FinaliseImageUpload()
 		vkCreateSampler(Vk_GetDevice(), &samplerCreateInfo, nullptr, &sampler);
 	}
 
-	//if (descriptorSet == VK_NULL_HANDLE)
-		descriptorSet = Vk_AllocDescriptorSetForImage();
-
-	VkDescriptorImageInfo imageInfo = {};
-	imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-	imageInfo.imageView = imageView;
-	imageInfo.sampler = sampler;
-
-	VkWriteDescriptorSet write = {};
-	write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	write.descriptorCount = 1;
-	write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	write.dstBinding = 0;
-	write.dstSet = descriptorSet;
-	write.pImageInfo = &imageInfo;
-			
-	vkUpdateDescriptorSets(Vk_GetDevice(), 1, &write, 0, 0);
+	UpdateDescriptorSet();
 }
 
 /*
@@ -374,57 +349,6 @@ This should not be done during normal game-play, if you can avoid it.
 void idImage::AllocImage() {
 	PurgeImage();
 
-	switch (opts.format) {
-	case FMT_RGBA8:
-		format = VK_FORMAT_R8G8B8A8_UNORM;
-		break;
-	case FMT_BGRA8:
-		format = VK_FORMAT_B8G8R8A8_UNORM;
-		break;
-	case FMT_XRGB8:
-		format = VK_FORMAT_R8G8B8_UNORM;
-		break;
-	case FMT_ALPHA:
-		format = VK_FORMAT_R8_UNORM;
-		break;
-	case FMT_L8A8:
-		format = VK_FORMAT_R8G8_UNORM;
-		break;
-	case FMT_LUM8:
-		format = VK_FORMAT_R8_UNORM;
-		break;
-	case FMT_INT8:
-		format = VK_FORMAT_R8_UNORM;
-		break;
-	case FMT_DXT1:
-		format = VK_FORMAT_BC1_RGB_UNORM_BLOCK;
-		break;
-	case FMT_DXT5:
-		format = VK_FORMAT_BC3_UNORM_BLOCK;
-		break;
-	case FMT_DEPTH:
-		format = VK_FORMAT_UNDEFINED;
-		break;
-	case FMT_X16:
-		format = VK_FORMAT_R16_UNORM;
-		break;
-	case FMT_Y16_X16:
-		format = VK_FORMAT_R16G16_UNORM;
-		break;
-	case FMT_RGB565:
-		format = VK_FORMAT_R5G6B5_UNORM_PACK16;
-		break;
-	default:
-		format = VK_FORMAT_UNDEFINED;
-		idLib::Error( "Unhandled image format %d in %s\n", opts.format, GetName() );
-		break;
-
-	}
-
-	if (!R_IsInitialized()) {
-		return;
-	}
-
 	VkDeviceSize size = 0;
 	if (IsCompressed())
 	{
@@ -448,42 +372,28 @@ void idImage::AllocImage() {
 
 	if (size == 0) return;
 
-	VkExtent3D extent = { (uint32_t)opts.width, (uint32_t)opts.height, (uint32_t)1 };
-
+	//TODO: don't do this for every image!
 	VkBufferCreateInfo buff = {};
 	buff.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 	buff.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 	buff.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	buff.size = size;
 
-	//TODO: don't do this for every image!
-	stagingBuffer = Vk_CreateAndBindBuffer(buff, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingMemory);
-
-	VkImageCreateInfo info = {};
-	info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-	info.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-	info.imageType = VK_IMAGE_TYPE_2D;
-	info.extent = extent;
-	info.arrayLayers = opts.textureType == TT_CUBIC ? 6 : 1;
-	info.mipLevels = opts.numLevels;
-	info.format = format;
-	info.tiling = VK_IMAGE_TILING_OPTIMAL;
-	info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	info.samples = VK_SAMPLE_COUNT_1_BIT;
+	stagingBuffer = Vk_CreateAndBindBuffer(buff, 
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | 
+		VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		stagingMemory);
 	
-	if (opts.textureType == TT_CUBIC)
-		info.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
-
-
-	image = Vk_AllocAndCreateImage(info, deviceMemory);
+	bool res = AllocImageInternal(image, imageView);
+	assert(res);
 
 	VkImageSubresourceRange range = {};
 	range.layerCount = opts.textureType == TT_CUBIC ? 6 : 1;
 	range.levelCount = opts.numLevels;
 	range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 
-	Vk_SetImageLayout(image, format, info.initialLayout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, range);
+	Vk_SetImageLayout(image, format, VK_IMAGE_LAYOUT_UNDEFINED,
+		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, range);
 
 	SetTexParameters();
 }
@@ -502,11 +412,17 @@ void idImage::PurgeImage()
 
 void idImage::ActuallyPurgeImage() {
 	if (texnum != TEXTURE_NOT_LOADED) {
-		vkDestroySampler(Vk_GetDevice(), sampler, nullptr);
+		if(sampler != VK_NULL_HANDLE)
+			vkDestroySampler(Vk_GetDevice(), sampler, nullptr);
+		
 		Vk_DestroyImageAndView(image, imageView);
-		Vk_FreeDescriptorSet(descriptorSet);
+		
+		if(descriptorSet != VK_NULL_HANDLE)
+			Vk_FreeDescriptorSet(descriptorSet);
+		
 		texnum = TEXTURE_NOT_LOADED;
 		image = imageView = sampler = VK_NULL_HANDLE;
+		descriptorSet = VK_NULL_HANDLE;
 	}
 
 	// clear all the current binding caches, so the next bind will do a real one
@@ -527,7 +443,20 @@ void idImage::Resize( int width, int height ) {
 	}
 	opts.width = width;
 	opts.height = height;
-	AllocImage();
+
+	VkImage newImage;
+	VkImageView newView;
+
+	bool res = AllocImageInternal(newImage, newView);
+	assert(res);
+
+	Vk_DestroyImageAndView(image, imageView);
+	image = newImage;
+	imageView = newView;
+
+	UpdateDescriptorSet();
+
+	//vkDeviceWaitIdle(Vk_GetDevice());
 }
 
 /*
@@ -566,8 +495,9 @@ void idImage::Bind() {
 			tmu->currentCubeMap = texnum;
 	}
 
-	vkCmdBindDescriptorSets(Vk_ActiveCommandBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS,
-		Vk_GetPipelineLayout(), texUnit + VK_IMAGE_SET_OFFSET, 1, &descriptorSet, 0, nullptr);
+	vkCmdBindDescriptorSets(Vk_ActiveCommandBuffer(), 
+		VK_PIPELINE_BIND_POINT_GRAPHICS, Vk_GetPipelineLayout(),
+		texUnit + VK_IMAGE_SET_OFFSET, 1, &descriptorSet, 0, nullptr);
 }
 
 /*
@@ -579,6 +509,12 @@ void idImage::CopyFramebuffer(int x, int y, int imageWidth, int imageHeight) {
 	//Consider this more of a "pause" than an "end" - 
 	//after we copy, we resume rendering to the same backbuffer w/o clearing
 	Vk_EndRenderPass();
+
+	//If the backbuffer has been resized then we need to resize this image too
+	if (!(opts.width == imageWidth && opts.height == imageHeight))
+	{
+		Resize(imageWidth, imageHeight);
+	}
 
 	VkImage img = Vk_ActiveColorBuffer();
 
@@ -640,6 +576,158 @@ CopyDepthbuffer
 */
 void idImage::CopyDepthbuffer(int x, int y, int imageWidth, int imageHeight) {
 
+}
+
+bool idImage::AllocImageInternal(VkImage& newImage, VkImageView& newView)
+{
+	if (!R_IsInitialized()) {
+		return false;
+	}
+
+
+	switch (opts.format) {
+	case FMT_RGBA8:
+		format = VK_FORMAT_R8G8B8A8_UNORM;
+		break;
+	case FMT_BGRA8:
+		format = VK_FORMAT_B8G8R8A8_UNORM;
+		break;
+	case FMT_XRGB8:
+		format = VK_FORMAT_R8G8B8_UNORM;
+		break;
+	case FMT_ALPHA:
+		format = VK_FORMAT_R8_UNORM;
+		break;
+	case FMT_L8A8:
+		format = VK_FORMAT_R8G8_UNORM;
+		break;
+	case FMT_LUM8:
+		format = VK_FORMAT_R8_UNORM;
+		break;
+	case FMT_INT8:
+		format = VK_FORMAT_R8_UNORM;
+		break;
+	case FMT_DXT1:
+		format = VK_FORMAT_BC1_RGB_UNORM_BLOCK;
+		break;
+	case FMT_DXT5:
+		format = VK_FORMAT_BC3_UNORM_BLOCK;
+		break;
+	case FMT_DEPTH:
+		format = VK_FORMAT_UNDEFINED;
+		break;
+	case FMT_X16:
+		format = VK_FORMAT_R16_UNORM;
+		break;
+	case FMT_Y16_X16:
+		format = VK_FORMAT_R16G16_UNORM;
+		break;
+	case FMT_RGB565:
+		format = VK_FORMAT_R5G6B5_UNORM_PACK16;
+		break;
+	default:
+		format = VK_FORMAT_UNDEFINED;
+		idLib::Error( "Unhandled image format %d in %s\n", opts.format, GetName() );
+		break;
+	}
+
+	VkImageViewType target = VK_IMAGE_VIEW_TYPE_2D;
+	uint32_t layerCount = 1;
+	switch ( opts.textureType ) {
+		case TT_2D:
+			target = VK_IMAGE_VIEW_TYPE_2D;
+			layerCount = 1;
+			break;
+		case TT_CUBIC:
+			target = VK_IMAGE_VIEW_TYPE_CUBE;
+			layerCount = 6;
+			break;
+		default:
+			idLib::FatalError( "%s: bad texture type %d", GetName(), opts.textureType );
+			return false;
+	}
+
+	VkComponentSwizzle r, g, b, a;
+	if ( opts.colorFormat == CFM_GREEN_ALPHA ) {
+		r = g = b = VK_COMPONENT_SWIZZLE_ONE;
+		a = VK_COMPONENT_SWIZZLE_G;
+	} else if ( opts.format == FMT_LUM8 ) {
+		r = g = b = VK_COMPONENT_SWIZZLE_R;
+		a = VK_COMPONENT_SWIZZLE_ONE;
+	} else if ( opts.format == FMT_L8A8 ) {
+		r = g = b = VK_COMPONENT_SWIZZLE_R;
+		a = VK_COMPONENT_SWIZZLE_G;
+	} else if ( opts.format == FMT_ALPHA ) {
+		r = g = b = VK_COMPONENT_SWIZZLE_ONE;
+		a = VK_COMPONENT_SWIZZLE_R;
+	} else if ( opts.format == FMT_INT8 ) {
+		r = g = b = a = VK_COMPONENT_SWIZZLE_R;
+	} else {
+		r = VK_COMPONENT_SWIZZLE_R;
+		g = VK_COMPONENT_SWIZZLE_G;
+		b = VK_COMPONENT_SWIZZLE_B;
+		a = VK_COMPONENT_SWIZZLE_A;
+	}
+	
+	VkExtent3D extent = { (uint32_t)opts.width, (uint32_t)opts.height, (uint32_t)1 };
+
+
+	VkImageCreateInfo info = {};
+	info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	info.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+	info.imageType = VK_IMAGE_TYPE_2D;
+	info.extent = extent;
+	info.arrayLayers = opts.textureType == TT_CUBIC ? 6 : 1;
+	info.mipLevels = opts.numLevels;
+	info.format = format;
+	info.tiling = VK_IMAGE_TILING_OPTIMAL;
+	info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	info.samples = VK_SAMPLE_COUNT_1_BIT;
+	
+	if (opts.textureType == TT_CUBIC)
+		info.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
+
+
+	newImage = Vk_AllocAndCreateImage(info, deviceMemory);
+
+	VkImageSubresourceRange range = {};
+	range.layerCount = layerCount;
+	range.levelCount = opts.numLevels;
+	range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+
+	VkImageViewCreateInfo view = {};
+	view.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	view.components = { r, g, b, a };
+	view.image = newImage;
+	view.viewType = target;
+	view.format = format;
+	view.subresourceRange = range;
+
+	texnum = (GLuint)newView;
+	newView = Vk_CreateImageView(view);
+
+	return true;
+}
+
+void idImage::UpdateDescriptorSet()
+{
+	Vk_QueueDestroyDescriptorSet(descriptorSet);
+	descriptorSet = Vk_AllocDescriptorSetForImage();
+	VkDescriptorImageInfo imageInfo = {};
+	imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	imageInfo.imageView = imageView;
+	imageInfo.sampler = sampler;
+
+	VkWriteDescriptorSet write = {};
+	write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	write.descriptorCount = 1;
+	write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	write.dstBinding = 0;
+	write.dstSet = descriptorSet;
+	write.pImageInfo = &imageInfo;
+			
+	vkUpdateDescriptorSets(Vk_GetDevice(), 1, &write, 0, 0);
 }
 
 #endif

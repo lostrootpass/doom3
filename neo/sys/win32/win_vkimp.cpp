@@ -37,16 +37,16 @@ QueueInfo vkPresentQueue;
 
 struct RenderImage
 {
-	VkImage image;
-	VkImageView view;
-	VkDeviceMemory memory;
+	VkImage image = VK_NULL_HANDLE;
+	VkImageView view = VK_NULL_HANDLE;
+	VkDeviceMemory memory = VK_NULL_HANDLE;
 };
 
 struct Framebuffer
 {
-	VkImage image;
-	VkImageView view;
-	VkFramebuffer framebuffer;
+	VkImage image = VK_NULL_HANDLE;
+	VkImageView view = VK_NULL_HANDLE;
+	VkFramebuffer framebuffer = VK_NULL_HANDLE;
 };
 
 struct RenderPass
@@ -69,14 +69,16 @@ std::vector<VkCommandBuffer> commandBuffers;
 
 VkSurfaceCapabilitiesKHR surfaceCaps;
 
-VkSemaphore imageAvailableSemaphore;
-VkSemaphore renderingFinishedSemaphore;
+VkSemaphore imageAvailableSemaphore = VK_NULL_HANDLE;
+VkSemaphore renderingFinishedSemaphore = VK_NULL_HANDLE;
 
 uint32_t activeCommandBufferIdx = -1;
 
 VkDescriptorSetLayout uniformSetLayout;
 VkDescriptorSetLayout imageSetLayout;
 VkDescriptorSetLayout jointSetLayout;
+
+std::vector<VkDescriptorSet> destructionQueue;
 
 const uint32_t MAX_IMAGE_DESC_SETS = 8192;
 
@@ -301,8 +303,145 @@ uint32_t Vk_GetMemoryTypeIndex(uint32_t bits, VkMemoryPropertyFlags flags)
 	return -1;
 }
 
+static void Vk_CreateDepthBuffer(RenderImage* renderImage)
+{
+	if (renderImage->view != VK_NULL_HANDLE)
+		vkDestroyImageView(vkDevice, renderImage->view, nullptr);
+
+	if (renderImage->image != VK_NULL_HANDLE)
+		vkDestroyImage(vkDevice, renderImage->image, nullptr);
+	
+	if (renderImage->memory != VK_NULL_HANDLE)
+		vkFreeMemory(vkDevice, renderImage->memory, nullptr);
+
+	VkImageCreateInfo info = {};
+	info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	info.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+	info.tiling = VK_IMAGE_TILING_OPTIMAL;
+	info.extent.width = surfaceCaps.currentExtent.width;
+	info.extent.height = surfaceCaps.currentExtent.height;
+	info.extent.depth = 1;
+	info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	info.samples = VK_SAMPLE_COUNT_1_BIT;
+	info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	info.mipLevels = 1;
+	info.arrayLayers = 1;
+	info.format = VK_FORMAT_D32_SFLOAT_S8_UINT;
+	info.imageType = VK_IMAGE_TYPE_2D;
+
+	VkCheck(vkCreateImage(vkDevice, &info, nullptr, &renderImage->image));
+
+	VkMemoryRequirements memReq;
+	vkGetImageMemoryRequirements(vkDevice, renderImage->image, &memReq);
+
+	VkMemoryAllocateInfo alloc = {};
+	alloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	alloc.allocationSize = memReq.size;
+	alloc.memoryTypeIndex = Vk_GetMemoryTypeIndex(memReq.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+	VkCheck(vkAllocateMemory(vkDevice, &alloc, nullptr, &renderImage->memory));
+	VkCheck(vkBindImageMemory(vkDevice, renderImage->image, renderImage->memory, 0));
+
+	VkImageViewCreateInfo view = {};
+	view.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	view.format = VK_FORMAT_D32_SFLOAT_S8_UINT;
+	view.viewType = VK_IMAGE_VIEW_TYPE_2D;
+	view.image = renderImage->image;
+	view.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+	view.subresourceRange.baseMipLevel = 0;
+	view.subresourceRange.baseArrayLayer = 0;
+	view.subresourceRange.layerCount = 1;
+	view.subresourceRange.levelCount = 1;
+
+	VkCheck(vkCreateImageView(vkDevice, &view, nullptr, &renderImage->view));
+
+	VkImageSubresourceRange range = {};
+	range.aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT | VK_IMAGE_ASPECT_DEPTH_BIT;
+	range.layerCount = 1;
+	range.levelCount = 1;
+	Vk_SetImageLayout(renderImage->image,
+		VK_FORMAT_D32_SFLOAT_S8_UINT, VK_IMAGE_LAYOUT_UNDEFINED,
+		VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, range);
+}
+
 static void Vk_CreateOffscreenRenderPass()
 {
+	//Create offscreen buffer
+	{
+		RenderImage* renderImage = &offscreenRenderPass.color;
+
+		VkImageCreateInfo info = {};
+		info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		info.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+		info.tiling = VK_IMAGE_TILING_OPTIMAL;
+		info.extent.width = surfaceCaps.currentExtent.width;
+		info.extent.height = surfaceCaps.currentExtent.height;
+		info.extent.depth = 1;
+		info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		info.samples = VK_SAMPLE_COUNT_1_BIT;
+		info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		info.mipLevels = 1;
+		info.arrayLayers = 1;
+		info.format = VK_FORMAT_B8G8R8A8_UNORM;
+		info.imageType = VK_IMAGE_TYPE_2D;
+
+		VkCheck(vkCreateImage(vkDevice, &info, nullptr, &renderImage->image));
+
+		VkMemoryRequirements memReq;
+		vkGetImageMemoryRequirements(vkDevice, renderImage->image, &memReq);
+
+		VkMemoryAllocateInfo alloc = {};
+		alloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+		alloc.allocationSize = memReq.size;
+		alloc.memoryTypeIndex = Vk_GetMemoryTypeIndex(memReq.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		VkCheck(vkAllocateMemory(vkDevice, &alloc, nullptr, &renderImage->memory));
+		VkCheck(vkBindImageMemory(vkDevice, renderImage->image, renderImage->memory, 0));
+
+
+		VkImageViewCreateInfo viewCreateInfo = {};
+		viewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		viewCreateInfo.image = renderImage->image;
+		viewCreateInfo.format = VK_FORMAT_B8G8R8A8_UNORM;
+		viewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+
+		viewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+		viewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+		viewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+		viewCreateInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+
+		viewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		viewCreateInfo.subresourceRange.baseMipLevel = 0;
+		viewCreateInfo.subresourceRange.levelCount = 1;
+		viewCreateInfo.subresourceRange.baseArrayLayer = 0;
+		viewCreateInfo.subresourceRange.layerCount = 1;
+
+		VkCheck(vkCreateImageView(vkDevice, &viewCreateInfo, nullptr, &renderImage->view));
+	}
+
+	//Create offscreen depth
+	Vk_CreateDepthBuffer(&offscreenRenderPass.depth);
+
+	//Create framebuffers
+	{
+		VkExtent2D extent = surfaceCaps.currentExtent;
+
+
+		VkFramebufferCreateInfo info = {};
+		info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+		info.width = extent.width;
+		info.height = extent.height;
+		info.attachmentCount = 2;
+		info.layers = 1;
+		info.renderPass = screenRenderPass.handle;
+
+		const VkImageView offscreenAttachments[] = {
+			offscreenRenderPass.color.view, offscreenRenderPass.depth.view
+		};
+
+		info.pAttachments = offscreenAttachments;
+		info.renderPass = screenRenderPass.handle;
+		VkCheck(vkCreateFramebuffer(vkDevice, &info, nullptr, &offscreenRenderPass.fb.framebuffer));
+	}
+
 	//Color
 	VkAttachmentDescription attachDesc = {};
 	attachDesc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -490,56 +629,6 @@ static void Vk_CreateRenderPass()
 	VkCheck(vkCreateRenderPass(vkDevice, &info, nullptr, &screenRenderPass.handle));
 }
 
-static void Vk_CreateDepthBuffer(RenderImage* renderImage)
-{
-	VkImageCreateInfo info = {};
-	info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-	info.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-	info.tiling = VK_IMAGE_TILING_OPTIMAL;
-	info.extent.width = surfaceCaps.currentExtent.width;
-	info.extent.height = surfaceCaps.currentExtent.height;
-	info.extent.depth = 1;
-	info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	info.samples = VK_SAMPLE_COUNT_1_BIT;
-	info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	info.mipLevels = 1;
-	info.arrayLayers = 1;
-	info.format = VK_FORMAT_D32_SFLOAT_S8_UINT;
-	info.imageType = VK_IMAGE_TYPE_2D;
-
-	VkCheck(vkCreateImage(vkDevice, &info, nullptr, &renderImage->image));
-
-	VkMemoryRequirements memReq;
-	vkGetImageMemoryRequirements(vkDevice, renderImage->image, &memReq);
-
-	VkMemoryAllocateInfo alloc = {};
-	alloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-	alloc.allocationSize = memReq.size;
-	alloc.memoryTypeIndex = Vk_GetMemoryTypeIndex(memReq.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-	VkCheck(vkAllocateMemory(vkDevice, &alloc, nullptr, &renderImage->memory));
-	VkCheck(vkBindImageMemory(vkDevice, renderImage->image, renderImage->memory, 0));
-
-	VkImageViewCreateInfo view = {};
-	view.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-	view.format = VK_FORMAT_D32_SFLOAT_S8_UINT;
-	view.viewType = VK_IMAGE_VIEW_TYPE_2D;
-	view.image = renderImage->image;
-	view.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
-	view.subresourceRange.baseMipLevel = 0;
-	view.subresourceRange.baseArrayLayer = 0;
-	view.subresourceRange.layerCount = 1;
-	view.subresourceRange.levelCount = 1;
-
-	VkCheck(vkCreateImageView(vkDevice, &view, nullptr, &renderImage->view));
-
-	VkImageSubresourceRange range = {};
-	range.aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT | VK_IMAGE_ASPECT_DEPTH_BIT;
-	range.layerCount = 1;
-	range.levelCount = 1;
-	Vk_SetImageLayout(renderImage->image,
-		VK_FORMAT_D32_SFLOAT_S8_UINT, VK_IMAGE_LAYOUT_UNDEFINED,
-		VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, range);
-}
 
 static void Vk_CreateSwapChain()
 {
@@ -583,13 +672,23 @@ static void Vk_CreateSwapChain()
 		VkCheck(vkGetSwapchainImagesKHR(vkDevice, vkSwapchain, &imageCount, nullptr));
 	}
 
-	//Create the image views
+	//If framebuffers is already populated, we've been here before, so
+	//destroy the old image views first in order to recreate
+	for (size_t i = 0; i < framebuffers.size(); ++i)
+	{
+		vkDestroyImageView(vkDevice, framebuffers[i].view, nullptr);
+		vkDestroyFramebuffer(vkDevice, framebuffers[i].framebuffer, nullptr);
+	}
+
+	//Retrieve the most up-to-date swapchain image handles
 
 	std::vector<VkImage> images;
 	images.resize(imageCount);
 	framebuffers.resize(imageCount);
 	VkCheck(vkGetSwapchainImagesKHR(vkDevice, vkSwapchain, &imageCount, images.data()));
 
+
+	//Create the image views
 	for (size_t i = 0; i < images.size(); ++i)
 	{
 		framebuffers[i].image = images[i];
@@ -617,60 +716,6 @@ static void Vk_CreateSwapChain()
 	//Create the depth buffer
 	Vk_CreateDepthBuffer(&screenRenderPass.depth);
 
-	//Create offscreen buffer
-	{
-		RenderImage* renderImage = &offscreenRenderPass.color;
-
-		VkImageCreateInfo info = {};
-		info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-		info.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-		info.tiling = VK_IMAGE_TILING_OPTIMAL;
-		info.extent.width = surfaceCaps.currentExtent.width;
-		info.extent.height = surfaceCaps.currentExtent.height;
-		info.extent.depth = 1;
-		info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		info.samples = VK_SAMPLE_COUNT_1_BIT;
-		info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-		info.mipLevels = 1;
-		info.arrayLayers = 1;
-		info.format = VK_FORMAT_B8G8R8A8_UNORM;
-		info.imageType = VK_IMAGE_TYPE_2D;
-
-		VkCheck(vkCreateImage(vkDevice, &info, nullptr, &renderImage->image));
-
-		VkMemoryRequirements memReq;
-		vkGetImageMemoryRequirements(vkDevice, renderImage->image, &memReq);
-
-		VkMemoryAllocateInfo alloc = {};
-		alloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-		alloc.allocationSize = memReq.size;
-		alloc.memoryTypeIndex = Vk_GetMemoryTypeIndex(memReq.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-		VkCheck(vkAllocateMemory(vkDevice, &alloc, nullptr, &renderImage->memory));
-		VkCheck(vkBindImageMemory(vkDevice, renderImage->image, renderImage->memory, 0));
-
-
-		VkImageViewCreateInfo viewCreateInfo = {};
-		viewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-		viewCreateInfo.image = renderImage->image;
-		viewCreateInfo.format = VK_FORMAT_B8G8R8A8_UNORM;
-		viewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-
-		viewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-		viewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-		viewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-		viewCreateInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-
-		viewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		viewCreateInfo.subresourceRange.baseMipLevel = 0;
-		viewCreateInfo.subresourceRange.levelCount = 1;
-		viewCreateInfo.subresourceRange.baseArrayLayer = 0;
-		viewCreateInfo.subresourceRange.layerCount = 1;
-
-		VkCheck(vkCreateImageView(vkDevice, &viewCreateInfo, nullptr, &renderImage->view));
-	}
-
-	//Create offscreen depth
-	Vk_CreateDepthBuffer(&offscreenRenderPass.depth);
 
 	//Create framebuffers
 	{
@@ -690,18 +735,10 @@ static void Vk_CreateSwapChain()
 			const VkImageView attachments[] = {
 				fb.view, screenRenderPass.depth.view
 			};
-		
+
 			info.pAttachments = attachments;
 			VkCheck(vkCreateFramebuffer(vkDevice, &info, nullptr, &(fb.framebuffer)));
 		}
-
-		const VkImageView offscreenAttachments[] = {
-			offscreenRenderPass.color.view, offscreenRenderPass.depth.view
-		};
-
-		info.pAttachments = offscreenAttachments;
-		info.renderPass = screenRenderPass.handle;
-		VkCheck(vkCreateFramebuffer(vkDevice, &info, nullptr, &offscreenRenderPass.fb.framebuffer));
 	}
 
 	//Create semaphores
@@ -709,15 +746,18 @@ static void Vk_CreateSwapChain()
 		VkSemaphoreCreateInfo info = {};
 		info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
-		VkCheck(vkCreateSemaphore(vkDevice, &info, nullptr, &imageAvailableSemaphore));
-		VkCheck(vkCreateSemaphore(vkDevice, &info, nullptr, &renderingFinishedSemaphore));
+		if(imageAvailableSemaphore == VK_NULL_HANDLE)
+			VkCheck(vkCreateSemaphore(vkDevice, &info, nullptr, &imageAvailableSemaphore));
+
+		if(renderingFinishedSemaphore == VK_NULL_HANDLE)
+			VkCheck(vkCreateSemaphore(vkDevice, &info, nullptr, &renderingFinishedSemaphore));
 	}
 }
 
 static void Vk_RecordCommandBuffer(VkFramebuffer framebuffer, VkCommandBuffer cmd, VkRenderPass pass)
 {	
 	VkClearValue colorClear, depthClear;
-	colorClear.color = { 0.0f, 0.0f, 0.5f, 1.0f };
+	colorClear.color = { 0.0f, 0.0f, 0.0f, 1.0f };
 	depthClear.depthStencil = { 1.0f, STENCIL_SHADOW_TEST_VALUE };
 	VkClearValue clearValues[] = {
 		colorClear, depthClear
@@ -821,6 +861,13 @@ void Vk_EndFrame()
 
 	renderProgManager->EndFrame();
 	VkCheck(vkEndCommandBuffer(cmd));
+
+	for (VkDescriptorSet set : destructionQueue)
+	{
+		Vk_FreeDescriptorSet(set);
+	}
+
+	destructionQueue.clear();
 }
 
 void Vk_EndRenderPass()
@@ -851,10 +898,8 @@ void Vk_EndRenderPass()
 	}
 }
 
-static void Vk_RecordAllCommandBuffers()
+static void Vk_AllocateAllCommandBuffers()
 {
-	vkDeviceWaitIdle(vkDevice);
-
 	commandBuffers.resize(framebuffers.size());
 
 	VkCommandBufferAllocateInfo info = {};
@@ -1107,7 +1152,7 @@ static bool Vk_InitDriver(VkImpParams_t params)
 	//Vk_CreateOffscreenRenderPass();
 	Vk_CreateRenderPass();
 	Vk_CreateSwapChain();
-	Vk_RecordAllCommandBuffers();
+	Vk_AllocateAllCommandBuffers();
 
 	Vk_RegisterDebugger();
 
@@ -1361,7 +1406,17 @@ void Vk_FlipPresent()
 	presentInfo.pSwapchains = swapChains;
 	presentInfo.pImageIndices = &activeCommandBufferIdx;
 
-	VkCheck(vkQueuePresentKHR(vkPresentQueue.vkQueue, &presentInfo));
+	VkResult res = vkQueuePresentKHR(vkPresentQueue.vkQueue, &presentInfo);
+	if (res == VK_ERROR_DEVICE_LOST || res == VK_ERROR_OUT_OF_DATE_KHR)
+	{
+		//Recreate device
+		vkDeviceWaitIdle(vkDevice);
+		Vk_CreateSwapChain();
+	}
+	else
+	{
+		VkCheck(res);
+	}
 }
 
 VkBuffer Vk_CreateAndBindBuffer(const VkBufferCreateInfo& info, VkMemoryPropertyFlags flags, VkDeviceMemory& memory)
@@ -1685,6 +1740,11 @@ void Vk_ClearAttachments(uint32_t mask, byte stencilValue)
 VkImage Vk_ActiveColorBuffer()
 {
 	return framebuffers[activeCommandBufferIdx].image;
+}
+
+void Vk_QueueDestroyDescriptorSet(VkDescriptorSet set)
+{
+	destructionQueue.push_back(set);
 }
 
 #endif
