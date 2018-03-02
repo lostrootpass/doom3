@@ -121,10 +121,6 @@ void idImage::FinaliseImageUpload()
 	vkCmdCopyBufferToImage(cmd, stagingBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, (uint32_t)copies.size(), copies.data());
 	Vk_SubmitOneShotCommandBuffer(cmd);
 
-	Vk_DestroyBuffer(stagingBuffer);
-	Vk_FreeMemory(stagingMemory);
-	stagingMemory = stagingBuffer = VK_NULL_HANDLE;
-
 	VkImageSubresourceRange range = {};
 	range.layerCount = layerCount;
 	range.levelCount = opts.numLevels;
@@ -412,6 +408,10 @@ void idImage::PurgeImage()
 
 void idImage::ActuallyPurgeImage() {
 	if (texnum != TEXTURE_NOT_LOADED) {
+		Vk_DestroyBuffer(stagingBuffer);
+		Vk_FreeMemory(stagingMemory);
+		stagingMemory = stagingBuffer = VK_NULL_HANDLE;
+
 		if(sampler != VK_NULL_HANDLE)
 			vkDestroySampler(Vk_GetDevice(), sampler, nullptr);
 		

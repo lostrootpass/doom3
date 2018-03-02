@@ -490,6 +490,8 @@ void idImage::UploadScratch( const byte * data, int cols, int rows ) {
 		SetSamplerState( TF_LINEAR, TR_REPEAT );
 		SubImageUpload( 0, 0, 0, 0, opts.width, opts.height, data );
 	}
+
+	FinaliseImageUpload();
 }
 
 /*
