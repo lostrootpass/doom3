@@ -3,16 +3,13 @@
 
 /*
 ================================================================================================
-Contains the Image implementation for OpenGL.
+Contains the Image implementation for Vulkan.
 ================================================================================================
 */
 
-#include "../tr_local.h"
-
 #ifdef DOOM3_VULKAN
 
-#include <vulkan/vulkan.h>
-#include <vector>
+#include "vk_image.h"
 
 const int VK_IMAGE_SET_OFFSET = 2;
 
@@ -59,7 +56,7 @@ static inline size_t FaceOffset(int z, const idImageOpts& opts)
 	return offset;
 }
 
-void idImage::FinaliseImageUpload()
+void idImageVk::FinaliseImageUpload()
 {
 	VkImageViewType target = VK_IMAGE_VIEW_TYPE_2D;
 	uint32_t layerCount = 1;
@@ -244,10 +241,10 @@ void idImage::FinaliseImageUpload()
 
 /*
 ========================
-idImage::SubImageUpload
+idImageVk::SubImageUpload
 ========================
 */
-void idImage::SubImageUpload(int mipLevel, int x, int y, int z, int width, int height, const void * pic, int pixelPitch) const {
+void idImageVk::SubImageUpload(int mipLevel, int x, int y, int z, int width, int height, const void * pic, int pixelPitch) const {
 	assert( x >= 0 && y >= 0 && mipLevel >= 0 && width >= 0 && height >= 0 && mipLevel < opts.numLevels );
 
 	int compressedSize = 0;
@@ -317,24 +314,24 @@ void idImage::SubImageUpload(int mipLevel, int x, int y, int z, int width, int h
 
 /*
 ========================
-idImage::SetPixel
+idImageVk::SetPixel
 ========================
 */
-void idImage::SetPixel(int mipLevel, int x, int y, const void * data, int dataSize) {
+void idImageVk::SetPixel(int mipLevel, int x, int y, const void * data, int dataSize) {
 	SubImageUpload(mipLevel, x, y, 0, 1, 1, data);
 }
 
 /*
 ========================
-idImage::SetTexParameters
+idImageVk::SetTexParameters
 ========================
 */
-void idImage::SetTexParameters() {
+void idImageVk::SetTexParameters() {
 }
 
 /*
 ========================
-idImage::AllocImage
+idImageVk::AllocImage
 
 Every image will pass through this function. Allocates all the necessary MipMap levels for the 
 Image, but doesn't put anything in them.
@@ -342,7 +339,7 @@ Image, but doesn't put anything in them.
 This should not be done during normal game-play, if you can avoid it.
 ========================
 */
-void idImage::AllocImage() {
+void idImageVk::AllocImage() {
 	PurgeImage();
 
 	VkDeviceSize size = 0;
@@ -396,17 +393,17 @@ void idImage::AllocImage() {
 
 /*
 ========================
-idImage::PurgeImage
+idImageVk::PurgeImage
 ========================
 */
 
-void idImage::PurgeImage()
+void idImageVk::PurgeImage()
 {
 	if(texnum != TEXTURE_NOT_LOADED)
 		renderSystem->QueueImagePurge(this);
 }
 
-void idImage::ActuallyPurgeImage() {
+void idImageVk::ActuallyPurgeImage() {
 	if (texnum != TEXTURE_NOT_LOADED) {
 		Vk_DestroyBuffer(stagingBuffer);
 		Vk_FreeMemory(stagingMemory);
@@ -434,10 +431,10 @@ void idImage::ActuallyPurgeImage() {
 
 /*
 ========================
-idImage::Resize
+idImageVk::Resize
 ========================
 */
-void idImage::Resize( int width, int height ) {
+void idImageVk::Resize( int width, int height ) {
 	if ( opts.width == width && opts.height == height ) {
 		return;
 	}
@@ -461,10 +458,10 @@ void idImage::Resize( int width, int height ) {
 
 /*
 ========================
-idImage::SetSamplerState
+idImageVk::SetSamplerState
 ========================
 */
-void idImage::SetSamplerState(textureFilter_t tf, textureRepeat_t trep) {
+void idImageVk::SetSamplerState(textureFilter_t tf, textureRepeat_t trep) {
 
 }
 
@@ -476,8 +473,8 @@ Bind
 Automatically enables 2D mapping or cube mapping if needed
 ==============
 */
-void idImage::Bind() {
-	RENDERLOG_PRINTF( "idImage::Bind( %s )\n", GetName() );
+void idImageVk::Bind() {
+	RENDERLOG_PRINTF( "idImageVk::Bind( %s )\n", GetName() );
 
 	// load the image if necessary (FIXME: not SMP safe!)
 	if ( !IsLoaded() ) {
@@ -505,7 +502,7 @@ void idImage::Bind() {
 CopyFramebuffer
 ====================
 */
-void idImage::CopyFramebuffer(int x, int y, int imageWidth, int imageHeight) {
+void idImageVk::CopyFramebuffer(int x, int y, int imageWidth, int imageHeight) {
 	CopyImageInternal(imageWidth, imageHeight, Vk_ActiveColorBuffer(),
 		VK_IMAGE_ASPECT_COLOR_BIT);
 }
@@ -516,12 +513,12 @@ void idImage::CopyFramebuffer(int x, int y, int imageWidth, int imageHeight) {
 CopyDepthbuffer
 ====================
 */
-void idImage::CopyDepthbuffer(int x, int y, int imageWidth, int imageHeight) {
+void idImageVk::CopyDepthbuffer(int x, int y, int imageWidth, int imageHeight) {
 	CopyImageInternal(imageWidth, imageHeight, Vk_ActiveDepthBuffer(),
 		VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
 }
 
-bool idImage::AllocImageInternal(VkImage& newImage, VkImageView& newView)
+bool idImageVk::AllocImageInternal(VkImage& newImage, VkImageView& newView)
 {
 	if (!R_IsInitialized()) {
 		return false;
@@ -653,7 +650,7 @@ bool idImage::AllocImageInternal(VkImage& newImage, VkImageView& newView)
 	return true;
 }
 
-void idImage::UpdateDescriptorSet()
+void idImageVk::UpdateDescriptorSet()
 {
 	Vk_QueueDestroyDescriptorSet(descriptorSet);
 	descriptorSet = Vk_AllocDescriptorSetForImage();
@@ -673,7 +670,7 @@ void idImage::UpdateDescriptorSet()
 	vkUpdateDescriptorSets(Vk_GetDevice(), 1, &write, 0, 0);
 }
 
-void idImage::CopyImageInternal(int imageWidth, int imageHeight, VkImage img, VkImageAspectFlags aspect)
+void idImageVk::CopyImageInternal(int imageWidth, int imageHeight, VkImage img, VkImageAspectFlags aspect)
 {
 	//Consider this more of a "pause" than an "end" - 
 	//after we copy, we resume rendering to the same backbuffer w/o clearing
@@ -735,7 +732,7 @@ void idImage::CopyImageInternal(int imageWidth, int imageHeight, VkImage img, Vk
 	Vk_StartRenderPass();
 }
 
-ID_INLINE VkImageAspectFlags idImage::Aspect() const
+ID_INLINE VkImageAspectFlags idImageVk::Aspect() const
 {
 	if (opts.format == FMT_DEPTH)
 		return VK_IMAGE_ASPECT_STENCIL_BIT | VK_IMAGE_ASPECT_DEPTH_BIT;

@@ -164,7 +164,7 @@ void idRenderSystemVk::RenderCommandBuffers(const emptyCommand_t * const cmdHead
 		uint64 backEndStartTime = Sys_Microseconds();
 
 		// needed for editor rendering
-		GL_SetDefaultState();
+		renderSystem->SetDefaultState();
 
 		// If we have a stereo pixel format, this will draw to both
 		// the back left and back right buffers, which will have a
@@ -995,13 +995,12 @@ const emptyCommand_t * idRenderSystemLocal::SwapCommandBuffers_FinishCommandBuff
 }
 
 const emptyCommand_t * idRenderSystemVk::SwapCommandBuffers_FinishCommandBuffers() {
-#ifdef DOOM3_VULKAN
 	Vk_StartFrame();
 	Vk_StartRenderPass();
 	Vk_ClearAttachments(VK_IMAGE_ASPECT_COLOR_BIT);
 
 	renderProgManager->BeginFrame();
-#endif
+
 	return idRenderSystemLocal::SwapCommandBuffers_FinishCommandBuffers();
 }
 

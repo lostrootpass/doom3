@@ -192,6 +192,8 @@ idCVar stereoRender_enable( "stereoRender_enable", "0", CVAR_INTEGER | CVAR_ARCH
 idCVar stereoRender_swapEyes( "stereoRender_swapEyes", "0", CVAR_BOOL | CVAR_ARCHIVE, "reverse eye adjustments" );
 idCVar stereoRender_deGhost( "stereoRender_deGhost", "0.05", CVAR_FLOAT | CVAR_ARCHIVE, "subtract from opposite eye to reduce ghosting" );
 
+idCVar r_openGL("r_openGL", "0", CVAR_BOOL|CVAR_RENDERER|CVAR_ARCHIVE, "1 = force OpenGL rendering, 0 = autoselect renderer (default Vulkan)" );
+
 
 // GL_ARB_multitexture
 PFNGLACTIVETEXTUREPROC					qglActiveTextureARB;
@@ -871,6 +873,8 @@ void R_InitOpenGL() {
 		common->FatalError( "R_InitOpenGL called while active" );
 	}
 
+	//renderSystem = new idRenderSystemLocal();
+
 	R_SetNewMode( true );
 
 
@@ -967,6 +971,8 @@ void R_InitVulkan() {
 	if (R_IsInitialized()) {
 		common->FatalError("R_InitVulkan called while active");
 	}
+
+	//renderSystem = new idRenderSystemVk();
 
 	R_SetNewModeVk(true);
 

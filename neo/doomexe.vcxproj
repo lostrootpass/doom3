@@ -214,6 +214,7 @@
     <ClInclude Include="renderer\ModelManager.h" />
     <ClInclude Include="renderer\ModelOverlay.h" />
     <ClInclude Include="renderer\OpenGL\glext.h" />
+    <ClInclude Include="renderer\OpenGL\gl_image.h" />
     <ClInclude Include="renderer\OpenGL\gl_RenderBackend.h" />
     <ClInclude Include="renderer\OpenGL\qgl.h" />
     <ClInclude Include="renderer\OpenGL\qgl_linked.h" />
@@ -232,6 +233,7 @@
     <ClInclude Include="renderer\simplex.h" />
     <ClInclude Include="renderer\tr_local.h" />
     <ClInclude Include="renderer\VertexCache.h" />
+    <ClInclude Include="renderer\Vulkan\vk_image.h" />
     <ClInclude Include="renderer\Vulkan\vk_RenderBackend.h" />
     <ClInclude Include="sound\snd_local.h" />
     <ClInclude Include="sound\sound.h" />
@@ -444,6 +446,7 @@
     <ClCompile Include="renderer\Vulkan\vk_GraphicsAPIWrapper.cpp" />
     <ClCompile Include="renderer\Vulkan\vk_image.cpp" />
     <ClCompile Include="renderer\Vulkan\vk_RenderBackend.cpp" />
+    <ClCompile Include="renderer\Vulkan\vk_RenderSystem.cpp" />
     <ClCompile Include="sound\snd_emitter.cpp" />
     <ClCompile Include="sound\snd_shader.cpp" />
     <ClCompile Include="sound\snd_system.cpp" />

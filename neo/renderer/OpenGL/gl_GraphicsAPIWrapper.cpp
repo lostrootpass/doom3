@@ -53,14 +53,13 @@ void GL_SelectTexture( int unit ) {
 
 /*
 ====================
-GL_Cull
+SetCull
 
 This handles the flipping needed when the view being
 rendered is a mirored view.
 ====================
 */
-void GL_Cull( int cullType ) {
-#ifndef DOOM3_VULKAN
+void idRenderSystemLocal::SetCull( int cullType ) {
 	if ( backEnd.glState.faceCulling == cullType ) {
 		return;
 	}
@@ -86,110 +85,58 @@ void GL_Cull( int cullType ) {
 			}
 		}
 	}
-#endif
 
 	backEnd.glState.faceCulling = cullType;
 }
 
 /*
 ====================
-GL_Scissor
+SetScissor
 ====================
 */
-void GL_Scissor( int x /* left*/, int y /* bottom */, int w, int h ) {
-#ifdef DOOM3_VULKAN
-	VkRect2D sc = { 
-		x,
-		Max(0, renderSystem->GetHeight() - y - h),
-		w, h
-	};
-	vkCmdSetScissor(Vk_ActiveCommandBuffer(), 0, 1, &sc);
-#else
+void idRenderSystemLocal::SetScissor( int x /* left*/, int y /* bottom */, int w, int h ) {
 	qglScissor( x, y, w, h );
-#endif
 }
 
 /*
 ====================
-GL_Viewport
+SetViewport
 ====================
 */
-void GL_Viewport( int x /* left */, int y /* bottom */, int w, int h ) {
-#ifdef DOOM3_VULKAN
-	VkViewport vp = { 
-		x,
-		Max(0, renderSystem->GetHeight() - y - h),
-		w,
-		h, 0.0f, 1.0f };
-	vkCmdSetViewport(Vk_ActiveCommandBuffer(), 0, 1, &vp);
-#else
+void idRenderSystemLocal::SetViewport( int x /* left */, int y /* bottom */, int w, int h ) {
 	qglViewport( x, y, w, h );
-#endif
 }
 
 /*
 ====================
-GL_PolygonOffset
+SetPolygonOffset
 ====================
 */
-void GL_PolygonOffset( float scale, float bias ) {
+void idRenderSystemLocal::SetPolygonOffset( float scale, float bias ) {
 	backEnd.glState.polyOfsScale = scale;
 	backEnd.glState.polyOfsBias = bias;
 
-	vkCmdSetDepthBias(Vk_ActiveCommandBuffer(), bias, 0.0f, scale);
-#ifndef DOOM3_VULKAN
 	if ( backEnd.glState.glStateBits & GLS_POLYGON_OFFSET ) {
 		qglPolygonOffset( scale, bias );
 	}
-#endif
 }
 
 /*
 ========================
-GL_DepthBoundsTest
+SetDepthBoundsTest
 ========================
 */
-void GL_DepthBoundsTest( const float zmin, const float zmax ) {
+void idRenderSystemLocal::SetDepthBoundsTest( const float zmin, const float zmax ) {
 	if ( !glConfig.depthBoundsTestAvailable || zmin > zmax ) {
 		return;
 	}
 
-#ifdef DOOM3_VULKAN
-	float m = zmax == 0.0f ? 1.0f : zmax;
-	vkCmdSetDepthBounds(Vk_ActiveCommandBuffer(), zmin, m);
-#else
 	if ( zmin == 0.0f && zmax == 0.0f ) {
 		qglDisable( GL_DEPTH_BOUNDS_TEST_EXT );
 	} else {
 		qglEnable( GL_DEPTH_BOUNDS_TEST_EXT );
 		qglDepthBoundsEXT( zmin, zmax );
 	}
-#endif
-}
-
-/*
-========================
-GL_StartDepthPass
-========================
-*/
-void GL_StartDepthPass( const idScreenRect & rect ) {
-}
-
-/*
-========================
-GL_FinishDepthPass
-========================
-*/
-void GL_FinishDepthPass() {
-}
-
-/*
-========================
-GL_GetDepthPassRect
-========================
-*/
-void GL_GetDepthPassRect( idScreenRect & rect ) {
-	rect.Clear();
 }
 
 /*
@@ -229,18 +176,11 @@ void GL_Color( float r, float g, float b, float a ) {
 
 /*
 ========================
-GL_Clear
+Clear
 ========================
 */
-void GL_Clear( bool color, bool depth, bool stencil, byte stencilValue, float r, float g, float b, float a ) {
-#ifdef DOOM3_VULKAN
-	uint32_t mask = 0;
-	mask |= (color ? VK_IMAGE_ASPECT_COLOR_BIT : 0);
-	mask |= (depth ? VK_IMAGE_ASPECT_DEPTH_BIT : 0);
-	mask |= (stencil ? VK_IMAGE_ASPECT_STENCIL_BIT : 0);
-
-	Vk_ClearAttachments(mask, stencilValue);
-#else
+void idRenderSystemLocal::Clear( bool color, bool depth, bool stencil, 
+	byte stencilValue, float r, float g, float b, float a ) {
 	int clearFlags = 0;
 	if ( color ) {
 		qglClearColor( r, g, b, a );
@@ -254,40 +194,30 @@ void GL_Clear( bool color, bool depth, bool stencil, byte stencilValue, float r,
 		clearFlags |= GL_STENCIL_BUFFER_BIT;
 	}
 	qglClear( clearFlags );
-#endif
 }
 
 /*
 ========================
-GL_SetDefaultState
+SetDefaultState
 
 This should initialize all GL state that any part of the entire program
 may touch, including the editor.
 ========================
 */
-void GL_SetDefaultState() {
-	RENDERLOG_PRINTF( "--- GL_SetDefaultState ---\n" );
+void idRenderSystemLocal::SetDefaultState() {
+	RENDERLOG_PRINTF( "--- renderSystem->SetDefaultState ---\n" );
 
-#ifdef DOOM3_VULKAN
-	memset( &backEnd.glState, 0, sizeof( backEnd.glState ) );
-	GL_State( 0, true );
-
-	if ( r_useScissor.GetBool() ) {
-		GL_Scissor( 0, 0, renderSystem->GetWidth(), renderSystem->GetHeight() );
-		GL_Viewport(0, 0, renderSystem->GetWidth(), renderSystem->GetHeight());
-	}
-#else
 	qglClearDepth( 1.0f );
 
 	// make sure our GL state vector is set correctly
 	memset( &backEnd.glState, 0, sizeof( backEnd.glState ) );
-	GL_State( 0, true );
+	SetState( 0, true );
 
-	// These are changed by GL_Cull
+	// These are changed by renderSystem->SetCull
 	qglCullFace( GL_FRONT_AND_BACK );
 	qglEnable( GL_CULL_FACE );
 
-	// These are changed by GL_State
+	// These are changed by renderSystem->SetState
 	qglColorMask( GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE );
 	qglBlendFunc( GL_ONE, GL_ZERO );
 	qglDepthMask( GL_TRUE );
@@ -308,18 +238,16 @@ void GL_SetDefaultState() {
 	if ( r_useScissor.GetBool() ) {
 		qglScissor( 0, 0, renderSystem->GetWidth(), renderSystem->GetHeight() );
 	}
-#endif
 }
 
-#ifndef DOOM3_VULKAN
 /*
 ====================
-GL_State
+SetState
 
 This routine is responsible for setting the most commonly changed state
 ====================
 */
-void GL_State( uint64 stateBits, bool forceGlState ) {
+void idRenderSystemLocal::SetState( uint64 stateBits, bool forceGlState ) {
 	uint64 diff = stateBits ^ backEnd.glState.glStateBits;
 	
 	if ( !r_useStateCaching.GetBool() || forceGlState ) {
@@ -359,7 +287,7 @@ void GL_State( uint64 stateBits, bool forceGlState ) {
 			case GLS_SRCBLEND_DST_ALPHA:			srcFactor = GL_DST_ALPHA; break;
 			case GLS_SRCBLEND_ONE_MINUS_DST_ALPHA:	srcFactor = GL_ONE_MINUS_DST_ALPHA; break;
 			default:
-				assert( !"GL_State: invalid src blend state bits\n" );
+				assert( !"renderSystem->SetState: invalid src blend state bits\n" );
 				break;
 		}
 
@@ -373,7 +301,7 @@ void GL_State( uint64 stateBits, bool forceGlState ) {
 			case GLS_DSTBLEND_DST_ALPHA:			dstFactor = GL_DST_ALPHA; break;
 			case GLS_DSTBLEND_ONE_MINUS_DST_ALPHA:  dstFactor = GL_ONE_MINUS_DST_ALPHA; break;
 			default:
-				assert( !"GL_State: invalid dst blend state bits\n" );
+				assert( !"renderSystem->SetState: invalid dst blend state bits\n" );
 				break;
 		}
 
@@ -523,7 +451,6 @@ void GL_State( uint64 stateBits, bool forceGlState ) {
 
 	backEnd.glState.glStateBits = stateBits;
 }
-#endif
 
 /*
 =================

@@ -34,22 +34,19 @@ Contains the Image implementation for OpenGL.
 ================================================================================================
 */
 
-#include "../tr_local.h"
+#include "gl_image.h"
 
-//TODO: these definitions conflict if DOOM3_OPENGL and DOOM3_VULKAN are both defined.
-#ifdef DOOM3_OPENGL
-
-void idImage::FinaliseImageUpload()
+void idImageGL::FinaliseImageUpload()
 {
 	//Do nothing on OpenGL.
 }
 
 /*
 ========================
-idImage::SubImageUpload
+idImageGL::SubImageUpload
 ========================
 */
-void idImage::SubImageUpload( int mipLevel, int x, int y, int z, int width, int height, const void * pic, int pixelPitch ) const {
+void idImageGL::SubImageUpload( int mipLevel, int x, int y, int z, int width, int height, const void * pic, int pixelPitch ) const {
 	assert( x >= 0 && y >= 0 && mipLevel >= 0 && width >= 0 && height >= 0 && mipLevel < opts.numLevels );
 
 	int compressedSize = 0;
@@ -133,19 +130,19 @@ void idImage::SubImageUpload( int mipLevel, int x, int y, int z, int width, int 
 
 /*
 ========================
-idImage::SetPixel
+idImageGL::SetPixel
 ========================
 */
-void idImage::SetPixel( int mipLevel, int x, int y, const void * data, int dataSize ) {
+void idImageGL::SetPixel( int mipLevel, int x, int y, const void * data, int dataSize ) {
 	SubImageUpload( mipLevel, x, y, 0, 1, 1, data );
 }
 
 /*
 ========================
-idImage::SetTexParameters
+idImageGL::SetTexParameters
 ========================
 */
-void idImage::SetTexParameters() {
+void idImageGL::SetTexParameters() {
 	int target = GL_TEXTURE_2D;
 	switch ( opts.textureType ) {
 		case TT_2D:
@@ -279,7 +276,7 @@ void idImage::SetTexParameters() {
 
 /*
 ========================
-idImage::AllocImage
+idImageGL::AllocImage
 
 Every image will pass through this function. Allocates all the necessary MipMap levels for the 
 Image, but doesn't put anything in them.
@@ -287,7 +284,7 @@ Image, but doesn't put anything in them.
 This should not be done during normal game-play, if you can avoid it.
 ========================
 */
-void idImage::AllocImage() {
+void idImageGL::AllocImage() {
 	GL_CheckErrors();
 	PurgeImage();
 
@@ -460,10 +457,10 @@ void idImage::AllocImage() {
 
 /*
 ========================
-idImage::PurgeImage
+idImageGL::PurgeImage
 ========================
 */
-void idImage::PurgeImage() {
+void idImageGL::PurgeImage() {
 	if ( texnum != TEXTURE_NOT_LOADED ) {
 		qglDeleteTextures( 1, (GLuint *)&texnum );	// this should be the ONLY place it is ever called!
 		texnum = TEXTURE_NOT_LOADED;
@@ -475,12 +472,16 @@ void idImage::PurgeImage() {
 	}
 }
 
+void idImageGL::ActuallyPurgeImage() {
+	//Do nothing on OpenGL
+}
+
 /*
 ========================
-idImage::Resize
+idImageGL::Resize
 ========================
 */
-void idImage::Resize( int width, int height ) {
+void idImageGL::Resize( int width, int height ) {
 	if ( opts.width == width && opts.height == height ) {
 		return;
 	}
@@ -491,10 +492,10 @@ void idImage::Resize( int width, int height ) {
 
 /*
 ========================
-idImage::SetSamplerState
+idImageGL::SetSamplerState
 ========================
 */
-void idImage::SetSamplerState( textureFilter_t tf, textureRepeat_t tr ) {
+void idImageGL::SetSamplerState( textureFilter_t tf, textureRepeat_t tr ) {
 	if ( tf == filter && tr == repeat ) {
 		return;
 	}
@@ -511,9 +512,9 @@ Bind
 Automatically enables 2D mapping or cube mapping if needed
 ==============
 */
-void idImage::Bind() {
+void idImageGL::Bind() {
 
-	RENDERLOG_PRINTF( "idImage::Bind( %s )\n", GetName() );
+	RENDERLOG_PRINTF( "idImageGL::Bind( %s )\n", GetName() );
 
 	// load the image if necessary (FIXME: not SMP safe!)
 	if ( !IsLoaded() ) {
@@ -544,7 +545,7 @@ void idImage::Bind() {
 CopyFramebuffer
 ====================
 */
-void idImage::CopyFramebuffer( int x, int y, int imageWidth, int imageHeight ) {
+void idImageGL::CopyFramebuffer( int x, int y, int imageWidth, int imageHeight ) {
 
 
 	qglBindTexture( ( opts.textureType == TT_CUBIC ) ? GL_TEXTURE_CUBE_MAP_EXT : GL_TEXTURE_2D, texnum );
@@ -570,7 +571,7 @@ void idImage::CopyFramebuffer( int x, int y, int imageWidth, int imageHeight ) {
 CopyDepthbuffer
 ====================
 */
-void idImage::CopyDepthbuffer( int x, int y, int imageWidth, int imageHeight ) {
+void idImageGL::CopyDepthbuffer( int x, int y, int imageWidth, int imageHeight ) {
 	qglBindTexture( ( opts.textureType == TT_CUBIC ) ? GL_TEXTURE_CUBE_MAP_EXT : GL_TEXTURE_2D, texnum );
 
 	opts.width = imageWidth;
@@ -579,5 +580,3 @@ void idImage::CopyDepthbuffer( int x, int y, int imageWidth, int imageHeight ) {
 
 	backEnd.pc.c_copyFrameBuffer++;
 }
-
-#endif

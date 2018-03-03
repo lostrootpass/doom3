@@ -131,24 +131,9 @@ void			GL_StartFrame( int frame );			// inserts a timing mark for the start of t
 void			GL_EndFrame();						// inserts a timing mark for the end of the GPU frame
 void			GL_WaitForEndFrame();				// wait for the GPU to reach the last end frame marker
 void			GL_GetLastFrameTime( uint64 & startGPUTimeMicroSec, uint64 & endGPUTimeMicroSec );	// GPU time between GL_StartFrame() and GL_EndFrame()
-void			GL_StartDepthPass( const idScreenRect & rect );
-void			GL_FinishDepthPass();
-void			GL_GetDepthPassRect( idScreenRect & rect );
 
-void			GL_SetDefaultState();
-void			GL_State( uint64 stateVector, bool forceGlState = false );
 uint64			GL_GetCurrentState();
 uint64			GL_GetCurrentStateMinusStencil();
-void			GL_Cull( int cullType );
-void			GL_Scissor( int x /* left*/, int y /* bottom */, int w, int h );
-void			GL_Viewport( int x /* left */, int y /* bottom */, int w, int h );
-ID_INLINE void	GL_Scissor( const idScreenRect & rect ) { GL_Scissor( rect.x1, rect.y1, rect.x2 - rect.x1 + 1, rect.y2 - rect.y1 + 1 ); }
-ID_INLINE void	GL_Viewport( const idScreenRect & rect ) { GL_Viewport( rect.x1, rect.y1, rect.x2 - rect.x1 + 1, rect.y2 - rect.y1 + 1 ); }
-ID_INLINE void	GL_ViewportAndScissor( int x, int y, int w, int h ) { GL_Viewport( x, y, w, h ); GL_Scissor( x, y, w, h ); }
-ID_INLINE void	GL_ViewportAndScissor( const idScreenRect& rect ) { GL_Viewport( rect ); GL_Scissor( rect ); }
-void			GL_Clear( bool color, bool depth, bool stencil, byte stencilValue, float r, float g, float b, float a );
-void			GL_PolygonOffset( float scale, float bias );
-void			GL_DepthBoundsTest( const float zmin, const float zmax );
 void			GL_Color( float * color );
 void			GL_Color( float r, float g, float b );
 void			GL_Color( float r, float g, float b, float a );

@@ -66,10 +66,6 @@ typedef enum {
 #include "ImageOpts.h"
 #include "BinaryImage.h"
 
-#ifdef DOOM3_VULKAN
-#include <vulkan/vulkan.h>
-#endif
-
 #define	MAX_IMAGE_NAME	256
 
 class idImage {
@@ -81,10 +77,10 @@ public:
 	// Makes this image active on the current GL texture unit.
 	// automatically enables or disables cube mapping
 	// May perform file loading if the image was not preloaded.
-	void		Bind();
+	virtual void		Bind()=0;
 
 	// Should be called at least once
-	void		SetSamplerState( textureFilter_t tf, textureRepeat_t tr );
+	virtual void		SetSamplerState( textureFilter_t tf, textureRepeat_t tr )=0;
 
 	// used by callback functions to specify the actual data
 	// data goes from the bottom to the top line of the image, as OpenGL expects it
@@ -95,8 +91,8 @@ public:
 	void		GenerateCubeImage( const byte *pic[6], int size, 
 						textureFilter_t filter, textureUsage_t usage );
 
-	void		CopyFramebuffer( int x, int y, int width, int height );
-	void		CopyDepthbuffer( int x, int y, int width, int height );
+	virtual void		CopyFramebuffer( int x, int y, int width, int height )=0;
+	virtual void		CopyDepthbuffer( int x, int y, int width, int height )=0;
 
 	void		UploadScratch( const byte *pic, int width, int height );
 
@@ -124,16 +120,17 @@ public:
 	// Platform specific implementations
 	//---------------------------------------------
 
-	void FinaliseImageUpload();
-	void		AllocImage( const idImageOpts &imgOpts, textureFilter_t filter, textureRepeat_t repeat );
+	virtual void FinaliseImageUpload()=0;
+	virtual void AllocImage( const idImageOpts &imgOpts, 
+		textureFilter_t filter, textureRepeat_t repeat );
 
 	// Deletes the texture object, but leaves the structure so it can be reloaded
 	// or resized.
-	void		PurgeImage();
+	virtual void		PurgeImage()=0;
 
 	//"Purge Image" will only queue the image to be purged by the render system,
 	//Actually Purge Image will do the associated freeing of resources
-	void		ActuallyPurgeImage();
+	virtual void		ActuallyPurgeImage()=0;
 
 	// z is 0 for 2D textures, 0 - 5 for cube maps, and 0 - uploadDepth for 3D textures. Only 
 	// one plane at a time of 3D textures can be uploaded. The data is assumed to be correct for 
@@ -141,41 +138,34 @@ public:
 	// be in OpenGL RGBA format, the consoles may have to reorganize. pixelPitch is only needed 
 	// when updating from a source subrect. Width, height, and dest* are always in pixels, so 
 	// they must be a multiple of four for dxt data.
-	void		SubImageUpload( int mipLevel, int destX, int destY, int destZ, 
+	virtual void SubImageUpload( int mipLevel, int destX, int destY, int destZ, 
 								int width, int height, const void * data, 
-								int pixelPitch = 0 ) const;
+								int pixelPitch = 0 ) const=0;
 
 	// SetPixel is assumed to be a fast memory write on consoles, degenerating to a 
 	// SubImageUpload on PCs.  Used to update the page mapping images.
 	// We could remove this now, because the consoles don't use the intermediate page mapping
 	// textures now that they can pack everything into the virtual page table images.
-	void		SetPixel( int mipLevel, int x, int y, const void * data, int dataSize );
+	virtual void SetPixel( int mipLevel, int x, int y, const void * data, int dataSize )=0;
 
 	// some scratch images are dynamically resized based on the display window size.  This 
 	// simply purges the image and recreates it if the sizes are different, so it should not be 
 	// done under any normal circumstances, and probably not at all on consoles.
-	void		Resize( int width, int height );
+	virtual void		Resize( int width, int height )=0;
 
 	bool		IsCompressed() const { return ( opts.format == FMT_DXT1 || opts.format == FMT_DXT5 ); }
 
-	void		SetTexParameters();	// update aniso and trilinear
+	virtual void		SetTexParameters()=0;	// update aniso and trilinear
 
 	bool		IsLoaded() const { return texnum != TEXTURE_NOT_LOADED; }
 
 	static void			GetGeneratedName( idStr &_name, const textureUsage_t &_usage, const cubeFiles_t &_cube );
 
-private:
+protected:
 	friend class idImageManager;
 
-	void				AllocImage();
+	virtual void				AllocImage()=0;
 	void				DeriveOpts();
-
-#ifdef DOOM3_VULKAN
-	bool AllocImageInternal(VkImage& newImage, VkImageView& newView);
-	void UpdateDescriptorSet();
-	void CopyImageInternal(int imageWidth, int imageHeight, VkImage img, VkImageAspectFlags aspect);
-	ID_INLINE VkImageAspectFlags Aspect() const;
-#endif
 
 	// parameters that define this image
 	idStr				imgName;				// game path, including extension (except for cube maps), may be an image program
@@ -204,19 +194,6 @@ private:
 	GLuint				internalFormat;
 	GLuint				dataFormat;
 	GLuint				dataType;
-
-#ifdef DOOM3_VULKAN
-	VkBuffer stagingBuffer;
-	VkDeviceMemory stagingMemory;
-	VkBuffer deviceBuffer;
-	VkDeviceMemory deviceMemory;
-	VkImage image;
-	VkImageView imageView;
-	VkFormat format;
-	VkSampler sampler = VK_NULL_HANDLE;
-	VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
-#endif
-
 };
 
 ID_INLINE idImage::idImage( const char * name ) : imgName( name ) {

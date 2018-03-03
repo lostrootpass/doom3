@@ -9,3 +9,4 @@
 *.opendb
 *.user
 /base/renderprogs/glsl
+*.bak

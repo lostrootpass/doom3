@@ -31,6 +31,8 @@ If you have questions concerning this license or the applicable additional terms
 
 
 #include "tr_local.h"
+#include "OpenGL/gl_image.h"
+#include "Vulkan/vk_image.h"
 
 // do this with a pointer, in case we want to make the actual manager
 // a private virtual subclass
@@ -236,7 +238,12 @@ idImage *idImageManager::AllocImage( const char *name ) {
 
 	int hash = idStr( name ).FileNameHash();
 
-	idImage * image = new (TAG_IMAGE) idImage( name );
+	idImage * image = nullptr;
+	
+	if (r_openGL.GetBool())
+		image = new (TAG_IMAGE) idImageGL(name);
+	else
+		image = new (TAG_IMAGE) idImageVk(name);
 
 	imageHash.Add( hash, images.Append( image ) );
 
@@ -256,7 +263,12 @@ idImage *idImageManager::AllocStandaloneImage( const char *name ) {
 		common->Error ("idImageManager::AllocImage: \"%s\" is too long\n", name);
 	}
 
-	idImage * image = new (TAG_IMAGE) idImage( name );
+	idImage * image = nullptr;
+	
+	if (r_openGL.GetBool())
+		image = new (TAG_IMAGE) idImageGL(name);
+	else
+		image = new (TAG_IMAGE) idImageVk(name);
 
 	return image;
 }

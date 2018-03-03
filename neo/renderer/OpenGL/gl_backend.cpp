@@ -89,7 +89,7 @@ static void	RB_SetBuffer( const void *data ) {
 
 	RENDERLOG_PRINTF( "---------- RB_SetBuffer ---------- to buffer # %d\n", cmd->buffer );
 
-	GL_Scissor( 0, 0, tr.GetWidth(), tr.GetHeight() );
+	renderSystem->SetScissor( 0, 0, renderSystem->GetWidth(), renderSystem->GetHeight() );
 
 	// clear screen for debugging
 	// automatically enable this with several other debug tools
@@ -97,13 +97,13 @@ static void	RB_SetBuffer( const void *data ) {
 	if ( r_clear.GetFloat() || idStr::Length( r_clear.GetString() ) != 1 || r_singleArea.GetBool() || r_showOverDraw.GetBool() ) {
 		float c[3];
 		if ( sscanf( r_clear.GetString(), "%f %f %f", &c[0], &c[1], &c[2] ) == 3 ) {
-			GL_Clear( true, false, false, 0, c[0], c[1], c[2], 1.0f );
+			renderSystem->Clear( true, false, false, 0, c[0], c[1], c[2], 1.0f );
 		} else if ( r_clear.GetInteger() == 2 ) {
-			GL_Clear( true, false, false, 0, 0.0f, 0.0f,  0.0f, 1.0f );
+			renderSystem->Clear( true, false, false, 0, 0.0f, 0.0f,  0.0f, 1.0f );
 		} else if ( r_showOverDraw.GetBool() ) {
-			GL_Clear( true, false, false, 0, 1.0f, 1.0f, 1.0f, 1.0f );
+			renderSystem->Clear( true, false, false, 0, 1.0f, 1.0f, 1.0f, 1.0f );
 		} else {
-			GL_Clear( true, false, false, 0, 0.4f, 0.0f, 0.25f, 1.0f );
+			renderSystem->Clear( true, false, false, 0, 0.4f, 0.0f, 0.25f, 1.0f );
 		}
 	}
 }
@@ -246,7 +246,7 @@ void RB_StereoRenderExecuteBackEndCommands( const emptyCommand_t * const allCmds
 		const int targetEye = ( stereoEye == 1 ) ? 1 : 0;
 		
 		// Set the back end into a known default state to fix any stale render state issues
-		GL_SetDefaultState();
+		renderSystem->SetDefaultState();
 		renderProgManager->Unbind();
 		renderProgManager->ZeroUniforms();
 
@@ -299,7 +299,7 @@ void RB_StereoRenderExecuteBackEndCommands( const emptyCommand_t * const allCmds
 	// perform the final compositing / warping / deghosting to the actual framebuffer(s)
 	assert( foundEye[0] && foundEye[1] );
 
-	GL_SetDefaultState();
+	renderSystem->SetDefaultState();
 
 	RB_SetMVP( renderMatrix_identity );
 
@@ -311,8 +311,8 @@ void RB_StereoRenderExecuteBackEndCommands( const emptyCommand_t * const allCmds
 		glDrawBuffer( GL_BACK );
 	}
 
-	GL_State( GLS_DEPTHFUNC_ALWAYS );
-	GL_Cull( CT_TWO_SIDED );
+	renderSystem->SetState( GLS_DEPTHFUNC_ALWAYS );
+	renderSystem->SetCull( CT_TWO_SIDED );
 
 	// We just want to do a quad pass - so make sure we disable any texgen and
 	// set the texture matrix to the identity so we don't get anomalies from 
@@ -352,14 +352,14 @@ void RB_StereoRenderExecuteBackEndCommands( const emptyCommand_t * const allCmds
 		stereoRenderImages[1]->Bind();
 		GL_SelectTexture( 1 );
 		stereoRenderImages[0]->Bind();
-		GL_ViewportAndScissor( 0, 0, 1280, 720 );
+		renderSystem->SetViewportAndScissor( 0, 0, 1280, 720 );
 		rb->DrawElementsWithCounters( &backEnd.unitSquareSurface );
 
 		GL_SelectTexture( 0 );
 		stereoRenderImages[0]->Bind();
 		GL_SelectTexture( 1 );
 		stereoRenderImages[1]->Bind();
-		GL_ViewportAndScissor( 0, 750, 1280, 720 );
+		renderSystem->SetViewportAndScissor( 0, 750, 1280, 720 );
 		rb->DrawElementsWithCounters( &backEnd.unitSquareSurface );
 
 		// force the HDMI 720P 3D guard band to a constant color
@@ -427,14 +427,14 @@ void RB_StereoRenderExecuteBackEndCommands( const emptyCommand_t * const allCmds
 		stereoRenderImages[0]->Bind();
 		GL_SelectTexture( 1 );
 		stereoRenderImages[1]->Bind();
-		GL_ViewportAndScissor( 0, 0, renderSystem->GetWidth(), renderSystem->GetHeight() );
+		renderSystem->SetViewportAndScissor( 0, 0, renderSystem->GetWidth(), renderSystem->GetHeight() );
 		rb->DrawElementsWithCounters( &backEnd.unitSquareSurface );
 
 		GL_SelectTexture( 0 );
 		stereoRenderImages[1]->Bind();
 		GL_SelectTexture( 1 );
 		stereoRenderImages[0]->Bind();
-		GL_ViewportAndScissor( renderSystem->GetWidth(), 0, renderSystem->GetWidth(), renderSystem->GetHeight() );
+		renderSystem->SetViewportAndScissor( renderSystem->GetWidth(), 0, renderSystem->GetWidth(), renderSystem->GetHeight() );
 		rb->DrawElementsWithCounters( &backEnd.unitSquareSurface );
 		break;
 
@@ -443,14 +443,14 @@ void RB_StereoRenderExecuteBackEndCommands( const emptyCommand_t * const allCmds
 		stereoRenderImages[0]->Bind();
 		GL_SelectTexture( 0 );
 		stereoRenderImages[1]->Bind();
-		GL_ViewportAndScissor( 0, 0, renderSystem->GetWidth(), renderSystem->GetHeight() );
+		renderSystem->SetViewportAndScissor( 0, 0, renderSystem->GetWidth(), renderSystem->GetHeight() );
 		rb->DrawElementsWithCounters( &backEnd.unitSquareSurface );
 
 		GL_SelectTexture( 1 );
 		stereoRenderImages[1]->Bind();
 		GL_SelectTexture( 0 );
 		stereoRenderImages[0]->Bind();
-		GL_ViewportAndScissor( 0, renderSystem->GetHeight(), renderSystem->GetWidth(), renderSystem->GetHeight() );
+		renderSystem->SetViewportAndScissor( 0, renderSystem->GetHeight(), renderSystem->GetWidth(), renderSystem->GetHeight() );
 		rb->DrawElementsWithCounters( &backEnd.unitSquareSurface );
 		break;
 
@@ -466,7 +466,7 @@ void RB_StereoRenderExecuteBackEndCommands( const emptyCommand_t * const allCmds
 		qglTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
 		qglTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
 
-		GL_ViewportAndScissor( 0, 0, renderSystem->GetWidth(), renderSystem->GetHeight()*2 );
+		renderSystem->SetViewportAndScissor( 0, 0, renderSystem->GetWidth(), renderSystem->GetHeight()*2 );
 		renderProgManager->BindShader_StereoInterlace();
 		rb->DrawElementsWithCounters( &backEnd.unitSquareSurface );
 
@@ -526,7 +526,7 @@ void RB_ExecuteBackEndCommands( const emptyCommand_t *cmds ) {
 	uint64 backEndStartTime = Sys_Microseconds();
 
 	// needed for editor rendering
-	GL_SetDefaultState();
+	renderSystem->SetDefaultState();
 
 	// If we have a stereo pixel format, this will draw to both
 	// the back left and back right buffers, which will have a

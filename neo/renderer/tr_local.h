@@ -748,7 +748,16 @@ public:
 	virtual void			UnCrop();
 	virtual bool			UploadImage( const char *imageName, const byte *data, int width, int height );
 
-	
+	//GraphicsAPIWrapper functions
+	virtual void SetCull(int cullType) override;
+	virtual void SetScissor(int x/*left*/, int y/*bottom*/, int w, int h) override;
+	virtual void SetViewport(int x/*left*/, int y/*bottom*/, int w, int h) override;
+	virtual void SetPolygonOffset(float scale, float bias) override;
+	virtual void SetDepthBoundsTest(const float zmin, const float zmax) override;
+	virtual void Clear(bool color, bool depth, bool stencil, byte stencilValue,
+		float r, float g, float b, float a) override;
+	virtual void SetDefaultState() override;
+	virtual void SetState(uint64 stateBits, bool forceState = false) override;
 
 public:
 	// internal functions
@@ -949,6 +958,16 @@ public:
 
 	virtual void QueueImagePurge(idImage* image);
 
+	virtual void SetCull(int cullType) override;
+	virtual void SetScissor(int x/*left*/, int y/*bottom*/, int w, int h) override;
+	virtual void SetViewport(int x/*left*/, int y/*bottom*/, int w, int h) override;
+	virtual void SetPolygonOffset(float scale, float bias) override;
+	virtual void SetDepthBoundsTest(const float zmin, const float zmax);
+	virtual void Clear(bool color, bool depth, bool stencil, byte stencilValue,
+		float r, float g, float b, float a) override;
+	virtual void SetDefaultState() override;
+	virtual void SetState(uint64 stateBits, bool forceState = false) override;
+
 private:
 	idList<idImage*> purgeQueue;
 };
@@ -1097,6 +1116,8 @@ extern idCVar r_debugRenderToTexture;
 extern idCVar stereoRender_deGhost;			// subtract from opposite eye to reduce ghosting
 
 extern idCVar r_useGPUSkinning;
+
+extern idCVar r_openGL; // 1 = force OpenGL rendering, 0 = autoselect renderer (default Vulkan)
 
 /*
 ====================================================================

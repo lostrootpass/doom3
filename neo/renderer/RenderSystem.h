@@ -29,6 +29,8 @@ If you have questions concerning this license or the applicable additional terms
 #ifndef __RENDERER_H__
 #define __RENDERER_H__
 
+#include "ScreenRect.h"
+
 /*
 ===============================================================================
 
@@ -170,7 +172,6 @@ const int TITLESAFE_WIDTH		= TITLESAFE_RIGHT - TITLESAFE_LEFT;
 const int TITLESAFE_HEIGHT		= TITLESAFE_BOTTOM - TITLESAFE_TOP;
 
 class idRenderWorld;
-
 
 class idRenderSystem {
 public:
@@ -317,6 +318,36 @@ public:
 
 	//Queues up images to be purged at the end of the frame
 	virtual void QueueImagePurge(idImage* image) {};
+
+	//GraphicsAPIWrapper functions
+	virtual void SetCull(int cullType) = 0;
+	virtual void SetScissor(int x/*left*/, int y/*bottom*/, int w, int h) = 0;
+	virtual void SetViewport(int x/*left*/, int y/*bottom*/, int w, int h) = 0;
+	virtual void SetPolygonOffset(float scale, float bias) = 0;
+	virtual void SetDepthBoundsTest(const float zmin, const float zmax) = 0;
+	virtual void StartDepthPass(const idScreenRect& rect) {};
+	virtual void FinishDepthPass() {};
+	virtual void GetDepthPassRect(idScreenRect& rect) { rect.Clear(); };
+	virtual void Clear(bool color, bool depth, bool stencil, byte stencilValue,
+		float r, float g, float b, float a) = 0;
+	virtual void SetDefaultState() = 0;
+	virtual void SetState(uint64 stateBits, bool forceState = false) = 0;
+
+	ID_INLINE void	SetScissor( const idScreenRect & rect ) { 
+		SetScissor( rect.x1, rect.y1, rect.x2 - rect.x1 + 1, rect.y2 - rect.y1 + 1 );
+	}
+	ID_INLINE void	SetViewport( const idScreenRect & rect ) {
+		SetViewport( rect.x1, rect.y1, rect.x2 - rect.x1 + 1, rect.y2 - rect.y1 + 1 ); 
+	}
+	
+	ID_INLINE void SetViewportAndScissor( int x, int y, int w, int h ) { 
+		SetViewport( x, y, w, h ); SetScissor( x, y, w, h );
+	}
+
+	ID_INLINE void	SetViewportAndScissor( const idScreenRect& rect ) { 
+		SetViewport( rect ); 
+		SetScissor( rect );
+	}
 };
 
 extern idRenderSystem *			renderSystem;

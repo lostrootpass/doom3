@@ -124,9 +124,9 @@ void idAutoRender::RenderFrame() {
 	}
 
 
-	GL_SetDefaultState();
+	renderSystem->SetDefaultState();
 	
-	GL_Cull( CT_TWO_SIDED );
+	renderSystem->SetCull( CT_TWO_SIDED );
 	
 	const bool stereoRender = false;
 
@@ -136,12 +136,12 @@ void idAutoRender::RenderFrame() {
 
 	if ( stereoRender ) {
 		for ( int viewNum = 0 ; viewNum < 2; viewNum++ ) {
-			GL_ViewportAndScissor( 0, viewNum * ( height + guardBand ), width, height );
+			renderSystem->SetViewportAndScissor( 0, viewNum * ( height + guardBand ), width, height );
 			RenderBackground();
 			RenderLoadingIcon( loadingIconPosX, loadingIconPosY, loadingIconScale, loadingIconSpeed );
 		}
 	} else {
-		GL_ViewportAndScissor( 0, 0, width, height );
+		renderSystem->SetViewportAndScissor( 0, 0, width, height );
 		RenderBackground();
 		RenderLoadingIcon( loadingIconPosX, loadingIconPosY, loadingIconScale, loadingIconSpeed );
 	}
@@ -158,7 +158,7 @@ void idAutoRender::RenderBackground() {
 
 	globalImages->currentRenderImage->Bind();
 
-	GL_State( GLS_DEPTHFUNC_ALWAYS | GLS_SRCBLEND_ONE | GLS_DSTBLEND_ZERO );
+	renderSystem->SetState( GLS_DEPTHFUNC_ALWAYS | GLS_SRCBLEND_ONE | GLS_DSTBLEND_ZERO );
 
 	float mvpMatrix[16] = { 0 };
 	mvpMatrix[0] = 1;
@@ -258,7 +258,7 @@ void idAutoRender::RenderLoadingIcon( float fracX, float fracY, float size, floa
 		globalImages->loadingIconImage->Bind();
 	}
 
-	GL_State( GLS_DEPTHFUNC_ALWAYS | GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA );
+	renderSystem->SetState( GLS_DEPTHFUNC_ALWAYS | GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA );
 
 	// Set Parms
 	float texS[4] = { 1.0f, 0.0f, 0.0f, 0.0f };

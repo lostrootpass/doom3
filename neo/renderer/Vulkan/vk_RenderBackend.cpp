@@ -192,7 +192,7 @@ void idRenderBackendVk::DrawInteractions()
 
 		// set the depth bounds for the whole light
 		if ( useLightDepthBounds ) {
-			GL_DepthBoundsTest( vLight->scissorRect.zmin, vLight->scissorRect.zmax );
+			renderSystem->SetDepthBoundsTest( vLight->scissorRect.zmin, vLight->scissorRect.zmax );
 		}
 
 		// only need to clear the stencil buffer and perform stencil testing if there are shadows
@@ -215,14 +215,14 @@ void idRenderBackendVk::DrawInteractions()
 				rect.y2 = ( vLight->scissorRect.y2 + 15 ) & ~15;
 
 				if ( !backEnd.currentScissor.Equals( rect ) && r_useScissor.GetBool() ) {
-					GL_Scissor( backEnd.viewDef->viewport.x1 + rect.x1,
+					renderSystem->SetScissor( backEnd.viewDef->viewport.x1 + rect.x1,
 								backEnd.viewDef->viewport.y1 + rect.y1,
 								rect.x2 + 1 - rect.x1,
 								rect.y2 + 1 - rect.y1 );
 					backEnd.currentScissor = rect;
 				}
-				GL_State( GLS_DEFAULT );	// make sure stencil mask passes for the clear
-				GL_Clear( false, false, true, STENCIL_SHADOW_TEST_VALUE, 0.0f, 0.0f, 0.0f, 0.0f );
+				renderSystem->SetState( GLS_DEFAULT );	// make sure stencil mask passes for the clear
+				renderSystem->Clear( false, false, true, STENCIL_SHADOW_TEST_VALUE, 0.0f, 0.0f, 0.0f, 0.0f );
 			}
 		}
 
@@ -257,7 +257,7 @@ void idRenderBackendVk::DrawInteractions()
 			// Disable the depth bounds test because translucent surfaces don't work with
 			// the depth bounds tests since they did not write depth during the depth pass.
 			if ( useLightDepthBounds ) {
-				GL_DepthBoundsTest( 0.0f, 0.0f );
+				renderSystem->SetDepthBoundsTest( 0.0f, 0.0f );
 			}
 
 			// The depth buffer wasn't filled in for translucent surfaces, so they
@@ -277,7 +277,7 @@ void idRenderBackendVk::DrawInteractions()
 	}
 
 	// disable stencil shadow test
-	GL_State( GLS_DEFAULT );
+	renderSystem->SetState( GLS_DEFAULT );
 
 	// unbind texture units
 	for ( int i = 0; i < 5; i++ ) {
@@ -288,7 +288,7 @@ void idRenderBackendVk::DrawInteractions()
 
 	// reset depth bounds
 	if ( useLightDepthBounds ) {
-		GL_DepthBoundsTest( 0.0f, 0.0f );
+		renderSystem->SetDepthBoundsTest( 0.0f, 0.0f );
 	}
 
 	renderLog.CloseBlock();
@@ -392,7 +392,7 @@ int idRenderBackendVk::DrawShaderPasses(const drawSurf_t * const * const drawSur
 
 		// change the scissor if needed
 		if (!backEnd.currentScissor.Equals( surf->scissorRect ) && r_useScissor.GetBool() ) {
-			GL_Scissor( backEnd.viewDef->viewport.x1 + surf->scissorRect.x1, 
+			renderSystem->SetScissor( backEnd.viewDef->viewport.x1 + surf->scissorRect.x1, 
 						backEnd.viewDef->viewport.y1 + surf->scissorRect.y1,
 						surf->scissorRect.x2 + 1 - surf->scissorRect.x1,
 						surf->scissorRect.y2 + 1 - surf->scissorRect.y1 );
@@ -404,16 +404,16 @@ int idRenderBackendVk::DrawShaderPasses(const drawSurf_t * const * const drawSur
 
 		// set face culling appropriately
 		if ( surf->space->isGuiSurface ) {
-			GL_Cull( CT_TWO_SIDED );
+			renderSystem->SetCull( CT_TWO_SIDED );
 		} else {
-			GL_Cull( shader->GetCullType() );
+			renderSystem->SetCull( shader->GetCullType() );
 		}
 
 		uint64 surfGLState = surf->extraGLState;
 
 		// set polygon offset if necessary
 		if ( shader->TestMaterialFlag(MF_POLYGONOFFSET) ) {
-			GL_PolygonOffset( r_offsetFactor.GetFloat(), r_offsetUnits.GetFloat() * shader->GetPolygonOffset() );
+			renderSystem->SetPolygonOffset( r_offsetFactor.GetFloat(), r_offsetUnits.GetFloat() * shader->GetPolygonOffset() );
 			surfGLState = GLS_POLYGON_OFFSET;
 		}
 
@@ -453,7 +453,7 @@ int idRenderBackendVk::DrawShaderPasses(const drawSurf_t * const * const drawSur
 				}
 				renderLog.OpenBlock( "New Shader Stage" );
 
-				GL_State( stageGLState );
+				renderSystem->SetState( stageGLState );
 			
 				renderProgManager->BindShader( newStage->glslProgram, newStage->glslProgram );
 
@@ -581,12 +581,12 @@ int idRenderBackendVk::DrawShaderPasses(const drawSurf_t * const * const drawSur
 
 			// set privatePolygonOffset if necessary
 			if ( pStage->privatePolygonOffset ) {
-				GL_PolygonOffset( r_offsetFactor.GetFloat(), r_offsetUnits.GetFloat() * pStage->privatePolygonOffset );
+				renderSystem->SetPolygonOffset( r_offsetFactor.GetFloat(), r_offsetUnits.GetFloat() * pStage->privatePolygonOffset );
 				stageGLState |= GLS_POLYGON_OFFSET;
 			}
 
 			// set the state
-			GL_State( stageGLState );
+			renderSystem->SetState( stageGLState );
 
 			PrepareStageTexturing( pStage, surf );
 
@@ -597,7 +597,7 @@ int idRenderBackendVk::DrawShaderPasses(const drawSurf_t * const * const drawSur
 
 			// unset privatePolygonOffset if necessary
 			if ( pStage->privatePolygonOffset ) {
-				GL_PolygonOffset( r_offsetFactor.GetFloat(), r_offsetUnits.GetFloat() * shader->GetPolygonOffset() );
+				renderSystem->SetPolygonOffset( r_offsetFactor.GetFloat(), r_offsetUnits.GetFloat() * shader->GetPolygonOffset() );
 			}
 			renderLog.CloseBlock();
 		}
@@ -605,7 +605,7 @@ int idRenderBackendVk::DrawShaderPasses(const drawSurf_t * const * const drawSur
 		renderLog.CloseBlock();
 	}
 
-	GL_Cull( CT_FRONT_SIDED );
+	renderSystem->SetCull( CT_FRONT_SIDED );
 	GL_Color( 1.0f, 1.0f, 1.0f );
 
 	renderLog.CloseBlock();
@@ -652,22 +652,22 @@ void idRenderBackendVk::DrawView(const void* data, const int stereoEye)
 	// restore the context for 2D drawing if we were stubbing it out
 	if ( r_skipRenderContext.GetBool() && backEnd.viewDef->viewEntitys ) {
 		//GLimp_ActivateContext();
-		GL_SetDefaultState();
+		renderSystem->SetDefaultState();
 	}
 
 	// optionally draw a box colored based on the eye number
 	if ( r_drawEyeColor.GetBool() ) {
 		const idScreenRect & r = backEnd.viewDef->viewport;
-		GL_Scissor( ( r.x1 + r.x2 ) / 2, ( r.y1 + r.y2 ) / 2, 32, 32 );
+		renderSystem->SetScissor( ( r.x1 + r.x2 ) / 2, ( r.y1 + r.y2 ) / 2, 32, 32 );
 		switch ( stereoEye ) {
 			case -1:
-				GL_Clear( true, false, false, 0, 1.0f, 0.0f, 0.0f, 1.0f );
+				renderSystem->Clear( true, false, false, 0, 1.0f, 0.0f, 0.0f, 1.0f );
 				break;
 			case 1:
-				GL_Clear( true, false, false, 0, 0.0f, 1.0f, 0.0f, 1.0f );
+				renderSystem->Clear( true, false, false, 0, 0.0f, 1.0f, 0.0f, 1.0f );
 				break;
 			default:
-				GL_Clear( true, false, false, 0, 0.5f, 0.5f, 0.5f, 1.0f );
+				renderSystem->Clear( true, false, false, 0, 0.5f, 0.5f, 0.5f, 1.0f );
 				break;
 		}
 	}
@@ -702,13 +702,13 @@ void idRenderBackendVk::DrawViewInternal(const viewDef_t* viewDef, const int ste
 	//-------------------------------------------------
 
 	// set the window clipping
-	GL_Viewport( viewDef->viewport.x1,
+	renderSystem->SetViewport( viewDef->viewport.x1,
 		viewDef->viewport.y1,
 		viewDef->viewport.x2 + 1 - viewDef->viewport.x1,
 		viewDef->viewport.y2 + 1 - viewDef->viewport.y1 );
 
 	// the scissor may be smaller than the viewport for subviews
-	GL_Scissor( backEnd.viewDef->viewport.x1 + viewDef->scissor.x1,
+	renderSystem->SetScissor( backEnd.viewDef->viewport.x1 + viewDef->scissor.x1,
 				backEnd.viewDef->viewport.y1 + viewDef->scissor.y1,
 				viewDef->scissor.x2 + 1 - viewDef->scissor.x1,
 				viewDef->scissor.y2 + 1 - viewDef->scissor.y1 );
@@ -717,14 +717,14 @@ void idRenderBackendVk::DrawViewInternal(const viewDef_t* viewDef, const int ste
 	backEnd.glState.faceCulling = -1;		// force face culling to set next time
 
 	// ensures that depth writes are enabled for the depth clear
-	GL_State( GLS_DEFAULT );
+	renderSystem->SetState( GLS_DEFAULT );
 
 
 	// Clear the depth buffer and clear the stencil to 128 for stencil shadows as well as gui masking
-	GL_Clear( false, true, true, STENCIL_SHADOW_TEST_VALUE, 0.0f, 0.0f, 0.0f, 0.0f );
+	renderSystem->Clear( false, true, true, STENCIL_SHADOW_TEST_VALUE, 0.0f, 0.0f, 0.0f, 0.0f );
 
 	// normal face culling
-	GL_Cull( CT_FRONT_SIDED );
+	renderSystem->SetCull( CT_FRONT_SIDED );
 
 	//------------------------------------
 	// sets variables that can be used by all programs
@@ -870,14 +870,14 @@ void idRenderBackendVk::FillDepthBufferFast(drawSurf_t **drawSurfs, int numDrawS
 	renderLog.OpenMainBlock( MRB_FILL_DEPTH_BUFFER );
 	renderLog.OpenBlock( "RB_FillDepthBufferFast" );
 
-	GL_StartDepthPass( backEnd.viewDef->scissor );
+	renderSystem->StartDepthPass( backEnd.viewDef->scissor );
 
 	// force MVP change on first surface
 	backEnd.currentSpace = NULL;
 
 	// draw all the subview surfaces, which will already be at the start of the sorted list,
 	// with the general purpose path
-	GL_State( GLS_DEFAULT );
+	renderSystem->SetState( GLS_DEFAULT );
 
 	int	surfNum;
 	for ( surfNum = 0; surfNum < numDrawSurfs; surfNum++ ) {
@@ -892,7 +892,7 @@ void idRenderBackendVk::FillDepthBufferFast(drawSurf_t **drawSurfs, int numDrawS
 
 	// draw all the opaque surfaces and build up a list of perforated surfaces that
 	// we will defer drawing until all opaque surfaces are done
-	GL_State( GLS_DEFAULT );
+	renderSystem->SetState( GLS_DEFAULT );
 
 	// continue checking past the subview surfaces
 	for ( ; surfNum < numDrawSurfs; surfNum++ ) {
@@ -941,7 +941,7 @@ void idRenderBackendVk::FillDepthBufferFast(drawSurf_t **drawSurfs, int numDrawS
 	}
 
 	// Allow platform specific data to be collected after the depth pass.
-	GL_FinishDepthPass();
+	renderSystem->FinishDepthPass();
 
 	renderLog.CloseBlock();
 	renderLog.CloseMainBlock();
@@ -1211,7 +1211,7 @@ void idRenderBackendVk::BasicFog(const drawSurf_t *drawSurfs, const idPlane fogP
 
 		if ( !backEnd.currentScissor.Equals( drawSurf->scissorRect ) && r_useScissor.GetBool() ) {
 			// change the scissor
-			GL_Scissor( backEnd.viewDef->viewport.x1 + drawSurf->scissorRect.x1,
+			renderSystem->SetScissor( backEnd.viewDef->viewport.x1 + drawSurf->scissorRect.x1,
 						backEnd.viewDef->viewport.y1 + drawSurf->scissorRect.y1,
 						drawSurf->scissorRect.x2 + 1 - drawSurf->scissorRect.x1,
 						drawSurf->scissorRect.y2 + 1 - drawSurf->scissorRect.y1 );
@@ -1265,7 +1265,7 @@ void idRenderBackendVk::BlendLight(const drawSurf_t *drawSurfs, const viewLight_
 
 		if ( !backEnd.currentScissor.Equals( drawSurf->scissorRect ) && r_useScissor.GetBool() ) {
 			// change the scissor
-			GL_Scissor( backEnd.viewDef->viewport.x1 + drawSurf->scissorRect.x1,
+			renderSystem->SetScissor( backEnd.viewDef->viewport.x1 + drawSurf->scissorRect.x1,
 						backEnd.viewDef->viewport.y1 + drawSurf->scissorRect.y1,
 						drawSurf->scissorRect.x2 + 1 - drawSurf->scissorRect.x1,
 						drawSurf->scissorRect.y2 + 1 - drawSurf->scissorRect.y1 );
@@ -1323,7 +1323,7 @@ void idRenderBackendVk::BlendLight(const drawSurf_t *drawSurfs, const drawSurf_t
 			continue;
 		}
 
-		GL_State( GLS_DEPTHMASK | stage->drawStateBits | GLS_DEPTHFUNC_EQUAL );
+		renderSystem->SetState( GLS_DEPTHMASK | stage->drawStateBits | GLS_DEPTHFUNC_EQUAL );
 
 		GL_SelectTexture( 0 );
 		stage->texture.image->Bind();
@@ -1453,7 +1453,7 @@ void idRenderBackendVk::FillDepthBufferGeneric(const drawSurf_t * const * drawSu
 		// set polygon offset if necessary
 		if ( shader->TestMaterialFlag( MF_POLYGONOFFSET ) ) {
 			surfGLState |= GLS_POLYGON_OFFSET;
-			GL_PolygonOffset( r_offsetFactor.GetFloat(), r_offsetUnits.GetFloat() * shader->GetPolygonOffset() );
+			renderSystem->SetPolygonOffset( r_offsetFactor.GetFloat(), r_offsetUnits.GetFloat() * shader->GetPolygonOffset() );
 		}
 
 		// subviews will just down-modulate the color buffer
@@ -1512,18 +1512,18 @@ void idRenderBackendVk::FillDepthBufferGeneric(const drawSurf_t * const * drawSu
 
 				// set privatePolygonOffset if necessary
 				if ( pStage->privatePolygonOffset ) {
-					GL_PolygonOffset( r_offsetFactor.GetFloat(), r_offsetUnits.GetFloat() * pStage->privatePolygonOffset );
+					renderSystem->SetPolygonOffset( r_offsetFactor.GetFloat(), r_offsetUnits.GetFloat() * pStage->privatePolygonOffset );
 					stageGLState |= GLS_POLYGON_OFFSET;
 				}
 
 				GL_Color( color );
 
 #ifdef USE_CORE_PROFILE
-				GL_State( stageGLState );
+				renderSystem->SetState( stageGLState );
 				idVec4 alphaTestValue( regs[ pStage->alphaTestRegister ] );
 				SetFragmentParm( RENDERPARM_ALPHA_TEST, alphaTestValue.ToFloatPtr() );
 #else
-				GL_State( stageGLState | GLS_ALPHATEST_FUNC_GREATER | GLS_ALPHATEST_MAKE_REF( idMath::Ftob( 255.0f * regs[ pStage->alphaTestRegister ] ) ) );
+				renderSystem->SetState( stageGLState | GLS_ALPHATEST_FUNC_GREATER | GLS_ALPHATEST_MAKE_REF( idMath::Ftob( 255.0f * regs[ pStage->alphaTestRegister ] ) ) );
 #endif
 
 				if ( drawSurf->jointCache ) {
@@ -1552,7 +1552,7 @@ void idRenderBackendVk::FillDepthBufferGeneric(const drawSurf_t * const * drawSu
 
 				// unset privatePolygonOffset if necessary
 				if ( pStage->privatePolygonOffset ) {
-					GL_PolygonOffset( r_offsetFactor.GetFloat(), r_offsetUnits.GetFloat() * shader->GetPolygonOffset() );
+					renderSystem->SetPolygonOffset( r_offsetFactor.GetFloat(), r_offsetUnits.GetFloat() * shader->GetPolygonOffset() );
 				}
 			}
 
@@ -1566,14 +1566,14 @@ void idRenderBackendVk::FillDepthBufferGeneric(const drawSurf_t * const * drawSu
 			if ( shader->GetSort() == SS_SUBVIEW ) {
 				renderProgManager->BindShader_Color();
 				GL_Color( color );
-				GL_State( surfGLState );
+				renderSystem->SetState( surfGLState );
 			} else {
 				if ( drawSurf->jointCache ) {
 					renderProgManager->BindShader_DepthSkinned();
 				} else {
 					renderProgManager->BindShader_Depth();
 				}
-				GL_State( surfGLState | GLS_ALPHAMASK );
+				renderSystem->SetState( surfGLState | GLS_ALPHAMASK );
 			}
 
 			// must render with less-equal for Z-Cull to work properly
@@ -1660,20 +1660,20 @@ void idRenderBackendVk::FogPass(const drawSurf_t * drawSurfs, const drawSurf_t *
 	fogPlanes[3][3] = FOG_SCALE * s + FOG_ENTER;
 
 	// draw it
-	GL_State( GLS_DEPTHMASK | GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA | GLS_DEPTHFUNC_EQUAL );
+	renderSystem->SetState( GLS_DEPTHMASK | GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA | GLS_DEPTHFUNC_EQUAL );
 	BasicFog( drawSurfs, fogPlanes, NULL );
 	BasicFog( drawSurfs2, fogPlanes, NULL );
 
 	// the light frustum bounding planes aren't in the depth buffer, so use depthfunc_less instead
 	// of depthfunc_equal
-	GL_State( GLS_DEPTHMASK | GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA | GLS_DEPTHFUNC_LESS );
-	GL_Cull( CT_BACK_SIDED );
+	renderSystem->SetState( GLS_DEPTHMASK | GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA | GLS_DEPTHFUNC_LESS );
+	renderSystem->SetCull( CT_BACK_SIDED );
 
 	backEnd.zeroOneCubeSurface.space = &backEnd.viewDef->worldSpace;
 	backEnd.zeroOneCubeSurface.scissorRect = backEnd.viewDef->scissor;
 	BasicFog( &backEnd.zeroOneCubeSurface, fogPlanes, &vLight->inverseBaseLightProject );
 
-	GL_Cull( CT_FRONT_SIDED );
+	renderSystem->SetCull( CT_FRONT_SIDED );
 
 	GL_SelectTexture( 1 );
 	globalImages->BindNull();
@@ -1762,7 +1762,7 @@ void idRenderBackendVk::MotionBlur()
 	const idScreenRect & viewport = backEnd.viewDef->viewport;
 	// clear the alpha buffer and draw only the hands + weapon into it so
 	// we can avoid blurring them
-	GL_State( GLS_COLORMASK | GLS_DEPTHMASK );
+	renderSystem->SetState( GLS_COLORMASK | GLS_DEPTHMASK );
 	GL_Color( 0, 0, 0, 1 );
 
 	idRenderMatrix mat( 1.0f,  0.0f, 0.0f, 0.0f,
@@ -1770,8 +1770,8 @@ void idRenderBackendVk::MotionBlur()
 						0.0f,  0.0f, 0.0f, 0.0f,
 						0.0f,  0.0f, 0.0f, 1.0f);
 	SetVertexParms( RENDERPARM_MVPMATRIX_X, mat[0], 4 );
-	GL_Scissor(viewport);
-	GL_Cull(CT_TWO_SIDED);
+	renderSystem->SetScissor(viewport);
+	renderSystem->SetCull(CT_TWO_SIDED);
 
 	//We can't actually do alpha-clears on Vulkan - vkCmdClearAttachments
 	//isn't affected by pipeline state and therefore color masks,
@@ -1815,7 +1815,7 @@ void idRenderBackendVk::MotionBlur()
 		// draw it solid
 		DrawElementsWithCounters( surf );
 	}
-	GL_State( GLS_DEPTHFUNC_ALWAYS );
+	renderSystem->SetState( GLS_DEPTHFUNC_ALWAYS );
 
 	// copy off the color buffer and the depth buffer for the motion blur prog
 	// we use the viewport dimensions for copying the buffers in case resolution scaling is enabled.
@@ -1839,8 +1839,8 @@ void idRenderBackendVk::MotionBlur()
 	//SetMVP which would convert it into a Vulkan matrix unnecessarily.
 	SetVertexParms( RENDERPARM_MVPMATRIX_X, motionMatrix[0], 4 );
 
-	GL_State( GLS_DEPTHFUNC_ALWAYS );
-	GL_Cull( CT_TWO_SIDED );
+	renderSystem->SetState( GLS_DEPTHFUNC_ALWAYS );
+	renderSystem->SetCull( CT_TWO_SIDED );
 
 	renderProgManager->BindShader_MotionBlur();
 
@@ -1864,7 +1864,7 @@ void idRenderBackendVk::RenderInteractions(const drawSurf_t *surfList, const vie
 
 	// change the scissor if needed, it will be constant across all the surfaces lit by the light
 	if ( !backEnd.currentScissor.Equals( vLight->scissorRect ) && r_useScissor.GetBool() ) {
-		GL_Scissor( backEnd.viewDef->viewport.x1 + vLight->scissorRect.x1, 
+		renderSystem->SetScissor( backEnd.viewDef->viewport.x1 + vLight->scissorRect.x1, 
 					backEnd.viewDef->viewport.y1 + vLight->scissorRect.y1,
 					vLight->scissorRect.x2 + 1 - vLight->scissorRect.x1,
 					vLight->scissorRect.y2 + 1 - vLight->scissorRect.y1 );
@@ -1873,10 +1873,10 @@ void idRenderBackendVk::RenderInteractions(const drawSurf_t *surfList, const vie
 
 	// perform setup here that will be constant for all interactions
 	if ( performStencilTest ) {
-		GL_State( GLS_SRCBLEND_ONE | GLS_DSTBLEND_ONE | GLS_DEPTHMASK | depthFunc | GLS_STENCIL_FUNC_EQUAL | GLS_STENCIL_MAKE_REF( STENCIL_SHADOW_TEST_VALUE ) | GLS_STENCIL_MAKE_MASK( STENCIL_SHADOW_MASK_VALUE ) );
+		renderSystem->SetState( GLS_SRCBLEND_ONE | GLS_DSTBLEND_ONE | GLS_DEPTHMASK | depthFunc | GLS_STENCIL_FUNC_EQUAL | GLS_STENCIL_MAKE_REF( STENCIL_SHADOW_TEST_VALUE ) | GLS_STENCIL_MAKE_MASK( STENCIL_SHADOW_MASK_VALUE ) );
 
 	} else {
-		GL_State( GLS_SRCBLEND_ONE | GLS_DSTBLEND_ONE | GLS_DEPTHMASK | depthFunc | GLS_STENCIL_FUNC_ALWAYS );
+		renderSystem->SetState( GLS_SRCBLEND_ONE | GLS_DSTBLEND_ONE | GLS_DEPTHMASK | depthFunc | GLS_STENCIL_FUNC_ALWAYS );
 	}
 
 	// some rare lights have multiple animating stages, loop over them outside the surface list
@@ -2001,12 +2001,12 @@ void idRenderBackendVk::RenderInteractions(const drawSurf_t *surfList, const vie
 				if ( useLightDepthBounds ) {
 					if ( !surf->space->weaponDepthHack && surf->space->modelDepthHack == 0.0f ) {
 						if ( lightDepthBoundsDisabled ) {
-							GL_DepthBoundsTest( vLight->scissorRect.zmin, vLight->scissorRect.zmax );
+							renderSystem->SetDepthBoundsTest( vLight->scissorRect.zmin, vLight->scissorRect.zmax );
 							lightDepthBoundsDisabled = false;
 						}
 					} else {
 						if ( !lightDepthBoundsDisabled ) {
-							GL_DepthBoundsTest( 0.0f, 0.0f );
+							renderSystem->SetDepthBoundsTest( 0.0f, 0.0f );
 							lightDepthBoundsDisabled = true;
 						}
 					}
@@ -2150,7 +2150,7 @@ void idRenderBackendVk::RenderInteractions(const drawSurf_t *surfList, const vie
 	}
 
 	if ( useLightDepthBounds && lightDepthBoundsDisabled ) {
-		GL_DepthBoundsTest( vLight->scissorRect.zmin, vLight->scissorRect.zmax );
+		renderSystem->SetDepthBoundsTest( vLight->scissorRect.zmin, vLight->scissorRect.zmax );
 	}
 
 	renderProgManager->Unbind();
@@ -2229,7 +2229,7 @@ void idRenderBackendVk::StencilSelectLight(const viewLight_t * vLight)
 
 	// enable the light scissor
 	if ( !backEnd.currentScissor.Equals( vLight->scissorRect ) && r_useScissor.GetBool() ) {
-		GL_Scissor( backEnd.viewDef->viewport.x1 + vLight->scissorRect.x1, 
+		renderSystem->SetScissor( backEnd.viewDef->viewport.x1 + vLight->scissorRect.x1, 
 					backEnd.viewDef->viewport.y1 + vLight->scissorRect.y1,
 					vLight->scissorRect.x2 + 1 - vLight->scissorRect.x1,
 					vLight->scissorRect.y2 + 1 - vLight->scissorRect.y1 );
@@ -2238,15 +2238,15 @@ void idRenderBackendVk::StencilSelectLight(const viewLight_t * vLight)
 
 	// clear stencil buffer to 0 (not drawable)
 	uint64 glStateMinusStencil = GL_GetCurrentStateMinusStencil();
-	GL_State( glStateMinusStencil | GLS_STENCIL_FUNC_ALWAYS | GLS_STENCIL_MAKE_REF( STENCIL_SHADOW_TEST_VALUE ) | GLS_STENCIL_MAKE_MASK( STENCIL_SHADOW_MASK_VALUE ) );	// make sure stencil mask passes for the clear
-	GL_Clear( false, false, true, 0, 0.0f, 0.0f, 0.0f, 0.0f );	// clear to 0 for stencil select
+	renderSystem->SetState( glStateMinusStencil | GLS_STENCIL_FUNC_ALWAYS | GLS_STENCIL_MAKE_REF( STENCIL_SHADOW_TEST_VALUE ) | GLS_STENCIL_MAKE_MASK( STENCIL_SHADOW_MASK_VALUE ) );	// make sure stencil mask passes for the clear
+	renderSystem->Clear( false, false, true, 0, 0.0f, 0.0f, 0.0f, 0.0f );	// clear to 0 for stencil select
 
 	// set the depthbounds
-	GL_DepthBoundsTest( vLight->scissorRect.zmin, vLight->scissorRect.zmax );
+	renderSystem->SetDepthBoundsTest( vLight->scissorRect.zmin, vLight->scissorRect.zmax );
 
 
-	GL_State( GLS_COLORMASK | GLS_ALPHAMASK | GLS_DEPTHMASK | GLS_DEPTHFUNC_LESS | GLS_STENCIL_FUNC_ALWAYS | GLS_STENCIL_MAKE_REF( STENCIL_SHADOW_TEST_VALUE ) | GLS_STENCIL_MAKE_MASK( STENCIL_SHADOW_MASK_VALUE ) );
-	GL_Cull( CT_TWO_SIDED );
+	renderSystem->SetState( GLS_COLORMASK | GLS_ALPHAMASK | GLS_DEPTHMASK | GLS_DEPTHFUNC_LESS | GLS_STENCIL_FUNC_ALWAYS | GLS_STENCIL_MAKE_REF( STENCIL_SHADOW_TEST_VALUE ) | GLS_STENCIL_MAKE_MASK( STENCIL_SHADOW_MASK_VALUE ) );
+	renderSystem->SetCull( CT_TWO_SIDED );
 
 	renderProgManager->BindShader_Depth();
 
@@ -2265,13 +2265,13 @@ void idRenderBackendVk::StencilSelectLight(const viewLight_t * vLight)
 
 	// reset stencil state
 
-	GL_Cull( CT_FRONT_SIDED );
+	renderSystem->SetCull( CT_FRONT_SIDED );
 
 	renderProgManager->Unbind();
 
 
 	// unset the depthbounds
-	GL_DepthBoundsTest( 0.0f, 0.0f );
+	renderSystem->SetDepthBoundsTest( 0.0f, 0.0f );
 
 	renderLog.CloseBlock();
 }
@@ -2311,16 +2311,16 @@ void idRenderBackendVk::StencilShadowPass(const drawSurf_t *drawSurfs, const vie
 		glState = GLS_DEPTHMASK | GLS_COLORMASK | GLS_ALPHAMASK | GLS_DEPTHFUNC_LESS;
 	}
 
-	GL_PolygonOffset( r_shadowPolygonFactor.GetFloat(), -r_shadowPolygonOffset.GetFloat() );
+	renderSystem->SetPolygonOffset( r_shadowPolygonFactor.GetFloat(), -r_shadowPolygonOffset.GetFloat() );
 
 	// the actual stencil func will be set in the draw code, but we need to make sure it isn't
 	// disabled here, and that the value will get reset for the interactions without looking
 	// like a no-change-required
-	GL_State( glState | GLS_STENCIL_OP_FAIL_KEEP | GLS_STENCIL_OP_ZFAIL_KEEP | GLS_STENCIL_OP_PASS_INCR | 
+	renderSystem->SetState( glState | GLS_STENCIL_OP_FAIL_KEEP | GLS_STENCIL_OP_ZFAIL_KEEP | GLS_STENCIL_OP_PASS_INCR | 
 		GLS_STENCIL_MAKE_REF( STENCIL_SHADOW_TEST_VALUE ) | GLS_STENCIL_MAKE_MASK( STENCIL_SHADOW_MASK_VALUE ) | GLS_POLYGON_OFFSET );
 
 	// Two Sided Stencil reduces two draw calls to one for slightly faster shadows
-	GL_Cull( CT_TWO_SIDED );
+	renderSystem->SetCull( CT_TWO_SIDED );
 
 
 	// process the chain of shadows with the current rendering state
@@ -2352,7 +2352,7 @@ void idRenderBackendVk::StencilShadowPass(const drawSurf_t *drawSurfs, const vie
 
 		if ( !backEnd.currentScissor.Equals( drawSurf->scissorRect ) && r_useScissor.GetBool() ) {
 			// change the scissor
-			GL_Scissor( backEnd.viewDef->viewport.x1 + drawSurf->scissorRect.x1,
+			renderSystem->SetScissor( backEnd.viewDef->viewport.x1 + drawSurf->scissorRect.x1,
 						backEnd.viewDef->viewport.y1 + drawSurf->scissorRect.y1,
 						drawSurf->scissorRect.x2 + 1 - drawSurf->scissorRect.x1,
 						drawSurf->scissorRect.y2 + 1 - drawSurf->scissorRect.y1 );
@@ -2387,7 +2387,7 @@ void idRenderBackendVk::StencilShadowPass(const drawSurf_t *drawSurfs, const vie
 
 		// set depth bounds per shadow
 		if ( r_useShadowDepthBounds.GetBool() ) {
-			GL_DepthBoundsTest( drawSurf->scissorRect.zmin, drawSurf->scissorRect.zmax );
+			renderSystem->SetDepthBoundsTest( drawSurf->scissorRect.zmin, drawSurf->scissorRect.zmax );
 		}
 
 		// Determine whether or not the shadow volume needs to be rendered with Z-pass or
@@ -2484,14 +2484,14 @@ void idRenderBackendVk::StencilShadowPass(const drawSurf_t *drawSurfs, const vie
 
 	// cleanup the shadow specific rendering state
 
-	GL_Cull( CT_FRONT_SIDED );
+	renderSystem->SetCull( CT_FRONT_SIDED );
 
 	// reset depth bounds
 	if ( r_useShadowDepthBounds.GetBool() ) {
 		if ( r_useLightDepthBounds.GetBool() ) {
-			GL_DepthBoundsTest( vLight->scissorRect.zmin, vLight->scissorRect.zmax );
+			renderSystem->SetDepthBoundsTest( vLight->scissorRect.zmin, vLight->scissorRect.zmax );
 		} else {
-			GL_DepthBoundsTest( 0.0f, 0.0f );
+			renderSystem->SetDepthBoundsTest( 0.0f, 0.0f );
 		}
 	}
 }

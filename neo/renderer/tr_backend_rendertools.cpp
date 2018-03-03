@@ -145,7 +145,7 @@ static void RB_SimpleSurfaceSetup( const drawSurf_t *drawSurf ) {
 
 	// change the scissor if needed
 	if ( !backEnd.currentScissor.Equals( drawSurf->scissorRect ) && r_useScissor.GetBool() ) {
-		GL_Scissor( backEnd.viewDef->viewport.x1 + drawSurf->scissorRect.x1, 
+		renderSystem->SetScissor( backEnd.viewDef->viewport.x1 + drawSurf->scissorRect.x1, 
 					backEnd.viewDef->viewport.y1 + drawSurf->scissorRect.y1,
 					drawSurf->scissorRect.x2 + 1 - drawSurf->scissorRect.x1,
 					drawSurf->scissorRect.y2 + 1 - drawSurf->scissorRect.y1 );
@@ -164,7 +164,7 @@ static void RB_SimpleWorldSetup() {
 
 	qglLoadMatrixf( backEnd.viewDef->worldSpace.modelViewMatrix );
 
-	GL_Scissor( backEnd.viewDef->viewport.x1 + backEnd.viewDef->scissor.x1,
+	renderSystem->SetScissor( backEnd.viewDef->viewport.x1 + backEnd.viewDef->scissor.x1,
 				backEnd.viewDef->viewport.y1 + backEnd.viewDef->scissor.y1,
 				backEnd.viewDef->scissor.x2 + 1 - backEnd.viewDef->scissor.x1,
 				backEnd.viewDef->scissor.y2 + 1 - backEnd.viewDef->scissor.y1 );
@@ -205,7 +205,7 @@ RB_ShowDestinationAlpha
 ====================
 */
 void RB_ShowDestinationAlpha() {
-	GL_State( GLS_SRCBLEND_DST_ALPHA | GLS_DSTBLEND_ZERO | GLS_DEPTHMASK | GLS_DEPTHFUNC_ALWAYS );
+	renderSystem->SetState( GLS_SRCBLEND_DST_ALPHA | GLS_DSTBLEND_ZERO | GLS_DEPTHMASK | GLS_DEPTHFUNC_ALWAYS );
 	GL_Color( 1, 1, 1 );
 	RB_PolygonClear();
 }
@@ -293,7 +293,7 @@ static void R_ColorByStencilBuffer() {
 	};
 
 	// clear color buffer to white (>6 passes)
-	GL_Clear( true, false, false, 0, 1.0f, 1.0f, 1.0f, 1.0f );
+	renderSystem->Clear( true, false, false, 0, 1.0f, 1.0f, 1.0f, 1.0f );
 
 	// now draw color for each stencil value
 	qglStencilOp( GL_KEEP, GL_KEEP, GL_KEEP );
@@ -427,7 +427,7 @@ static void RB_ShowIntensity() {
 	// draw it back to the screen
 	qglLoadIdentity();
 	qglMatrixMode( GL_PROJECTION );
-	GL_State( GLS_DEPTHFUNC_ALWAYS );
+	renderSystem->SetState( GLS_DEPTHFUNC_ALWAYS );
 	qglPushMatrix();
 	qglLoadIdentity(); 
     qglOrtho( 0, 1, 0, 1, -1, 1 );
@@ -468,7 +468,7 @@ static void RB_ShowDepthBuffer() {
 	qglMatrixMode( GL_MODELVIEW );
 	qglPopMatrix();
 
-	GL_State( GLS_DEPTHFUNC_ALWAYS );
+	renderSystem->SetState( GLS_DEPTHFUNC_ALWAYS );
 	GL_Color( 1, 1, 1 );
 	globalImages->BindNull();
 
@@ -509,13 +509,13 @@ static void RB_ShowLightCount() {
 
 	RB_SimpleWorldSetup();
 
-	GL_Clear( false, false, true, 0, 0.0f, 0.0f, 0.0f, 0.0f );
+	renderSystem->Clear( false, false, true, 0, 0.0f, 0.0f, 0.0f, 0.0f );
 
 	// optionally count everything through walls
 	if ( r_showLightCount.GetInteger() >= 2 ) {
-		GL_State( GLS_DEPTHFUNC_EQUAL | GLS_STENCIL_OP_FAIL_KEEP | GLS_STENCIL_OP_ZFAIL_INCR | GLS_STENCIL_OP_PASS_INCR );
+		renderSystem->SetState( GLS_DEPTHFUNC_EQUAL | GLS_STENCIL_OP_FAIL_KEEP | GLS_STENCIL_OP_ZFAIL_INCR | GLS_STENCIL_OP_PASS_INCR );
 	} else {
-		GL_State( GLS_DEPTHFUNC_EQUAL | GLS_STENCIL_OP_FAIL_KEEP | GLS_STENCIL_OP_ZFAIL_KEEP | GLS_STENCIL_OP_PASS_INCR );
+		renderSystem->SetState( GLS_DEPTHFUNC_EQUAL | GLS_STENCIL_OP_FAIL_KEEP | GLS_STENCIL_OP_ZFAIL_KEEP | GLS_STENCIL_OP_PASS_INCR );
 	}
 
 	globalImages->defaultImage->Bind();
@@ -659,7 +659,7 @@ static void RB_RenderDrawSurfListWithFunction( drawSurf_t **drawSurfs, int numDr
 		// change the scissor if needed
 		if ( r_useScissor.GetBool() && !backEnd.currentScissor.Equals( drawSurf->scissorRect ) ) {
 			backEnd.currentScissor = drawSurf->scissorRect;
-			GL_Scissor( backEnd.viewDef->viewport.x1 + backEnd.currentScissor.x1, 
+			renderSystem->SetScissor( backEnd.viewDef->viewport.x1 + backEnd.currentScissor.x1, 
 				backEnd.viewDef->viewport.y1 + backEnd.currentScissor.y1,
 				backEnd.currentScissor.x2 + 1 - backEnd.currentScissor.x1,
 				backEnd.currentScissor.y2 + 1 - backEnd.currentScissor.y1 );
@@ -703,9 +703,9 @@ static void RB_ShowSilhouette() {
 
 	GL_Color( 0, 0, 0 );
 
-	GL_State( GLS_DEPTHFUNC_ALWAYS | GLS_POLYMODE_LINE );
+	renderSystem->SetState( GLS_DEPTHFUNC_ALWAYS | GLS_POLYMODE_LINE );
 
-	GL_Cull( CT_TWO_SIDED );
+	renderSystem->SetCull( CT_TWO_SIDED );
 
 	RB_RenderDrawSurfListWithFunction( backEnd.viewDef->drawSurfs, backEnd.viewDef->numDrawSurfs, 
 		RB_DrawElementsWithCounters );
@@ -716,7 +716,7 @@ static void RB_ShowSilhouette() {
 	//
 	RB_SimpleWorldSetup();
 	GL_Color( 0.5, 0, 0 );
-	GL_State( GLS_SRCBLEND_ONE | GLS_DSTBLEND_ONE );
+	renderSystem->SetState( GLS_SRCBLEND_ONE | GLS_DSTBLEND_ONE );
 
 	for ( vLight = backEnd.viewDef->viewLights; vLight; vLight = vLight->next ) {
 		for ( i = 0; i < 2; i++ ) {
@@ -758,9 +758,9 @@ static void RB_ShowSilhouette() {
 		}
 	}
 
-	GL_State( GLS_DEFAULT );
+	renderSystem->SetState( GLS_DEFAULT );
 	GL_Color( 1,1,1 );
-	GL_Cull( CT_FRONT_SIDED );
+	renderSystem->SetCull( CT_FRONT_SIDED );
 }
 
 /*
@@ -781,24 +781,24 @@ static void RB_ShowTris( drawSurf_t **drawSurfs, int numDrawSurfs ) {
 
 	float color[4] = { 1, 1, 1, 1 };
 
-	GL_PolygonOffset( -1.0f, -2.0f );
+	renderSystem->SetPolygonOffset( -1.0f, -2.0f );
 	
 	switch ( r_showTris.GetInteger() ) {			
 		case 1: // only draw visible ones
-			GL_State( GLS_DEPTHMASK | GLS_ALPHAMASK | GLS_POLYMODE_LINE | GLS_POLYGON_OFFSET );
+			renderSystem->SetState( GLS_DEPTHMASK | GLS_ALPHAMASK | GLS_POLYMODE_LINE | GLS_POLYGON_OFFSET );
 			break;
 		case 2:	// draw all front facing
 		case 3: // draw all
-			GL_State( GLS_DEPTHMASK | GLS_ALPHAMASK | GLS_POLYMODE_LINE | GLS_POLYGON_OFFSET | GLS_DEPTHFUNC_ALWAYS );
+			renderSystem->SetState( GLS_DEPTHMASK | GLS_ALPHAMASK | GLS_POLYMODE_LINE | GLS_POLYGON_OFFSET | GLS_DEPTHFUNC_ALWAYS );
 			break;
 		case 4: // only draw visible ones with blended lines
-			GL_State( GLS_DEPTHMASK | GLS_ALPHAMASK | GLS_POLYMODE_LINE | GLS_POLYGON_OFFSET | GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA );
+			renderSystem->SetState( GLS_DEPTHMASK | GLS_ALPHAMASK | GLS_POLYMODE_LINE | GLS_POLYGON_OFFSET | GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA );
 			color[3] = 0.4f;
 			break;
 	}
 
 	if ( r_showTris.GetInteger() == 3 ) {
-		GL_Cull( CT_TWO_SIDED );
+		renderSystem->SetCull( CT_TWO_SIDED );
 	}
 
 	GL_Color( color );
@@ -807,7 +807,7 @@ static void RB_ShowTris( drawSurf_t **drawSurfs, int numDrawSurfs ) {
 	RB_RenderDrawSurfListWithFunction( drawSurfs, numDrawSurfs, RB_DrawElementsWithCounters );
 
 	if ( r_showTris.GetInteger() == 3 ) {
-		GL_Cull( CT_FRONT_SIDED );
+		renderSystem->SetCull( CT_FRONT_SIDED );
 	}
 }
 
@@ -841,8 +841,8 @@ static void RB_ShowSurfaceInfo( drawSurf_t **drawSurfs, int numDrawSurfs ) {
 	static float scale = -1;
 	static float bias = -2;
 
-	GL_PolygonOffset( scale, bias );
-	GL_State( GLS_DEPTHFUNC_ALWAYS | GLS_POLYMODE_LINE | GLS_POLYGON_OFFSET );
+	renderSystem->SetPolygonOffset( scale, bias );
+	renderSystem->SetState( GLS_DEPTHFUNC_ALWAYS | GLS_POLYMODE_LINE | GLS_POLYGON_OFFSET );
 
 	idVec3	trans[3];
 	float	matrix[16];
@@ -884,8 +884,8 @@ static void RB_ShowViewEntitys( viewEntity_t *vModels ) {
 	renderProgManager->BindShader_Color();
 
 	GL_Color( 1, 1, 1 );
-	GL_State( GLS_DEPTHFUNC_ALWAYS | GLS_POLYMODE_LINE );
-	GL_Cull( CT_TWO_SIDED );
+	renderSystem->SetState( GLS_DEPTHFUNC_ALWAYS | GLS_POLYMODE_LINE );
+	renderSystem->SetCull( CT_TWO_SIDED );
 
 	for ( const viewEntity_t * vModel = vModels; vModel; vModel = vModel->next ) {
 		idBounds	b;
@@ -956,7 +956,7 @@ static void RB_ShowTexturePolarity( drawSurf_t **drawSurfs, int numDrawSurfs ) {
 	}
 	globalImages->BindNull();
 
-	GL_State( GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA );
+	renderSystem->SetState( GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA );
 
 	GL_Color( 1, 1, 1 );
 
@@ -1005,7 +1005,7 @@ static void RB_ShowTexturePolarity( drawSurf_t **drawSurfs, int numDrawSurfs ) {
 		qglEnd();
 	}
 
-	GL_State( GLS_DEFAULT );
+	renderSystem->SetState( GLS_DEFAULT );
 }
 
 /*
@@ -1025,7 +1025,7 @@ static void RB_ShowUnsmoothedTangents( drawSurf_t **drawSurfs, int numDrawSurfs 
 	}
 	globalImages->BindNull();
 
-	GL_State( GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA );
+	renderSystem->SetState( GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA );
 
 	GL_Color( 0, 1, 0, 0.5 );
 
@@ -1054,7 +1054,7 @@ static void RB_ShowUnsmoothedTangents( drawSurf_t **drawSurfs, int numDrawSurfs 
 		qglEnd();
 	}
 
-	GL_State( GLS_DEFAULT );
+	renderSystem->SetState( GLS_DEFAULT );
 }
 
 /*
@@ -1077,7 +1077,7 @@ static void RB_ShowTangentSpace( drawSurf_t **drawSurfs, int numDrawSurfs ) {
 	}
 	globalImages->BindNull();
 
-	GL_State( GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA );
+	renderSystem->SetState( GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA );
 
 	for ( i = 0; i < numDrawSurfs; i++ ) {
 		drawSurf = drawSurfs[i];
@@ -1112,7 +1112,7 @@ static void RB_ShowTangentSpace( drawSurf_t **drawSurfs, int numDrawSurfs ) {
 		qglEnd();
 	}
 
-	GL_State( GLS_DEFAULT );
+	renderSystem->SetState( GLS_DEFAULT );
 }
 
 /*
@@ -1132,7 +1132,7 @@ static void RB_ShowVertexColor( drawSurf_t **drawSurfs, int numDrawSurfs ) {
 	}
 	globalImages->BindNull();
 
-	GL_State( GLS_DEPTHFUNC_LESS );
+	renderSystem->SetState( GLS_DEPTHFUNC_LESS );
 
 	for ( i = 0; i < numDrawSurfs; i++ ) {
 		drawSurf = drawSurfs[i];
@@ -1154,7 +1154,7 @@ static void RB_ShowVertexColor( drawSurf_t **drawSurfs, int numDrawSurfs ) {
 		qglEnd();
 	}
 
-	GL_State( GLS_DEFAULT );
+	renderSystem->SetState( GLS_DEFAULT );
 }
 
 /*
@@ -1180,9 +1180,9 @@ static void RB_ShowNormals( drawSurf_t **drawSurfs, int numDrawSurfs ) {
 	globalImages->BindNull();
 
 	if ( !r_debugLineDepthTest.GetBool() ) {
-		GL_State( GLS_POLYMODE_LINE | GLS_DEPTHFUNC_ALWAYS );
+		renderSystem->SetState( GLS_POLYMODE_LINE | GLS_DEPTHFUNC_ALWAYS );
 	} else {
-		GL_State( GLS_POLYMODE_LINE );
+		renderSystem->SetState( GLS_POLYMODE_LINE );
 	}
 
 	size = r_showNormals.GetFloat();
@@ -1267,7 +1267,7 @@ static void RB_AltShowNormals( drawSurf_t **drawSurfs, int numDrawSurfs ) {
 
 	globalImages->BindNull();
 
-	GL_State( GLS_DEPTHFUNC_ALWAYS );
+	renderSystem->SetState( GLS_DEPTHFUNC_ALWAYS );
 
 	for ( int i = 0; i < numDrawSurfs; i++ ) {
 		drawSurf_t * drawSurf = drawSurfs[i];
@@ -1331,7 +1331,7 @@ static void RB_ShowTextureVectors( drawSurf_t **drawSurfs, int numDrawSurfs ) {
 		return;
 	}
 
-	GL_State( GLS_DEPTHFUNC_LESS );
+	renderSystem->SetState( GLS_DEPTHFUNC_LESS );
 
 	globalImages->BindNull();
 
@@ -1431,9 +1431,9 @@ static void RB_ShowDominantTris( drawSurf_t **drawSurfs, int numDrawSurfs ) {
 		return;
 	}
 
-	GL_State( GLS_DEPTHFUNC_LESS );
+	renderSystem->SetState( GLS_DEPTHFUNC_LESS );
 
-	GL_PolygonOffset( -1, -2 );
+	renderSystem->SetPolygonOffset( -1, -2 );
 	qglEnable( GL_POLYGON_OFFSET_LINE );
 
 	globalImages->BindNull();
@@ -1495,7 +1495,7 @@ static void RB_ShowEdges( drawSurf_t **drawSurfs, int numDrawSurfs ) {
 
 	globalImages->BindNull();
 
-	GL_State( GLS_DEPTHFUNC_ALWAYS );
+	renderSystem->SetState( GLS_DEPTHFUNC_ALWAYS );
 
 	for ( i = 0; i < numDrawSurfs; i++ ) {
 		drawSurf = drawSurfs[i];
@@ -1585,7 +1585,7 @@ static void RB_ShowLights() {
 		return;
 	}
 
-	GL_State( GLS_DEFAULT );
+	renderSystem->SetState( GLS_DEFAULT );
 
 	// we use the 'vLight->invProjectMVPMatrix'
 	qglMatrixMode( GL_PROJECTION );
@@ -1595,7 +1595,7 @@ static void RB_ShowLights() {
 
 	renderProgManager->BindShader_Color();
 
-	GL_Cull( CT_TWO_SIDED );
+	renderSystem->SetCull( CT_TWO_SIDED );
 
 	common->Printf( "volumes: " );	// FIXME: not in back end!
 
@@ -1607,7 +1607,7 @@ static void RB_ShowLights() {
 
 		// depth buffered planes
 		if ( r_showLights.GetInteger() >= 2 ) {
-			GL_State( GLS_DEPTHFUNC_ALWAYS | GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA | GLS_DEPTHMASK );
+			renderSystem->SetState( GLS_DEPTHFUNC_ALWAYS | GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA | GLS_DEPTHMASK );
 			GL_Color( 0.0f, 0.0f, 1.0f, 0.25f );
 			idRenderMatrix invProjectMVPMatrix;
 			idRenderMatrix::Multiply( backEnd.viewDef->worldSpace.mvp, vLight->inverseBaseLightProject, invProjectMVPMatrix );
@@ -1617,7 +1617,7 @@ static void RB_ShowLights() {
 
 		// non-hidden lines
 		if ( r_showLights.GetInteger() >= 3 ) {
-			GL_State( GLS_DEPTHFUNC_ALWAYS | GLS_POLYMODE_LINE | GLS_DEPTHMASK  );
+			renderSystem->SetState( GLS_DEPTHFUNC_ALWAYS | GLS_POLYMODE_LINE | GLS_DEPTHMASK  );
 			GL_Color( 1.0f, 1.0f, 1.0f );
 			idRenderMatrix invProjectMVPMatrix;
 			idRenderMatrix::Multiply( backEnd.viewDef->worldSpace.mvp, vLight->inverseBaseLightProject, invProjectMVPMatrix );
@@ -1654,7 +1654,7 @@ static void RB_ShowPortals() {
 
 	globalImages->BindNull();
 	renderProgManager->BindShader_Color();
-	GL_State( GLS_DEPTHFUNC_ALWAYS );
+	renderSystem->SetState( GLS_DEPTHFUNC_ALWAYS );
 
 	((idRenderWorldLocal *)backEnd.viewDef->renderWorld)->ShowPortals();
 }
@@ -1869,9 +1869,9 @@ void RB_ShowDebugText() {
 
 
 	if ( !r_debugLineDepthTest.GetBool() ) {
-		GL_State( GLS_POLYMODE_LINE | GLS_DEPTHFUNC_ALWAYS );
+		renderSystem->SetState( GLS_POLYMODE_LINE | GLS_DEPTHFUNC_ALWAYS );
 	} else {
-		GL_State( GLS_POLYMODE_LINE );
+		renderSystem->SetState( GLS_POLYMODE_LINE );
 	}
 
 	text = rb_debugText;
@@ -1882,7 +1882,7 @@ void RB_ShowDebugText() {
 	}
 
 	if ( !r_debugLineDepthTest.GetBool() ) {
-		GL_State( GLS_POLYMODE_LINE );
+		renderSystem->SetState( GLS_POLYMODE_LINE );
 	}
 
 	text = rb_debugText;
@@ -1974,9 +1974,9 @@ void RB_ShowDebugLines() {
 	qglLineWidth( width );
 
 	if ( !r_debugLineDepthTest.GetBool() ) {
-		GL_State( GLS_POLYMODE_LINE | GLS_DEPTHFUNC_ALWAYS );
+		renderSystem->SetState( GLS_POLYMODE_LINE | GLS_DEPTHFUNC_ALWAYS );
 	} else {
-		GL_State( GLS_POLYMODE_LINE );
+		renderSystem->SetState( GLS_POLYMODE_LINE );
 	}
 
 	qglBegin( GL_LINES );
@@ -1992,7 +1992,7 @@ void RB_ShowDebugLines() {
 	qglEnd();
 
 	if ( !r_debugLineDepthTest.GetBool() ) {
-		GL_State( GLS_POLYMODE_LINE );
+		renderSystem->SetState( GLS_POLYMODE_LINE );
 	}
 
 	qglBegin( GL_LINES );
@@ -2009,7 +2009,7 @@ void RB_ShowDebugLines() {
 	qglEnd();
 
 	qglLineWidth( 1 );
-	GL_State( GLS_DEFAULT );
+	renderSystem->SetState( GLS_DEFAULT );
 }
 
 /*
@@ -2082,11 +2082,11 @@ void RB_ShowDebugPolygons() {
 	qglDisable( GL_TEXTURE_2D );
 
 	if ( r_debugPolygonFilled.GetBool() ) {
-		GL_State( GLS_POLYGON_OFFSET | GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA | GLS_DEPTHMASK );
-		GL_PolygonOffset( -1, -2 );
+		renderSystem->SetState( GLS_POLYGON_OFFSET | GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA | GLS_DEPTHMASK );
+		renderSystem->SetPolygonOffset( -1, -2 );
 	} else {
-		GL_State( GLS_POLYGON_OFFSET | GLS_POLYMODE_LINE );
-		GL_PolygonOffset( -1, -2 );
+		renderSystem->SetState( GLS_POLYGON_OFFSET | GLS_POLYMODE_LINE );
+		renderSystem->SetPolygonOffset( -1, -2 );
 	}
 
 	poly = rb_debugPolygons;
@@ -2105,7 +2105,7 @@ void RB_ShowDebugPolygons() {
 //		}
 	}
 
-	GL_State( GLS_DEFAULT );
+	renderSystem->SetState( GLS_DEFAULT );
 
 	if ( r_debugPolygonFilled.GetBool() ) {
 		qglDisable( GL_POLYGON_OFFSET_FILL );
@@ -2113,7 +2113,7 @@ void RB_ShowDebugPolygons() {
 		qglDisable( GL_POLYGON_OFFSET_LINE );
 	}
 
-	GL_State( GLS_DEFAULT );
+	renderSystem->SetState( GLS_DEFAULT );
 }
 
 /*
@@ -2261,7 +2261,7 @@ void RB_TestGamma() {
 	qglLoadIdentity();
 
 	qglMatrixMode( GL_PROJECTION );
-	GL_State( GLS_DEPTHFUNC_ALWAYS );
+	renderSystem->SetState( GLS_DEPTHFUNC_ALWAYS );
 	GL_Color( 1, 1, 1 );
 	qglPushMatrix();
 	qglLoadIdentity(); 
@@ -2310,7 +2310,7 @@ static void RB_TestGammaBias() {
 
 	qglLoadIdentity();
 	qglMatrixMode( GL_PROJECTION );
-	GL_State( GLS_DEPTHFUNC_ALWAYS );
+	renderSystem->SetState( GLS_DEPTHFUNC_ALWAYS );
 	GL_Color( 1, 1, 1 );
 	qglPushMatrix();
 	qglLoadIdentity(); 
@@ -2366,7 +2366,7 @@ void RB_TestImage() {
 	}
 
 	// Set State
-	GL_State( GLS_DEPTHFUNC_ALWAYS | GLS_SRCBLEND_ONE | GLS_DSTBLEND_ZERO );
+	renderSystem->SetState( GLS_DEPTHFUNC_ALWAYS | GLS_SRCBLEND_ONE | GLS_DSTBLEND_ZERO );
 
 	// Set Parms
 	float texS[4] = { 1.0f, 0.0f, 0.0f, 0.0f };
@@ -2555,13 +2555,13 @@ void RB_ShowTrace( drawSurf_t **drawSurfs, int numDrawSurfs ) {
 		qglLoadMatrixf( surf->space->modelViewMatrix );
 
 		// highlight the surface
-		GL_State( GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA );
+		renderSystem->SetState( GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA );
 
 		GL_Color( 1, 0, 0, 0.25 );
 		RB_DrawElementsWithCounters( surf );
 
 		// draw the bounding box
-		GL_State( GLS_DEPTHFUNC_ALWAYS );
+		renderSystem->SetState( GLS_DEPTHFUNC_ALWAYS );
 
 		GL_Color( 1, 1, 1, 1 );
 		RB_DrawBounds( tri->bounds );
@@ -2597,9 +2597,9 @@ void RB_RenderDebugTools( drawSurf_t **drawSurfs, int numDrawSurfs ) {
 	renderLog.OpenMainBlock( MRB_DRAW_DEBUG_TOOLS );
 	RENDERLOG_PRINTF( "---------- RB_RenderDebugTools ----------\n" );
 
-	GL_State( GLS_DEFAULT );
+	renderSystem->SetState( GLS_DEFAULT );
 
-	GL_Scissor( backEnd.viewDef->viewport.x1 + backEnd.viewDef->scissor.x1,
+	renderSystem->SetScissor( backEnd.viewDef->viewport.x1 + backEnd.viewDef->scissor.x1,
 				backEnd.viewDef->viewport.y1 + backEnd.viewDef->scissor.y1,
 				backEnd.viewDef->scissor.x2 + 1 - backEnd.viewDef->scissor.x1,
 				backEnd.viewDef->scissor.y2 + 1 - backEnd.viewDef->scissor.y1 );
