@@ -62,11 +62,11 @@ a viewLight and add it to the list with an empty scissor rect.
 =============
 */
 viewLight_t *R_SetLightDefViewLight( idRenderLightLocal *light ) {
-	if ( light->viewCount == tr.viewCount ) {
+	if ( light->viewCount == tr->viewCount ) {
 		// already set up for this frame
 		return light->viewLight;
 	}
-	light->viewCount = tr.viewCount;
+	light->viewCount = tr->viewCount;
 
 	// add to the view light chain
 	viewLight_t * vLight = (viewLight_t *)R_ClearedFrameAlloc( sizeof( *vLight ), FRAME_ALLOC_VIEW_LIGHT );
@@ -77,8 +77,8 @@ viewLight_t *R_SetLightDefViewLight( idRenderLightLocal *light ) {
 	vLight->scissorRect.Clear();
 
 	// link the view light
-	vLight->next = tr.viewDef->viewLights;
-	tr.viewDef->viewLights = vLight;
+	vLight->next = tr->viewDef->viewLights;
+	tr->viewDef->viewLights = vLight;
 
 	light->viewLight = vLight;
 
@@ -94,11 +94,11 @@ a viewEntity and add it to the list with an empty scissor rect.
 =============
 */
 viewEntity_t *R_SetEntityDefViewEntity( idRenderEntityLocal *def ) {
-	if ( def->viewCount == tr.viewCount ) {
+	if ( def->viewCount == tr->viewCount ) {
 		// already set up for this frame
 		return def->viewEntity;
 	}
-	def->viewCount = tr.viewCount;
+	def->viewCount = tr->viewCount;
 
 	viewEntity_t * vModel = (viewEntity_t *)R_ClearedFrameAlloc( sizeof( *vModel ), FRAME_ALLOC_VIEW_ENTITY );
 	vModel->entityDef = def;
@@ -107,8 +107,8 @@ viewEntity_t *R_SetEntityDefViewEntity( idRenderEntityLocal *def ) {
 	// It will remain clear if the model is only needed for shadows.
 	vModel->scissorRect.Clear();
 
-	vModel->next = tr.viewDef->viewEntitys;
-	tr.viewDef->viewEntitys = vModel;
+	vModel->next = tr->viewDef->viewEntitys;
+	tr->viewDef->viewEntitys = vModel;
 
 	def->viewEntity = vModel;
 
@@ -146,7 +146,7 @@ bool idRenderWorldLocal::CullEntityByPortals( const idRenderEntityLocal *entity,
 			// the entity frustum planes face inward, so the planes that have the
 			// view origin on the positive side will be the "back" faces of the entity,
 			// which must have some fragment inside the portal stack planes to be visible
-			if ( frustumPlanes[i].Distance( tr.viewDef->renderView.vieworg ) <= 0.0f ) {
+			if ( frustumPlanes[i].Distance( tr->viewDef->renderView.vieworg ) <= 0.0f ) {
 				continue;
 			}
 
@@ -210,16 +210,16 @@ void idRenderWorldLocal::AddAreaViewEntities( int areaNum, const portalStack_t *
 		}
 
 		// remove decals that are completely faded away
-		R_FreeEntityDefFadedDecals( entity, tr.viewDef->renderView.time[0] );
+		R_FreeEntityDefFadedDecals( entity, tr->viewDef->renderView.time[0] );
 
 		// check for completely suppressing the model
 		if ( !r_skipSuppress.GetBool() ) {
 			if ( entity->parms.suppressSurfaceInViewID
-					&& entity->parms.suppressSurfaceInViewID == tr.viewDef->renderView.viewID ) {
+					&& entity->parms.suppressSurfaceInViewID == tr->viewDef->renderView.viewID ) {
 				continue;
 			}
 			if ( entity->parms.allowSurfaceInViewID 
-					&& entity->parms.allowSurfaceInViewID != tr.viewDef->renderView.viewID ) {
+					&& entity->parms.allowSurfaceInViewID != tr->viewDef->renderView.viewID ) {
 				continue;
 			}
 		}
@@ -266,7 +266,7 @@ bool idRenderWorldLocal::CullLightByPortals( const idRenderLightLocal *light, co
 			// the light frustum planes face inward, so the planes that have the
 			// view origin on the positive side will be the "back" faces of the light,
 			// which must have some fragment inside the the portal stack planes to be visible
-			if ( frustumPlanes[i].Distance( tr.viewDef->renderView.vieworg ) <= 0.0f ) {
+			if ( frustumPlanes[i].Distance( tr->viewDef->renderView.vieworg ) <= 0.0f ) {
 				continue;
 			}
 
@@ -332,7 +332,7 @@ void idRenderWorldLocal::AddAreaViewLights( int areaNum, const portalStack_t *ps
 		// check for being closed off behind a door
 		// a light that doesn't cast shadows will still light even if it is behind a door
 		if ( r_useLightAreaCulling.GetBool() && !light->LightCastsShadows()
-					&& light->areaNum != -1 && !tr.viewDef->connectedAreas[ light->areaNum ] ) {
+					&& light->areaNum != -1 && !tr->viewDef->connectedAreas[ light->areaNum ] ) {
 			continue;
 		}
 
@@ -360,7 +360,7 @@ if more than one portal sees into the area
 */
 void idRenderWorldLocal::AddAreaToView( int areaNum, const portalStack_t *ps ) {
 	// mark the viewCount, so r_showPortals can display the considered portals
-	portalAreas[ areaNum ].viewCount = tr.viewCount;
+	portalAreas[ areaNum ].viewCount = tr->viewCount;
 
 	// add the models and lights, using more precise culling to the planes
 	AddAreaViewEntities( areaNum, ps );
@@ -373,8 +373,8 @@ idRenderWorldLocal::ScreenRectForWinding
 ===================
 */
 idScreenRect idRenderWorldLocal::ScreenRectFromWinding( const idWinding * w, const viewEntity_t * space ) {
-	const float viewWidth = (float) tr.viewDef->viewport.x2 - (float) tr.viewDef->viewport.x1;
-	const float viewHeight = (float) tr.viewDef->viewport.y2 - (float) tr.viewDef->viewport.y1;
+	const float viewWidth = (float) tr->viewDef->viewport.x2 - (float) tr->viewDef->viewport.x1;
+	const float viewHeight = (float) tr->viewDef->viewport.y2 - (float) tr->viewDef->viewport.y1;
 
 	idScreenRect r;
 	r.Clear();
@@ -412,7 +412,7 @@ bool idRenderWorldLocal::PortalIsFoggedOut( const portal_t *p ) {
 	float * regs = (float *)_alloca( size );
 
 	lightShader->EvaluateRegisters( regs, ldef->parms.shaderParms, 
-		tr.viewDef->renderView.shaderParms, tr.viewDef->renderView.time[0] * 0.001f, ldef->parms.referenceSound );
+		tr->viewDef->renderView.shaderParms, tr->viewDef->renderView.time[0] * 0.001f, ldef->parms.referenceSound );
 
 	const shaderStage_t	*stage = lightShader->GetStage(0);
 
@@ -428,10 +428,10 @@ bool idRenderWorldLocal::PortalIsFoggedOut( const portal_t *p ) {
 	}
 
 	idPlane forward;
-	forward[0] = a * tr.viewDef->worldSpace.modelViewMatrix[0*4+2];
-	forward[1] = a * tr.viewDef->worldSpace.modelViewMatrix[1*4+2];
-	forward[2] = a * tr.viewDef->worldSpace.modelViewMatrix[2*4+2];
-	forward[3] = a * tr.viewDef->worldSpace.modelViewMatrix[3*4+2];
+	forward[0] = a * tr->viewDef->worldSpace.modelViewMatrix[0*4+2];
+	forward[1] = a * tr->viewDef->worldSpace.modelViewMatrix[1*4+2];
+	forward[2] = a * tr->viewDef->worldSpace.modelViewMatrix[2*4+2];
+	forward[3] = a * tr->viewDef->worldSpace.modelViewMatrix[3*4+2];
 
 	const idWinding	* w = p->w;
 	for ( int i = 0; i < w->GetNumPoints(); i++ ) {
@@ -523,7 +523,7 @@ void idRenderWorldLocal::FloodViewThroughArea_r( const idVec3 & origin, int area
 
 		// find the screen pixel bounding box of the remaining portal
 		// so we can scissor things outside it
-		newStack.rect = ScreenRectFromWinding( &w, &tr.identitySpace );
+		newStack.rect = ScreenRectFromWinding( &w, &tr->identitySpace );
 		
 		// slop might have spread it a pixel outside, so trim it back
 		newStack.rect.Intersect( ps->rect );
@@ -585,17 +585,17 @@ void idRenderWorldLocal::FlowViewThroughPortals( const idVec3 & origin, int numP
 	}
 
 	ps.numPortalPlanes = numPlanes;
-	ps.rect = tr.viewDef->scissor;
+	ps.rect = tr->viewDef->scissor;
 
 	// if outside the world, mark everything
-	if ( tr.viewDef->areaNum < 0 ){
+	if ( tr->viewDef->areaNum < 0 ){
 		for ( int i = 0; i < numPortalAreas; i++ ) {
-			areaScreenRect[i] = tr.viewDef->scissor;
+			areaScreenRect[i] = tr->viewDef->scissor;
 			AddAreaToView( i, &ps );
 		}
 	} else {
 		// flood out through portals, setting area viewCount
-		FloodViewThroughArea_r( origin, tr.viewDef->areaNum, &ps );
+		FloodViewThroughArea_r( origin, tr->viewDef->areaNum, &ps );
 	}
 }
 
@@ -605,11 +605,11 @@ idRenderWorldLocal::BuildConnectedAreas_r
 ===================
 */
 void idRenderWorldLocal::BuildConnectedAreas_r( int areaNum ) {
-	if ( tr.viewDef->connectedAreas[areaNum] ) {
+	if ( tr->viewDef->connectedAreas[areaNum] ) {
 		return;
 	}
 
-	tr.viewDef->connectedAreas[areaNum] = true;
+	tr->viewDef->connectedAreas[areaNum] = true;
 
 	// flood through all non-blocked portals
 	portalArea_t * area = &portalAreas[ areaNum ];
@@ -628,19 +628,19 @@ This is only valid for a given view, not all views in a frame
 ===================
 */
 void idRenderWorldLocal::BuildConnectedAreas() {
-	tr.viewDef->connectedAreas = (bool *)R_FrameAlloc( numPortalAreas * sizeof( tr.viewDef->connectedAreas[0] ) );
+	tr->viewDef->connectedAreas = (bool *)R_FrameAlloc( numPortalAreas * sizeof( tr->viewDef->connectedAreas[0] ) );
 
 	// if we are outside the world, we can see all areas
-	if ( tr.viewDef->areaNum == -1 ) {
+	if ( tr->viewDef->areaNum == -1 ) {
 		for ( int i = 0; i < numPortalAreas; i++ ) {
-			tr.viewDef->connectedAreas[i] = true;
+			tr->viewDef->connectedAreas[i] = true;
 		}
 		return;
 	}
 
 	// start with none visible, and flood fill from the current area
-	memset( tr.viewDef->connectedAreas, 0, numPortalAreas * sizeof( tr.viewDef->connectedAreas[0] ) );
-	BuildConnectedAreas_r( tr.viewDef->areaNum );
+	memset( tr->viewDef->connectedAreas, 0, numPortalAreas * sizeof( tr->viewDef->connectedAreas[0] ) );
+	BuildConnectedAreas_r( tr->viewDef->areaNum );
 }
 
 /*
@@ -663,11 +663,11 @@ void idRenderWorldLocal::FindViewLightsAndEntities() {
 	// bumping this counter invalidates cached viewLights / viewEntities,
 	// when a light or entity is next considered, it will create a new
 	// viewLight / viewEntity
-	tr.viewCount++;
+	tr->viewCount++;
 
 	// clear the visible lightDef and entityDef lists
-	tr.viewDef->viewLights = NULL;
-	tr.viewDef->viewEntitys = NULL;
+	tr->viewDef->viewLights = NULL;
+	tr->viewDef->viewEntitys = NULL;
 
 	// all areas are initially not visible, but each portal
 	// chain that leads to them will expand the visible rectangle
@@ -678,9 +678,9 @@ void idRenderWorldLocal::FindViewLightsAndEntities() {
 	// find the area to start the portal flooding in
 	if ( !r_usePortals.GetBool() ) {
 		// debug tool to force no portal culling
-		tr.viewDef->areaNum = -1;
+		tr->viewDef->areaNum = -1;
 	} else {
-		tr.viewDef->areaNum = PointInArea( tr.viewDef->initialViewAreaOrigin );
+		tr->viewDef->areaNum = PointInArea( tr->viewDef->initialViewAreaOrigin );
 	}
 
 	// determine all possible connected areas for
@@ -691,27 +691,27 @@ void idRenderWorldLocal::FindViewLightsAndEntities() {
 	if ( r_singleArea.GetBool() ) {
 		// if debugging, only mark this area
 		// if we are outside the world, don't draw anything
-		if ( tr.viewDef->areaNum >= 0 ) {
+		if ( tr->viewDef->areaNum >= 0 ) {
 			static int lastPrintedAreaNum;
-			if ( tr.viewDef->areaNum != lastPrintedAreaNum ) {
-				lastPrintedAreaNum = tr.viewDef->areaNum;
-				common->Printf( "entering portal area %i\n", tr.viewDef->areaNum );
+			if ( tr->viewDef->areaNum != lastPrintedAreaNum ) {
+				lastPrintedAreaNum = tr->viewDef->areaNum;
+				common->Printf( "entering portal area %i\n", tr->viewDef->areaNum );
 			}
 
 			portalStack_t ps;
 			for ( int i = 0; i < 5; i++ ) {
-				ps.portalPlanes[i] = tr.viewDef->frustum[i];
+				ps.portalPlanes[i] = tr->viewDef->frustum[i];
 			}
 			ps.numPortalPlanes = 5;
-			ps.rect = tr.viewDef->scissor;
+			ps.rect = tr->viewDef->scissor;
 
-			AddAreaToView( tr.viewDef->areaNum, &ps );
+			AddAreaToView( tr->viewDef->areaNum, &ps );
 		}
 	} else {
 		// note that the center of projection for flowing through portals may
 		// be a different point than initialViewAreaOrigin for subviews that
 		// may have the viewOrigin in a solid/invalid area
-		FlowViewThroughPortals( tr.viewDef->renderView.vieworg, 5, tr.viewDef->frustum );
+		FlowViewThroughPortals( tr->viewDef->renderView.vieworg, 5, tr->viewDef->frustum );
 	}
 }
 
@@ -1028,7 +1028,7 @@ void idRenderWorldLocal::ShowPortals() {
 	// flood out through portals, setting area viewCount
 	for ( i = 0; i < numPortalAreas; i++ ) {
 		area = &portalAreas[i];
-		if ( area->viewCount != tr.viewCount ) {
+		if ( area->viewCount != tr->viewCount ) {
 			continue;
 		}
 		for ( p = area->portals; p; p = p->next ) {
@@ -1037,7 +1037,7 @@ void idRenderWorldLocal::ShowPortals() {
 				continue;
 			}
 
-			if ( portalAreas[ p->intoArea ].viewCount != tr.viewCount ) {
+			if ( portalAreas[ p->intoArea ].viewCount != tr->viewCount ) {
 				// red = can't see
 				GL_Color( 1, 0, 0 );
 			} else {

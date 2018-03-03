@@ -40,15 +40,15 @@ void R_ListRenderLightDefs_f( const idCmdArgs &args ) {
 	int			i;
 	idRenderLightLocal	*ldef;
 
-	if ( !tr.primaryWorld ) {
+	if ( !tr->primaryWorld ) {
 		return;
 	}
 	int active = 0;
 	int	totalRef = 0;
 	int	totalIntr = 0;
 
-	for ( i = 0; i < tr.primaryWorld->lightDefs.Num(); i++ ) {
-		ldef = tr.primaryWorld->lightDefs[i];
+	for ( i = 0; i < tr->primaryWorld->lightDefs.Num(); i++ ) {
+		ldef = tr->primaryWorld->lightDefs[i];
 		if ( !ldef ) {
 			common->Printf( "%4i: FREED\n", i );
 			continue;
@@ -84,15 +84,15 @@ void R_ListRenderEntityDefs_f( const idCmdArgs &args ) {
 	int			i;
 	idRenderEntityLocal	*mdef;
 
-	if ( !tr.primaryWorld ) {
+	if ( !tr->primaryWorld ) {
 		return;
 	}
 	int active = 0;
 	int	totalRef = 0;
 	int	totalIntr = 0;
 
-	for ( i = 0; i < tr.primaryWorld->entityDefs.Num(); i++ ) {
-		mdef = tr.primaryWorld->entityDefs[i];
+	for ( i = 0; i < tr->primaryWorld->entityDefs.Num(); i++ ) {
+		mdef = tr->primaryWorld->entityDefs[i];
 		if ( !mdef ) {
 			common->Printf( "%4i: FREED\n", i );
 			continue;
@@ -243,7 +243,7 @@ void idRenderWorldLocal::UpdateEntityDef( qhandle_t entityHandle, const renderEn
 		return;
 	}
 
-	tr.pc.c_entityUpdates++;
+	tr->pc.c_entityUpdates++;
 
 	if ( !re->hModel && !re->callback ) {
 		common->Error( "idRenderWorld::UpdateEntityDef: NULL hModel" );
@@ -306,7 +306,7 @@ void idRenderWorldLocal::UpdateEntityDef( qhandle_t entityHandle, const renderEn
 
 	def->parms = *re;
 
-	def->lastModifiedFrameNum = tr.frameCount;
+	def->lastModifiedFrameNum = tr->frameCount;
 	if ( common->WriteDemo() && def->archived ) {
 		WriteFreeEntity( entityHandle );
 		def->archived = false;
@@ -425,7 +425,7 @@ void idRenderWorldLocal::UpdateLightDef( qhandle_t lightHandle, const renderLigh
 		return;
 	}
 
-	tr.pc.c_lightUpdates++;
+	tr->pc.c_lightUpdates++;
 
 	// create new slots if needed
 	if ( lightHandle < 0 || lightHandle > LUDICROUS_INDEX ) {
@@ -463,7 +463,7 @@ void idRenderWorldLocal::UpdateLightDef( qhandle_t lightHandle, const renderLigh
 	}
 
 	light->parms = *rlight;
-	light->lastModifiedFrameNum = tr.frameCount;
+	light->lastModifiedFrameNum = tr->frameCount;
 	if ( common->WriteDemo() && light->archived ) {
 		WriteFreeLight( lightHandle );
 		light->archived = false;
@@ -765,7 +765,7 @@ Sets the current view so any calls to the render world will use the correct parm
 ====================
 */
 void idRenderWorldLocal::SetRenderView( const renderView_t *renderView ) {
-	tr.primaryRenderView = *renderView;
+	tr->primaryRenderView = *renderView;
 }
 
 /*
@@ -799,8 +799,8 @@ void idRenderWorldLocal::RenderScene( const renderView_t *renderView ) {
 	}
 
 	// close any gui drawing
-	tr.guiModel->EmitFullScreen();
-	tr.guiModel->Clear();
+	tr->guiModel->EmitFullScreen();
+	tr->guiModel->Clear();
 
 	int startTime = Sys_Microseconds();
 
@@ -808,21 +808,21 @@ void idRenderWorldLocal::RenderScene( const renderView_t *renderView ) {
 	viewDef_t * parms = (viewDef_t *)R_ClearedFrameAlloc( sizeof( *parms ), FRAME_ALLOC_VIEW_DEF );
 	parms->renderView = *renderView;
 
-	if ( tr.takingScreenshot ) {
+	if ( tr->takingScreenshot ) {
 		parms->renderView.forceUpdate = true;
 	}
 
-	int windowWidth = tr.GetWidth();
-	int windowHeight = tr.GetHeight();
-	tr.PerformResolutionScaling( windowWidth, windowHeight );
+	int windowWidth = tr->GetWidth();
+	int windowHeight = tr->GetHeight();
+	tr->PerformResolutionScaling( windowWidth, windowHeight );
 
 	// screenFraction is just for quickly testing fill rate limitations
 	if ( r_screenFraction.GetInteger() != 100 ) {
 		windowWidth = ( windowWidth * r_screenFraction.GetInteger() ) / 100;
 		windowHeight = ( windowHeight * r_screenFraction.GetInteger() ) / 100;
 	}
-	tr.CropRenderSize( windowWidth, windowHeight );
-	tr.GetCroppedViewport( &parms->viewport );
+	tr->CropRenderSize( windowWidth, windowHeight );
+	tr->GetCroppedViewport( &parms->viewport );
 
 	// the scissor bounds may be shrunk in subviews even if
 	// the viewport stays the same
@@ -847,9 +847,9 @@ void idRenderWorldLocal::RenderScene( const renderView_t *renderView ) {
 	}
 
 	// save this world for use by some console commands
-	tr.primaryWorld = this;
-	tr.primaryRenderView = *renderView;
-	tr.primaryView = parms;
+	tr->primaryWorld = this;
+	tr->primaryRenderView = *renderView;
+	tr->primaryView = parms;
 
 	// rendering this view may cause other views to be rendered
 	// for mirrors / portals / shadows / environment maps
@@ -880,14 +880,14 @@ void idRenderWorldLocal::RenderScene( const renderView_t *renderView ) {
 	}
 #endif
 
-	tr.UnCrop();
+	tr->UnCrop();
 
 	int endTime = Sys_Microseconds();
 
-	tr.pc.frontEndMicroSec += endTime - startTime;
+	tr->pc.frontEndMicroSec += endTime - startTime;
 
 	// prepare for any 2D drawing after this
-	tr.guiModel->Clear();
+	tr->guiModel->Clear();
 }
 
 /*
@@ -1474,7 +1474,7 @@ void idRenderWorldLocal::AddEntityRefToArea( idRenderEntityLocal *def, portalAre
 
 	ref = areaReferenceAllocator.Alloc();
 
-	tr.pc.c_entityReferences++;
+	tr->pc.c_entityReferences++;
 
 	ref->entity = def;
 
@@ -1510,7 +1510,7 @@ void idRenderWorldLocal::AddLightRefToArea( idRenderLightLocal *light, portalAre
 	lref->area = area;
 	lref->ownerNext = light->references;
 	light->references = lref;
-	tr.pc.c_lightReferences++;
+	tr->pc.c_lightReferences++;
 
 	// doubly linked list so we can free them easily later
 	area->lightRefs.areaNext->areaPrev = lref;
@@ -1538,7 +1538,7 @@ void idRenderWorldLocal::GenerateAllInteractions() {
 
 	// let the interaction creation code know that it shouldn't
 	// try and do any view specific optimizations
-	tr.viewDef = NULL;
+	tr->viewDef = NULL;
 
 	// build the interaction table
 	// this will be dynamically resized if the entity / light counts grow too much
@@ -1634,7 +1634,7 @@ Used for both light volumes and model volumes.
 This does not clip the points by the planes, so some slop
 occurs.
 
-tr.viewCount should be bumped before calling, allowing it
+tr->viewCount should be bumped before calling, allowing it
 to prevent double checking areas.
 
 We might alternatively choose to do this with an area flow.
@@ -1645,10 +1645,10 @@ void idRenderWorldLocal::PushFrustumIntoTree_r( idRenderEntityLocal *def, idRend
 	if ( nodeNum < 0 ) {
 		int areaNum = -1 - nodeNum;
 		portalArea_t * area = &portalAreas[ areaNum ];
-		if ( area->viewCount == tr.viewCount ) {
+		if ( area->viewCount == tr->viewCount ) {
 			return;	// already added a reference here
 		}
-		area->viewCount = tr.viewCount;
+		area->viewCount = tr->viewCount;
 
 		if ( def != NULL ) {
 			AddEntityRefToArea( def, area );
@@ -1669,7 +1669,7 @@ void idRenderWorldLocal::PushFrustumIntoTree_r( idRenderEntityLocal *def, idRend
 		// yet, because the test volume may yet wind up being in the
 		// solid part, which would cause bounds slightly poked into
 		// a wall to show up in the next room
-		if ( portalAreas[ node->commonChildrenArea ].viewCount == tr.viewCount ) {
+		if ( portalAreas[ node->commonChildrenArea ].viewCount == tr->viewCount ) {
 			return;
 		}
 	}
@@ -2065,8 +2065,8 @@ bool R_GlobalShaderOverride( const idMaterial **shader ) {
 		return false;
 	}
 
-	if ( tr.primaryRenderView.globalMaterial ) {
-		*shader = tr.primaryRenderView.globalMaterial;
+	if ( tr->primaryRenderView.globalMaterial ) {
+		*shader = tr->primaryRenderView.globalMaterial;
 		return true;
 	}
 

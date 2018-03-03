@@ -32,7 +32,6 @@ If you have questions concerning this license or the applicable additional terms
 #ifdef DOOM3_VULKAN
 #include <vulkan/vulkan.h>
 #include "sys/win32/win_vkutil.h"
-#include "tr_local.h"
 extern VkDevice vkDevice;
 #endif
 
@@ -75,11 +74,8 @@ UnbindBufferObjects
 ========================
 */
 void UnbindBufferObjects() {
-#ifdef DOOM3_OPENGL
 	qglBindBufferARB( GL_ARRAY_BUFFER_ARB, 0 );
 	qglBindBufferARB( GL_ELEMENT_ARRAY_BUFFER_ARB, 0 );
-#elif DOOM3_VULKAN
-#endif
 }
 
 #ifdef ID_WIN_X86_SSE2_INTRIN
@@ -645,6 +641,7 @@ idJointBuffer::idJointBuffer
 */
 idJointBuffer::idJointBuffer() {
 	numJoints = 0;
+	size = 0;
 	offsetInOtherBuffer = OWNS_BUFFER_FLAG;
 	apiObject = NULL;
 	SetUnmapped();
@@ -669,6 +666,7 @@ bool idJointBuffer::AllocBufferObject( const void * joints, int jointBytes ) {
 	assert_16_byte_aligned( joints );
 
 	numJoints = jointBytes / sizeof(idJointMat);
+	size = jointBytes;
 
 	if ( numJoints <= 0 ) {
 		idLib::Error( "idJointBuffer::AllocBufferObject: joints = %i", numJoints );
@@ -866,7 +864,7 @@ void idJointBuffer::Swap( idJointBuffer & other ) {
 	SwapValues( other.apiObject, apiObject );
 }
 
-idBufferObject::idBufferObject()
+idBufferObject::idBufferObject() : size(0)
 {
 	SetUnmapped();
 }

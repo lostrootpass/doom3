@@ -84,10 +84,10 @@ static drawSurf_t * R_AutospriteDeform( drawSurf_t *surf ) {
 
 	idVec3 leftDir;
 	idVec3 upDir;
-	R_GlobalVectorToLocal( surf->space->modelMatrix, tr.viewDef->renderView.viewaxis[1], leftDir );
-	R_GlobalVectorToLocal( surf->space->modelMatrix, tr.viewDef->renderView.viewaxis[2], upDir );
+	R_GlobalVectorToLocal( surf->space->modelMatrix, tr->viewDef->renderView.viewaxis[1], leftDir );
+	R_GlobalVectorToLocal( surf->space->modelMatrix, tr->viewDef->renderView.viewaxis[2], upDir );
 
-	if ( tr.viewDef->isMirror ) {
+	if ( tr->viewDef->isMirror ) {
 		leftDir = vec3_origin - leftDir;
 	}
 
@@ -174,7 +174,7 @@ static drawSurf_t * R_TubeDeform( drawSurf_t * surf ) {
 	// we need the view direction to project the minor axis of the tube
 	// as the view changes
 	idVec3	localView;
-	R_GlobalPointToLocal( surf->space->modelMatrix, tr.viewDef->renderView.vieworg, localView );
+	R_GlobalPointToLocal( surf->space->modelMatrix, tr->viewDef->renderView.vieworg, localView );
 
 	// the srfTriangles_t are in frame memory and will be automatically disposed of
 	srfTriangles_t * newTri = (srfTriangles_t *)R_ClearedFrameAlloc( sizeof( *newTri ), FRAME_ALLOC_SURFACE_TRIANGLES );
@@ -359,7 +359,7 @@ static drawSurf_t * R_FlareDeform( drawSurf_t * surf ) {
 
 	// if viewer is behind the plane, draw nothing
 	idVec3 localViewer;
-	R_GlobalPointToLocal( surf->space->modelMatrix, tr.viewDef->renderView.vieworg, localViewer );
+	R_GlobalPointToLocal( surf->space->modelMatrix, tr->viewDef->renderView.vieworg, localViewer );
 	float distFromPlane = localViewer * plane.Normal() + plane[3];
 	if ( distFromPlane <= 0 ) {
 		return NULL;
@@ -770,7 +770,7 @@ Emit particles from the surface.
 */
 static drawSurf_t * R_ParticleDeform( drawSurf_t *surf, bool useArea ) {
 	const renderEntity_t * renderEntity = &surf->space->entityDef->parms;
-	const viewDef_t * viewDef = tr.viewDef;
+	const viewDef_t * viewDef = tr->viewDef;
 	const idDeclParticle * particleSystem = (const idDeclParticle *)surf->material->GetDeformDecl();
 	const srfTriangles_t * srcTri = surf->frontEndGeo;
 

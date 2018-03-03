@@ -205,8 +205,8 @@ void R_GlobalToNormalizedDeviceCoordinates( const idVec3 &global, idVec3 &ndc ) 
 	idPlane	view;
 	idPlane	clip;
 
-	// _D3XP use tr.primaryView when there is no tr.viewDef
-	const viewDef_t * viewDef = ( tr.viewDef != NULL ) ? tr.viewDef : tr.primaryView;
+	// _D3XP use tr->primaryView when there is no tr->viewDef
+	const viewDef_t * viewDef = ( tr->viewDef != NULL ) ? tr->viewDef : tr->primaryView;
 
 	for ( int i = 0; i < 4; i ++ ) {
 		view[i] = 	viewDef->worldSpace.modelViewMatrix[i + 0 * 4] * global[0] +

@@ -239,7 +239,7 @@ void idRenderModelStatic::MakeDefaultModel() {
 
 	srfTriangles_t *tri = R_AllocStaticTriSurf();
 
-	surf.shader = tr.defaultMaterial;
+	surf.shader = tr->defaultMaterial;
 	surf.geometry = tri;
 
 	R_AllocStaticTriSurfVerts( tri, 24 );
@@ -1083,7 +1083,7 @@ bool idRenderModelStatic::ConvertASEToModelSurfaces( const struct aseModel_s *as
 	surf.geometry = NULL;
 	if ( ase->materials.Num() == 0 ) {
 		// if we don't have any materials, dump everything into a single surface
-		surf.shader = tr.defaultMaterial;
+		surf.shader = tr->defaultMaterial;
 		surf.id = 0;
 		this->AddSurface( surf );
 		for ( i = 0; i < ase->objects.Num(); i++ ) { 
@@ -1917,7 +1917,7 @@ bool idRenderModelStatic::ConvertMAToModelSurfaces (const struct maModel_s *ma )
 	surf.geometry = NULL;
 	if ( ma->materials.Num() == 0 ) {
 		// if we don't have any materials, dump everything into a single surface
-		surf.shader = tr.defaultMaterial;
+		surf.shader = tr->defaultMaterial;
 		surf.id = 0;
 		this->AddSurface( surf );
 		for ( i = 0; i < ma->objects.Num(); i++ ) { 
@@ -1932,7 +1932,7 @@ bool idRenderModelStatic::ConvertMAToModelSurfaces (const struct maModel_s *ma )
 				material = ma->materials[object->materialRef];
 				surf.shader = declManager->FindMaterial( material->name );
 			} else {
-				surf.shader = tr.defaultMaterial;
+				surf.shader = tr->defaultMaterial;
 			}
 			surf.id = this->NumSurfaces();
 			this->AddSurface( surf );
@@ -1945,7 +1945,7 @@ bool idRenderModelStatic::ConvertMAToModelSurfaces (const struct maModel_s *ma )
 				material = ma->materials[object->materialRef];
 				im1 = declManager->FindMaterial( material->name );
 			} else {
-				im1 = tr.defaultMaterial;
+				im1 = tr->defaultMaterial;
 			}
 			if ( im1->IsDiscrete() ) {
 				// flares, autosprites, etc
@@ -1982,7 +1982,7 @@ bool idRenderModelStatic::ConvertMAToModelSurfaces (const struct maModel_s *ma )
 			material = ma->materials[object->materialRef];
 			im1 = declManager->FindMaterial( material->name );
 		} else {
-			im1 = tr.defaultMaterial;
+			im1 = tr->defaultMaterial;
 		}
 
 		bool normalsParsed = mesh->normalsParsed;
@@ -2359,7 +2359,7 @@ void idRenderModelStatic::WriteToDemoFile( class idDemoFile *f ) {
 	int	data[1];
 
 	// note that it has been updated
-	lastArchivedFrame = tr.frameCount;
+	lastArchivedFrame = tr->frameCount;
 
 	data[0] = DC_DEFINE_MODEL;
 	f->WriteInt( data[0] );

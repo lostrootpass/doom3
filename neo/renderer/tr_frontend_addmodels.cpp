@@ -127,12 +127,12 @@ bool R_IssueEntityDefCallback( idRenderEntityLocal *def ) {
 	def->archived = false;		// will need to be written to the demo file
 
 	bool update;
-	if ( tr.viewDef != NULL ) {
-		update = def->parms.callback( &def->parms, &tr.viewDef->renderView );
+	if ( tr->viewDef != NULL ) {
+		update = def->parms.callback( &def->parms, &tr->viewDef->renderView );
 	} else {
 		update = def->parms.callback( &def->parms, NULL );
 	}
-	tr.pc.c_entityDefCallbacks++;
+	tr->pc.c_entityDefCallbacks++;
 
 	if ( def->parms.hModel == NULL ) {
 		common->Error( "R_IssueEntityDefCallback: dynamic entity callback didn't set model" );
@@ -164,7 +164,7 @@ Returns the cached dynamic model if present, otherwise creates it.
 ===================
 */
 idRenderModel *R_EntityDefDynamicModel( idRenderEntityLocal *def ) {
-	if ( def->dynamicModelFrameCount == tr.frameCount ) {
+	if ( def->dynamicModelFrameCount == tr->frameCount ) {
 		return def->dynamicModel;
 	}
 
@@ -191,7 +191,7 @@ idRenderModel *R_EntityDefDynamicModel( idRenderEntityLocal *def ) {
 	}
 
 	// continously animating models (particle systems, etc) will have their snapshot updated every single view
-	if ( callbackUpdate || ( model->IsDynamicModel() == DM_CONTINUOUS && def->dynamicModelFrameCount != tr.frameCount ) ) {
+	if ( callbackUpdate || ( model->IsDynamicModel() == DM_CONTINUOUS && def->dynamicModelFrameCount != tr->frameCount ) ) {
 		R_ClearEntityDefDynamicModel( def );
 	}
 
@@ -201,7 +201,7 @@ idRenderModel *R_EntityDefDynamicModel( idRenderEntityLocal *def ) {
 		SCOPED_PROFILE_EVENT( "InstantiateDynamicModel" );
 
 		// instantiate the snapshot of the dynamic model, possibly reusing memory from the cached snapshot
-		def->cachedDynamicModel = model->InstantiateDynamicModel( &def->parms, tr.viewDef, def->cachedDynamicModel );
+		def->cachedDynamicModel = model->InstantiateDynamicModel( &def->parms, tr->viewDef, def->cachedDynamicModel );
 
 		if ( def->cachedDynamicModel != NULL && r_checkBounds.GetBool() ) {
 			idBounds b = def->cachedDynamicModel->Bounds();
@@ -216,14 +216,14 @@ idRenderModel *R_EntityDefDynamicModel( idRenderEntityLocal *def ) {
 		}
 
 		def->dynamicModel = def->cachedDynamicModel;
-		def->dynamicModelFrameCount = tr.frameCount;
+		def->dynamicModelFrameCount = tr->frameCount;
 	}
 
 	// set model depth hack value
-	if ( def->dynamicModel != NULL && model->DepthHack() != 0.0f && tr.viewDef != NULL ) {
+	if ( def->dynamicModel != NULL && model->DepthHack() != 0.0f && tr->viewDef != NULL ) {
 		idPlane eye, clip;
 		idVec3 ndc;
-		R_TransformModelToClip( def->parms.origin, tr.viewDef->worldSpace.modelViewMatrix, tr.viewDef->projectionMatrix, eye, clip );
+		R_TransformModelToClip( def->parms.origin, tr->viewDef->worldSpace.modelViewMatrix, tr->viewDef->projectionMatrix, eye, clip );
 		R_TransformClipToDevice( clip, ndc );
 		def->parms.modelDepthHack = model->DepthHack() * ( 1.0f - ndc.z );
 	} else {
@@ -260,8 +260,8 @@ void R_SetupDrawSurfShader( drawSurf_t * drawSurf, const idMaterial * shader, co
 			// evaluate the reference shader to find our shader parms
 			float refRegs[MAX_EXPRESSION_REGISTERS];
 			renderEntity->referenceShader->EvaluateRegisters( refRegs, renderEntity->shaderParms,
-																tr.viewDef->renderView.shaderParms,
-																tr.viewDef->renderView.time[renderEntity->timeGroup] * 0.001f, renderEntity->referenceSound );
+																tr->viewDef->renderView.shaderParms,
+																tr->viewDef->renderView.time[renderEntity->timeGroup] * 0.001f, renderEntity->referenceSound );
 
 			const shaderStage_t * pStage = renderEntity->referenceShader->GetStage( 0 );
 
@@ -278,8 +278,8 @@ void R_SetupDrawSurfShader( drawSurf_t * drawSurf, const idMaterial * shader, co
 		drawSurf->shaderRegisters = regs;
 
 		// process the shader expressions for conditionals / color / texcoords
-		shader->EvaluateRegisters( regs, shaderParms, tr.viewDef->renderView.shaderParms,
-										tr.viewDef->renderView.time[renderEntity->timeGroup] * 0.001f, renderEntity->referenceSound );
+		shader->EvaluateRegisters( regs, shaderParms, tr->viewDef->renderView.shaderParms,
+										tr->viewDef->renderView.time[renderEntity->timeGroup] * 0.001f, renderEntity->referenceSound );
 	}
 }
 
@@ -324,7 +324,7 @@ void R_AddSingleModel( viewEntity_t * vEntity ) {
 	vEntity->dynamicShadowVolumes = NULL;
 
 	// globals we really should pass in...
-	const viewDef_t * viewDef = tr.viewDef;
+	const viewDef_t * viewDef = tr->viewDef;
 
 	idRenderEntityLocal * entityDef = vEntity->entityDef;
 	const renderEntity_t * renderEntity = &entityDef->parms;
@@ -543,8 +543,8 @@ void R_AddSingleModel( viewEntity_t * vEntity ) {
 		}
 
 		// optionally override with the renderView->globalMaterial
-		if ( tr.primaryRenderView.globalMaterial != NULL ) {
-			shader = tr.primaryRenderView.globalMaterial;
+		if ( tr->primaryRenderView.globalMaterial != NULL ) {
+			shader = tr->primaryRenderView.globalMaterial;
 		}
 
 		SCOPED_PROFILE_EVENT( shader->GetName() );
@@ -936,7 +936,7 @@ void R_AddSingleModel( viewEntity_t * vEntity ) {
 						vEntity->dynamicShadowVolumes = dynamicShadowParms;
 					}
 
-					tr.pc.c_createShadowVolumes++;
+					tr->pc.c_createShadowVolumes++;
 				}
 			}
 
@@ -996,14 +996,14 @@ void R_LinkDrawSurfToView( drawSurf_t * drawSurf, viewDef_t * viewDef ) {
 R_AddModels
 
 The end result of running this is the addition of drawSurf_t to the
-tr.viewDef->drawSurfs[] array and light link chains, along with
+tr->viewDef->drawSurfs[] array and light link chains, along with
 frameData and vertexCache allocations to support the drawSurfs.
 ===================
 */
 void R_AddModels() {
 	SCOPED_PROFILE_EVENT( "R_AddModels" );
 
-	tr.viewDef->viewEntitys = R_SortViewEntities( tr.viewDef->viewEntitys );
+	tr->viewDef->viewEntitys = R_SortViewEntities( tr->viewDef->viewEntitys );
 
 	//-------------------------------------------------
 	// Go through each view entity that is either visible to the view, or to
@@ -1011,13 +1011,13 @@ void R_AddModels() {
 	//-------------------------------------------------
 
 	if ( r_useParallelAddModels.GetBool() ) {
-		for ( viewEntity_t * vEntity = tr.viewDef->viewEntitys; vEntity != NULL; vEntity = vEntity->next ) {
-			tr.frontEndJobList->AddJob( (jobRun_t)R_AddSingleModel, vEntity );
+		for ( viewEntity_t * vEntity = tr->viewDef->viewEntitys; vEntity != NULL; vEntity = vEntity->next ) {
+			tr->frontEndJobList->AddJob( (jobRun_t)R_AddSingleModel, vEntity );
 		}
-		tr.frontEndJobList->Submit();
-		tr.frontEndJobList->Wait();
+		tr->frontEndJobList->Submit();
+		tr->frontEndJobList->Wait();
 	} else {
-		for ( viewEntity_t * vEntity = tr.viewDef->viewEntitys; vEntity != NULL; vEntity = vEntity->next ) {
+		for ( viewEntity_t * vEntity = tr->viewDef->viewEntitys; vEntity != NULL; vEntity = vEntity->next ) {
 			R_AddSingleModel( vEntity );
 		}
 	}
@@ -1027,23 +1027,23 @@ void R_AddModels() {
 	//-------------------------------------------------
 
 	if ( r_useParallelAddShadows.GetInteger() == 1 ) {
-		for ( viewEntity_t * vEntity = tr.viewDef->viewEntitys; vEntity != NULL; vEntity = vEntity->next ) {
+		for ( viewEntity_t * vEntity = tr->viewDef->viewEntitys; vEntity != NULL; vEntity = vEntity->next ) {
 			for ( staticShadowVolumeParms_t * shadowParms = vEntity->staticShadowVolumes; shadowParms != NULL; shadowParms = shadowParms->next ) {
-				tr.frontEndJobList->AddJob( (jobRun_t)StaticShadowVolumeJob, shadowParms );
+				tr->frontEndJobList->AddJob( (jobRun_t)StaticShadowVolumeJob, shadowParms );
 			}
 			for ( dynamicShadowVolumeParms_t * shadowParms = vEntity->dynamicShadowVolumes; shadowParms != NULL; shadowParms = shadowParms->next ) {
-				tr.frontEndJobList->AddJob( (jobRun_t)DynamicShadowVolumeJob, shadowParms );
+				tr->frontEndJobList->AddJob( (jobRun_t)DynamicShadowVolumeJob, shadowParms );
 			}
 			vEntity->staticShadowVolumes = NULL;
 			vEntity->dynamicShadowVolumes = NULL;
 		}
-		tr.frontEndJobList->Submit();
+		tr->frontEndJobList->Submit();
 		// wait here otherwise the shadow volume index buffer may be unmapped before all shadow volumes have been constructed
-		tr.frontEndJobList->Wait();
+		tr->frontEndJobList->Wait();
 	} else {
 		int start = Sys_Microseconds();
 
-		for ( viewEntity_t * vEntity = tr.viewDef->viewEntitys; vEntity != NULL; vEntity = vEntity->next ) {
+		for ( viewEntity_t * vEntity = tr->viewDef->viewEntitys; vEntity != NULL; vEntity = vEntity->next ) {
 			for ( staticShadowVolumeParms_t * shadowParms = vEntity->staticShadowVolumes; shadowParms != NULL; shadowParms = shadowParms->next ) {
 				StaticShadowVolumeJob( shadowParms );
 			}
@@ -1062,14 +1062,14 @@ void R_AddModels() {
 	// Move the draw surfs to the view.
 	//-------------------------------------------------
 
-	tr.viewDef->numDrawSurfs = 0;	// clear the ambient surface list
-	tr.viewDef->maxDrawSurfs = 0;	// will be set to INITIAL_DRAWSURFS on R_LinkDrawSurfToView
+	tr->viewDef->numDrawSurfs = 0;	// clear the ambient surface list
+	tr->viewDef->maxDrawSurfs = 0;	// will be set to INITIAL_DRAWSURFS on R_LinkDrawSurfToView
 
-	for ( viewEntity_t * vEntity = tr.viewDef->viewEntitys; vEntity != NULL; vEntity = vEntity->next ) {
+	for ( viewEntity_t * vEntity = tr->viewDef->viewEntitys; vEntity != NULL; vEntity = vEntity->next ) {
 		for ( drawSurf_t * ds = vEntity->drawSurfs; ds != NULL; ) {
 			drawSurf_t * next = ds->nextOnLight;
 			if ( ds->linkChain == NULL ) {
-				R_LinkDrawSurfToView( ds, tr.viewDef );
+				R_LinkDrawSurfToView( ds, tr->viewDef );
 			} else {
 				ds->nextOnLight = *ds->linkChain;
 				*ds->linkChain = ds;

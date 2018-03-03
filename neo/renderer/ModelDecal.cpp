@@ -544,7 +544,7 @@ idRenderModelDecal::CreateDeferredDecals
 void idRenderModelDecal::CreateDeferredDecals( const idRenderModel *model ) {
 	for ( unsigned int i = firstDeferredDecal; i < nextDeferredDecal; i++ ) {
 		decalProjectionParms_t & parms = deferredDecals[i & ( MAX_DEFERRED_DECALS - 1 )];
-		if ( parms.startTime > tr.viewDef->renderView.time[0] -  DEFFERED_DECAL_TIMEOUT ) {
+		if ( parms.startTime > tr->viewDef->renderView.time[0] -  DEFFERED_DECAL_TIMEOUT ) {
 			CreateDecal( model, parms );
 		}
 	}
@@ -730,7 +730,7 @@ drawSurf_t * idRenderModelDecal::CreateDecalDrawSurf( const viewEntity_t *space,
 
 	const decalInfo_t decalInfo = material->GetDecalInfo();
 	const int maxTime = decalInfo.stayTime + decalInfo.fadeTime;
-	const int time = tr.viewDef->renderView.time[0];
+	const int time = tr->viewDef->renderView.time[0];
 
 	int numVerts = 0;
 	int numIndexes = 0;

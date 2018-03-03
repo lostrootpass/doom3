@@ -302,6 +302,16 @@ PFNGLGETDEBUGMESSAGELOGARBPROC			qglGetDebugMessageLogARB;
 
 PFNGLGETSTRINGIPROC						qglGetStringi;
 
+void R_InitRenderBackend()
+{
+	if (r_openGL.GetBool())
+		renderSystem = tr = new idRenderSystemLocal();
+	else
+		renderSystem = tr = new idRenderSystemVk();
+
+	renderSystem->InitRenderBackend();
+}
+
 /*
 ========================
 glBindMultiTextureEXT
@@ -751,7 +761,6 @@ safeMode:
 }
 
 void R_SetNewModeVk( const bool fullInit ) {
-#ifdef DOOM3_VULKAN
 	// try up to three different configurations
 
 	for ( int i = 0 ; i < 3 ; i++ ) {
@@ -843,7 +852,6 @@ safeMode:
 		r_displayRefresh.SetInteger( 0 );
 		r_multiSamples.SetInteger( 0 );
 	}
-#endif
 }
 
 
@@ -872,8 +880,6 @@ void R_InitOpenGL() {
 	if ( R_IsInitialized() ) {
 		common->FatalError( "R_InitOpenGL called while active" );
 	}
-
-	//renderSystem = new idRenderSystemLocal();
 
 	R_SetNewMode( true );
 
@@ -972,8 +978,6 @@ void R_InitVulkan() {
 		common->FatalError("R_InitVulkan called while active");
 	}
 
-	//renderSystem = new idRenderSystemVk();
-
 	R_SetNewModeVk(true);
 
 	Sys_InitInput();
@@ -1052,9 +1056,9 @@ static void R_ReloadSurface_f( const idCmdArgs &args ) {
 	idVec3 start, end;
 	
 	// start far enough away that we don't hit the player model
-	start = tr.primaryView->renderView.vieworg + tr.primaryView->renderView.viewaxis[0] * 16;
-	end = start + tr.primaryView->renderView.viewaxis[0] * 1000.0f;
-	if ( !tr.primaryWorld->Trace( mt, start, end, 0.0f, false ) ) {
+	start = tr->primaryView->renderView.vieworg + tr->primaryView->renderView.viewaxis[0] * 16;
+	end = start + tr->primaryView->renderView.viewaxis[0] * 1000.0f;
+	if ( !tr->primaryWorld->Trace( mt, start, end, 0.0f, false ) ) {
 		return;
 	}
 
@@ -1096,11 +1100,11 @@ testimage <filename>
 void R_TestImage_f( const idCmdArgs &args ) {
 	int imageNum;
 
-	if ( tr.testVideo ) {
-		delete tr.testVideo;
-		tr.testVideo = NULL;
+	if ( tr->testVideo ) {
+		delete tr->testVideo;
+		tr->testVideo = NULL;
 	}
-	tr.testImage = NULL;
+	tr->testImage = NULL;
 
 	if ( args.Argc() != 2 ) {
 		return;
@@ -1109,10 +1113,10 @@ void R_TestImage_f( const idCmdArgs &args ) {
 	if ( idStr::IsNumeric( args.Argv(1) ) ) {
 		imageNum = atoi( args.Argv(1) );
 		if ( imageNum >= 0 && imageNum < globalImages->images.Num() ) {
-			tr.testImage = globalImages->images[imageNum];
+			tr->testImage = globalImages->images[imageNum];
 		}
 	} else {
-		tr.testImage = globalImages->ImageFromFile( args.Argv( 1 ), TF_DEFAULT, TR_REPEAT, TD_DEFAULT );
+		tr->testImage = globalImages->ImageFromFile( args.Argv( 1 ), TF_DEFAULT, TR_REPEAT, TD_DEFAULT );
 	}
 }
 
@@ -1124,35 +1128,35 @@ Plays the cinematic file in a testImage
 =============
 */
 void R_TestVideo_f( const idCmdArgs &args ) {
-	if ( tr.testVideo ) {
-		delete tr.testVideo;
-		tr.testVideo = NULL;
+	if ( tr->testVideo ) {
+		delete tr->testVideo;
+		tr->testVideo = NULL;
 	}
-	tr.testImage = NULL;
+	tr->testImage = NULL;
 
 	if ( args.Argc() < 2 ) {
 		return;
 	}
 
-	tr.testImage = globalImages->ImageFromFile( "_scratch", TF_DEFAULT, TR_REPEAT, TD_DEFAULT );
-	tr.testVideo = idCinematic::Alloc();
-	tr.testVideo->InitFromFile( args.Argv( 1 ), true );
+	tr->testImage = globalImages->ImageFromFile( "_scratch", TF_DEFAULT, TR_REPEAT, TD_DEFAULT );
+	tr->testVideo = idCinematic::Alloc();
+	tr->testVideo->InitFromFile( args.Argv( 1 ), true );
 
 	cinData_t	cin;
-	cin = tr.testVideo->ImageForTime( 0 );
+	cin = tr->testVideo->ImageForTime( 0 );
 	if ( cin.imageY == NULL ) {
-		delete tr.testVideo;
-		tr.testVideo = NULL;
-		tr.testImage = NULL;
+		delete tr->testVideo;
+		tr->testVideo = NULL;
+		tr->testImage = NULL;
 		return;
 	}
 
 	common->Printf( "%i x %i images\n", cin.imageWidth, cin.imageHeight );
 
-	int	len = tr.testVideo->AnimationLength();
+	int	len = tr->testVideo->AnimationLength();
 	common->Printf( "%5.1f seconds of video\n", len * 0.001 );
 
-	tr.testVideoStartTime = tr.primaryRenderView.time[1];
+	tr->testVideoStartTime = tr->primaryRenderView.time[1];
 
 	// try to play the matching wav file
 	idStr	wavString = args.Argv( ( args.Argc() == 2 ) ? 1 : 2 );
@@ -1263,16 +1267,16 @@ void R_ReadTiledPixels( int width, int height, byte *buffer, renderView_t *ref =
 		for ( int yo = 0 ; yo < height ; yo += sysHeight ) {
 			if ( ref ) {
 				// discard anything currently on the list
-				tr.SwapCommandBuffers( NULL, NULL, NULL, NULL );
+				tr->SwapCommandBuffers( NULL, NULL, NULL, NULL );
 
 				// build commands to render the scene
-				tr.primaryWorld->RenderScene( ref );
+				tr->primaryWorld->RenderScene( ref );
 
 				// finish off these commands
-				const emptyCommand_t * cmd = tr.SwapCommandBuffers( NULL, NULL, NULL, NULL );
+				const emptyCommand_t * cmd = tr->SwapCommandBuffers( NULL, NULL, NULL, NULL );
 
 				// issue the commands to the GPU
-				tr.RenderCommandBuffers( cmd );
+				tr->RenderCommandBuffers( cmd );
 			} else {
 				const bool captureToImage = false;
 				common->UpdateScreen( captureToImage );
@@ -1483,7 +1487,7 @@ void R_ScreenShot_f( const idCmdArgs &args ) {
 	// put the console away
 	console->Close();
 
-	tr.TakeScreenshot( width, height, checkname, blends, NULL );
+	tr->TakeScreenshot( width, height, checkname, blends, NULL );
 
 	common->Printf( "Wrote %s\n", checkname.c_str() );
 }
@@ -1497,8 +1501,8 @@ Save out a screenshot showing the stencil buffer expanded by 16x range
 void R_StencilShot() {
 	int			i, c;
 
-	int	width = tr.GetWidth();
-	int	height = tr.GetHeight();
+	int	width = tr->GetWidth();
+	int	height = tr->GetHeight();
 
 	int	pix = width * height;
 
@@ -1743,10 +1747,10 @@ void R_SetColorMappings() {
 	float j = 0.0f;
 	for ( int i = 0; i < 256; i++, j += b ) {
 		int inf = idMath::Ftoi( 0xffff * pow( j / 255.0f, invg ) + 0.5f );
-		tr.gammaTable[i] = idMath::ClampInt( 0, 0xFFFF, inf );
+		tr->gammaTable[i] = idMath::ClampInt( 0, 0xFFFF, inf );
 	}
 
-	GLimp_SetGamma( tr.gammaTable, tr.gammaTable, tr.gammaTable );
+	GLimp_SetGamma( tr->gammaTable, tr->gammaTable, tr->gammaTable );
 }
 
 /*
@@ -1909,8 +1913,8 @@ void R_VidRestart_f( const idCmdArgs &args ) {
 
 
 	// make sure the regeneration doesn't use anything no longer valid
-	tr.viewCount++;
-	tr.viewDef = NULL;
+	tr->viewCount++;
+	tr->viewDef = NULL;
 
 	// check for problems
 	int err = qglGetError();
@@ -1927,14 +1931,14 @@ R_InitMaterials
 =================
 */
 void R_InitMaterials() {
-	tr.defaultMaterial = declManager->FindMaterial( "_default", false );
-	if ( !tr.defaultMaterial ) {
+	tr->defaultMaterial = declManager->FindMaterial( "_default", false );
+	if ( !tr->defaultMaterial ) {
 		common->FatalError( "_default material not found" );
 	}
-	tr.defaultPointLight = declManager->FindMaterial( "lights/defaultPointLight" );
-	tr.defaultProjectedLight = declManager->FindMaterial( "lights/defaultProjectedLight" );
-	tr.whiteMaterial = declManager->FindMaterial( "_white" );
-	tr.charSetMaterial = declManager->FindMaterial( "textures/bigchars" );
+	tr->defaultPointLight = declManager->FindMaterial( "lights/defaultPointLight" );
+	tr->defaultProjectedLight = declManager->FindMaterial( "lights/defaultProjectedLight" );
+	tr->whiteMaterial = declManager->FindMaterial( "_white" );
+	tr->charSetMaterial = declManager->FindMaterial( "textures/bigchars" );
 }
 
 
@@ -2321,7 +2325,7 @@ void idRenderSystemLocal::Init() {
 	if ( zeroOneCubeTriangles == NULL ) {
 		zeroOneCubeTriangles = R_MakeZeroOneCubeTris();
 	}
-	// make sure the tr.testImageTriangles data is current in the vertex / index cache
+	// make sure the tr->testImageTriangles data is current in the vertex / index cache
 	if ( testImageTriangles == NULL )  {
 		testImageTriangles = R_MakeTestImageTriangles();
 	}
@@ -2612,11 +2616,9 @@ void idRenderSystemLocal::ShutdownRenderBackend() {
 }
 
 void idRenderSystemVk::ShutdownRenderBackend() {
-#ifdef DOOM3_VULKAN
 	R_ShutdownFrameData();
 	VkImp_Shutdown();
 	r_initialized = false;
-#endif
 }
 
 /*

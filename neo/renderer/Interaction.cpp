@@ -775,8 +775,8 @@ void R_ShowInteractionMemory_f( const idCmdArgs &args ) {
 	int maxInteractionsForEntity = 0;
 	int maxInteractionsForLight = 0;
 
-	for ( int i = 0; i < tr.primaryWorld->lightDefs.Num(); i++ ) {
-		idRenderLightLocal * light = tr.primaryWorld->lightDefs[i];
+	for ( int i = 0; i < tr->primaryWorld->lightDefs.Num(); i++ ) {
+		idRenderLightLocal * light = tr->primaryWorld->lightDefs[i];
 		if ( light == NULL ) {
 			continue;
 		}
@@ -791,8 +791,8 @@ void R_ShowInteractionMemory_f( const idCmdArgs &args ) {
 		}
 	}
 
-	for ( int i = 0; i < tr.primaryWorld->entityDefs.Num(); i++ ) {
-		idRenderEntityLocal	*def = tr.primaryWorld->entityDefs[i];
+	for ( int i = 0; i < tr->primaryWorld->entityDefs.Num(); i++ ) {
+		idRenderEntityLocal	*def = tr->primaryWorld->entityDefs[i];
 		if ( def == NULL ) {
 			continue;
 		}

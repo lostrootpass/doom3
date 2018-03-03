@@ -439,9 +439,9 @@ idMD5Mesh::UpdateSurface
 void idMD5Mesh::UpdateSurface( const struct renderEntity_s *ent, const idJointMat *entJoints,
 								const idJointMat *entJointsInverted, modelSurface_t *surf ) {
 
-	tr.pc.c_deformedSurfaces++;
-	tr.pc.c_deformedVerts += deformInfo->numOutputVerts;
-	tr.pc.c_deformedIndexes += deformInfo->numIndexes;
+	tr->pc.c_deformedSurfaces++;
+	tr->pc.c_deformedVerts += deformInfo->numOutputVerts;
+	tr->pc.c_deformedIndexes += deformInfo->numIndexes;
 
 	surf->shader = shader;
 
@@ -1209,7 +1209,7 @@ idRenderModel *idRenderModelMD5::InstantiateDynamicModel( const struct renderEnt
 		return NULL;
 	}
 
-	tr.pc.c_generateMd5++;
+	tr->pc.c_generateMd5++;
 
 	idRenderModelStatic * staticModel;
 	if ( cachedModel != NULL ) {

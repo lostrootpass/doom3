@@ -135,11 +135,11 @@ static void R_RenderGuiSurf( idUserInterface *gui, const drawSurf_t *drawSurf ) 
 	}
 
 	// don't allow an infinite recursion loop
-	if ( tr.guiRecursionLevel == 4 ) {
+	if ( tr->guiRecursionLevel == 4 ) {
 		return;
 	}
 
-	tr.pc.c_guiSurfs++;
+	tr->pc.c_guiSurfs++;
 
 	// create the new matrix to draw on this surface
 	idVec3 origin, axis[3];
@@ -170,15 +170,15 @@ static void R_RenderGuiSurf( idUserInterface *gui, const drawSurf_t *drawSurf ) 
 
 	R_MatrixMultiply( guiModelMatrix, drawSurf->space->modelMatrix, modelMatrix );
 
-	tr.guiRecursionLevel++;
+	tr->guiRecursionLevel++;
 
 	// call the gui, which will call the 2D drawing functions
-	tr.guiModel->Clear();
-	gui->Redraw( tr.viewDef->renderView.time[0] );
-	tr.guiModel->EmitToCurrentView( modelMatrix, drawSurf->space->weaponDepthHack );
-	tr.guiModel->Clear();
+	tr->guiModel->Clear();
+	gui->Redraw( tr->viewDef->renderView.time[0] );
+	tr->guiModel->EmitToCurrentView( modelMatrix, drawSurf->space->weaponDepthHack );
+	tr->guiModel->Clear();
 
-	tr.guiRecursionLevel--;
+	tr->guiRecursionLevel--;
 }
 
 /*

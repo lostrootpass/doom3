@@ -68,7 +68,7 @@ static void RB_DrawFlickerBox() {
 	if ( !r_drawFlickerBox.GetBool() ) {
 		return;
 	}
-	if ( tr.frameCount & 1 ) {
+	if ( tr->frameCount & 1 ) {
 		qglClearColor( 1, 0, 0, 1 );
 	} else {
 		qglClearColor( 0, 1, 0, 1 );

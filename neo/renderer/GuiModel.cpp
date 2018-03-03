@@ -110,8 +110,8 @@ void idGuiModel::EmitSurfaces( float modelMatrix[16], float modelViewMatrix[16],
 	// If this is an in-game gui, we need to be able to find the matrix again for head mounted
 	// display bypass matrix fixup.
 	if ( linkAsEntity ) {
-		guiSpace->next = tr.viewDef->viewEntitys;
-		tr.viewDef->viewEntitys = guiSpace;
+		guiSpace->next = tr->viewDef->viewEntitys;
+		tr->viewDef->viewEntitys = guiSpace;
 	}
 
 	//---------------------------
@@ -119,7 +119,7 @@ void idGuiModel::EmitSurfaces( float modelMatrix[16], float modelViewMatrix[16],
 	//---------------------------
 	idRenderMatrix viewMat;
 	idRenderMatrix::Transpose( *(idRenderMatrix *)modelViewMatrix, viewMat );
-	idRenderMatrix::Multiply( tr.viewDef->projectionRenderMatrix, viewMat, guiSpace->mvp );
+	idRenderMatrix::Multiply( tr->viewDef->projectionRenderMatrix, viewMat, guiSpace->mvp );
 	if ( depthHack ) {
 		idRenderMatrix::ApplyDepthHack( guiSpace->mvp );
 	}
@@ -151,7 +151,7 @@ void idGuiModel::EmitSurfaces( float modelMatrix[16], float modelViewMatrix[16],
 		drawSurf->space = guiSpace;
 		drawSurf->material = shader;
 		drawSurf->extraGLState = guiSurf.glState;
-		drawSurf->scissorRect = tr.viewDef->scissor;
+		drawSurf->scissorRect = tr->viewDef->scissor;
 		drawSurf->sort = shader->GetSort();
 		drawSurf->renderZFail = 0;
 		// process the shader expressions for conditionals / color / texcoords
@@ -162,9 +162,9 @@ void idGuiModel::EmitSurfaces( float modelMatrix[16], float modelViewMatrix[16],
 		} else {
 			float *regs = (float *)R_FrameAlloc( shader->GetNumRegisters() * sizeof( float ), FRAME_ALLOC_SHADER_REGISTER );
 			drawSurf->shaderRegisters = regs;
-			shader->EvaluateRegisters( regs, shaderParms, tr.viewDef->renderView.shaderParms, tr.viewDef->renderView.time[1] * 0.001f, NULL );
+			shader->EvaluateRegisters( regs, shaderParms, tr->viewDef->renderView.shaderParms, tr->viewDef->renderView.time[1] * 0.001f, NULL );
 		}
-		R_LinkDrawSurfToView( drawSurf, tr.viewDef );
+		R_LinkDrawSurfToView( drawSurf, tr->viewDef );
 		if ( allowFullScreenStereoDepth ) {
 			// override sort with the stereoDepth
 			//drawSurf->sort = stereoDepth;
@@ -190,7 +190,7 @@ EmitToCurrentView
 void idGuiModel::EmitToCurrentView( float modelMatrix[16], bool depthHack ) {
 	float	modelViewMatrix[16];
 
-	R_MatrixMultiply( modelMatrix, tr.viewDef->worldSpace.modelViewMatrix, modelViewMatrix );
+	R_MatrixMultiply( modelMatrix, tr->viewDef->worldSpace.modelViewMatrix, modelViewMatrix );
 
 	EmitSurfaces( modelMatrix, modelViewMatrix, depthHack, false /* stereoDepthSort */, true /* link as entity */ );
 }
@@ -213,7 +213,7 @@ void idGuiModel::EmitFullScreen() {
 
 	viewDef_t * viewDef = (viewDef_t *)R_ClearedFrameAlloc( sizeof( *viewDef ), FRAME_ALLOC_VIEW_DEF );
 	viewDef->is2Dgui = true;
-	tr.GetCroppedViewport( &viewDef->viewport );
+	tr->GetCroppedViewport( &viewDef->viewport );
 
 	bool stereoEnabled = ( renderSystem->GetStereo3DMode() != STEREO3D_OFF );
 	if ( stereoEnabled ) {
@@ -272,13 +272,13 @@ void idGuiModel::EmitFullScreen() {
 	viewDef->drawSurfs = (drawSurf_t **)R_FrameAlloc( viewDef->maxDrawSurfs * sizeof( viewDef->drawSurfs[0] ), FRAME_ALLOC_DRAW_SURFACE_POINTER );
 	viewDef->numDrawSurfs = 0;
 
-	viewDef_t * oldViewDef = tr.viewDef;
-	tr.viewDef = viewDef;
+	viewDef_t * oldViewDef = tr->viewDef;
+	tr->viewDef = viewDef;
 
 	EmitSurfaces( viewDef->worldSpace.modelMatrix, viewDef->worldSpace.modelViewMatrix, 
 		false /* depthHack */ , stereoEnabled /* stereoDepthSort */, false /* link as entity */ );
 
-	tr.viewDef = oldViewDef;
+	tr->viewDef = oldViewDef;
 
 	// add the command to draw this view
 	R_AddDrawViewCmd( viewDef, true );
@@ -296,7 +296,7 @@ void idGuiModel::AdvanceSurf() {
 		s.material = surf->material;
 		s.glState = surf->glState;
 	} else {
-		s.material = tr.defaultMaterial;
+		s.material = tr->defaultMaterial;
 		s.glState = 0;
 	}
 
@@ -321,16 +321,16 @@ idDrawVert * idGuiModel::AllocTris( int vertCount, const triIndex_t * tempIndexe
 	}
 	if ( numIndexes + indexCount > MAX_INDEXES ) {
 		static int warningFrame = 0;
-		if ( warningFrame != tr.frameCount ) {
-			warningFrame = tr.frameCount;
+		if ( warningFrame != tr->frameCount ) {
+			warningFrame = tr->frameCount;
 			idLib::Warning( "idGuiModel::AllocTris: MAX_INDEXES exceeded" );
 		}
 		return NULL;
 	}
 	if ( numVerts + vertCount > MAX_VERTS ) {
 		static int warningFrame = 0;
-		if ( warningFrame != tr.frameCount ) {
-			warningFrame = tr.frameCount;
+		if ( warningFrame != tr->frameCount ) {
+			warningFrame = tr->frameCount;
 			idLib::Warning( "idGuiModel::AllocTris: MAX_VERTS exceeded" );
 		}
 		return NULL;

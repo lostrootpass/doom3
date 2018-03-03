@@ -133,7 +133,7 @@ idRenderModel *	idRenderModelSprite::InstantiateDynamicModel( const struct rende
 
 		surf.geometry = tri;
 		surf.id = 0;
-		surf.shader = tr.defaultMaterial;
+		surf.shader = tr->defaultMaterial;
 		staticModel->AddSurface( surf );
 	}
 

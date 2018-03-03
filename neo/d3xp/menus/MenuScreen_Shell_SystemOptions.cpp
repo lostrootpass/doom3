@@ -109,6 +109,14 @@ void idMenuScreen_Shell_SystemOptions::Initialize( idMenuHandler * data ) {
 	options->AddChild( control );
 
 	control = new (TAG_SWF) idMenuWidget_ControlButton();
+	control->SetOptionType( OPTION_SLIDER_TEXT );
+	control->SetLabel( "Renderer" );
+	control->SetDataSource( &systemData, idMenuDataSource_SystemSettings::SYSTEM_FIELD_RENDERER );
+	control->SetupEvents( DEFAULT_REPEAT_TIME, options->GetChildren().Num() );
+	control->AddEventAction( WIDGET_EVENT_PRESS ).Set( WIDGET_ACTION_COMMAND, idMenuDataSource_SystemSettings::SYSTEM_FIELD_RENDERER );
+	options->AddChild( control );
+
+	control = new (TAG_SWF) idMenuWidget_ControlButton();
 	control->SetOptionType( OPTION_SLIDER_BAR );
 	control->SetLabel( "#str_swf_lodbias" );
 	control->SetDataSource( &systemData, idMenuDataSource_SystemSettings::SYSTEM_FIELD_LODBIAS );
@@ -116,13 +124,14 @@ void idMenuScreen_Shell_SystemOptions::Initialize( idMenuHandler * data ) {
 	control->AddEventAction( WIDGET_EVENT_PRESS ).Set( WIDGET_ACTION_COMMAND, idMenuDataSource_SystemSettings::SYSTEM_FIELD_LODBIAS );
 	options->AddChild( control );
 
-	control = new (TAG_SWF) idMenuWidget_ControlButton();
-	control->SetOptionType( OPTION_SLIDER_BAR );
-	control->SetLabel( "#str_02155" );	// Brightness
-	control->SetDataSource( &systemData, idMenuDataSource_SystemSettings::SYSTEM_FIELD_BRIGHTNESS );
-	control->SetupEvents( 2, options->GetChildren().Num() );
-	control->AddEventAction( WIDGET_EVENT_PRESS ).Set( WIDGET_ACTION_COMMAND, idMenuDataSource_SystemSettings::SYSTEM_FIELD_BRIGHTNESS );
-	options->AddChild( control );
+	//TODO: Control Lists don't like to scroll so sacrifice an option for now.
+	//control = new (TAG_SWF) idMenuWidget_ControlButton();
+	//control->SetOptionType( OPTION_SLIDER_BAR );
+	//control->SetLabel( "#str_02155" );	// Brightness
+	//control->SetDataSource( &systemData, idMenuDataSource_SystemSettings::SYSTEM_FIELD_BRIGHTNESS );
+	//control->SetupEvents( 2, options->GetChildren().Num() );
+	//control->AddEventAction( WIDGET_EVENT_PRESS ).Set( WIDGET_ACTION_COMMAND, idMenuDataSource_SystemSettings::SYSTEM_FIELD_BRIGHTNESS );
+	//options->AddChild( control );
 
 	control = new (TAG_SWF) idMenuWidget_ControlButton();
 	control->SetOptionType( OPTION_SLIDER_BAR );
@@ -345,6 +354,7 @@ void idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::LoadData
 	originalAntialias = r_multiSamples.GetInteger();
 	originalMotionBlur = r_motionBlur.GetInteger();
 	originalVsync = r_swapInterval.GetInteger();
+	originalRenderer = r_openGL.GetInteger();
 	originalBrightness = r_lightScale.GetFloat();
 	originalVolume = s_volume_dB.GetFloat();
 
@@ -366,6 +376,9 @@ bool idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::IsRestar
 		return true;
 	}
 	if ( originalFramerate != com_engineHz.GetInteger() ) {
+		return true;
+	}
+	if (originalRenderer != r_openGL.GetInteger()) {
 		return true;
 	}
 	return false;
@@ -443,6 +456,12 @@ void idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::AdjustFi
 			r_motionBlur.SetInteger( AdjustOption( r_motionBlur.GetInteger(), values, numValues, adjustAmount ) );
 			break;
 		}
+		case SYSTEM_FIELD_RENDERER: {
+			static const int numValues = 2;
+			static const int values[numValues] = { 0, 1 };
+			r_openGL.SetInteger(AdjustOption(r_openGL.GetInteger(), values, numValues, adjustAmount));
+			break;
+		}
 		case SYSTEM_FIELD_LODBIAS: {
 			const float percent = LinearAdjust( r_lodBias.GetFloat(), -1.0f, 1.0f, 0.0f, 100.0f );
 			const float adjusted = percent + (float)adjustAmount * 5.0f;
@@ -510,6 +529,8 @@ idSWFScriptVar idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings
 				return "#str_swf_disabled";
 			}
 			return va( "%dx", idMath::IPow( 2, r_motionBlur.GetInteger() ) );
+		case SYSTEM_FIELD_RENDERER:
+			return r_openGL.GetBool() ? "OpenGL" : "Vulkan";
 		case SYSTEM_FIELD_LODBIAS:
 			return LinearAdjust( r_lodBias.GetFloat(), -1.0f, 1.0f, 0.0f, 100.0f );
 		case SYSTEM_FIELD_BRIGHTNESS:
@@ -537,6 +558,9 @@ bool idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::IsDataCh
 		return true;
 	}
 	if ( originalVsync != r_swapInterval.GetInteger() ) {
+		return true;
+	}
+	if (originalRenderer != r_openGL.GetInteger()) {
 		return true;
 	}
 	if ( originalBrightness != r_lightScale.GetFloat() ) {

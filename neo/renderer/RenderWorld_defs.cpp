@@ -156,7 +156,7 @@ R_CreateEntityRefs
 Creates all needed model references in portal areas,
 chaining them to both the area and the entityDef.
 
-Bumps tr.viewCount, which means viewCount can change many times each frame.
+Bumps tr->viewCount, which means viewCount can change many times each frame.
 ===============
 */
 void R_CreateEntityRefs( idRenderEntityLocal *entity ) {
@@ -189,7 +189,7 @@ void R_CreateEntityRefs( idRenderEntityLocal *entity ) {
 
 	// bump the view count so we can tell if an
 	// area already has a reference
-	tr.viewCount++;
+	tr->viewCount++;
 
 	// push the model frustum down the BSP tree into areas
 	entity->world->PushFrustumIntoTree( entity, NULL, entity->inverseBaseModelProject, bounds_unitCube );
@@ -330,9 +330,9 @@ static void R_DeriveLightData( idRenderLightLocal * light ) {
 		light->lightShader = light->parms.shader;
 	} else if ( light->lightShader == NULL ) {
 		if ( light->parms.pointLight ) {
-			light->lightShader = tr.defaultPointLight;
+			light->lightShader = tr->defaultPointLight;
 		} else {
-			light->lightShader = tr.defaultProjectedLight;
+			light->lightShader = tr->defaultProjectedLight;
 		}
 	}
 
@@ -344,7 +344,7 @@ static void R_DeriveLightData( idRenderLightLocal * light ) {
 		const idMaterial * defaultShader;
 
 		if ( light->parms.pointLight ) {
-			defaultShader = tr.defaultPointLight;
+			defaultShader = tr->defaultPointLight;
 
 			// Touch the default shader. to make sure it's decl has been parsed ( it might have been purged ).
 			declManager->Touch( static_cast< const idDecl *>( defaultShader ) );
@@ -353,7 +353,7 @@ static void R_DeriveLightData( idRenderLightLocal * light ) {
 
 		} else {
 			// projected lights by default don't diminish with distance
-			defaultShader = tr.defaultProjectedLight;
+			defaultShader = tr->defaultProjectedLight;
 
 			// Touch the light shader. to make sure it's decl has been parsed ( it might have been purged ).
 			declManager->Touch( static_cast< const idDecl *>( defaultShader ) );
@@ -552,7 +552,7 @@ void R_CreateLightRefs( idRenderLightLocal * light ) {
 
 	// bump the view count so we can tell if an
 	// area already has a reference
-	tr.viewCount++;
+	tr->viewCount++;
 
 	// if we have a prelight model that includes all the shadows for the major world occluders,
 	// we can limit the area references to those visible through the portals from the light center.
@@ -584,8 +584,8 @@ ReloadModels and RegenerateWorld call this
 ===================
 */
 void R_FreeDerivedData() {
-	for ( int j = 0; j < tr.worlds.Num(); j++ ) {
-		idRenderWorldLocal * rw = tr.worlds[j];
+	for ( int j = 0; j < tr->worlds.Num(); j++ ) {
+		idRenderWorldLocal * rw = tr->worlds[j];
 
 		for ( int i = 0; i < rw->entityDefs.Num(); i++ ) {
 			idRenderEntityLocal * def = rw->entityDefs[i];
@@ -611,8 +611,8 @@ R_CheckForEntityDefsUsingModel
 ===================
 */
 void R_CheckForEntityDefsUsingModel( idRenderModel *model ) {
-	for ( int j = 0; j < tr.worlds.Num(); j++ ) {
-		idRenderWorldLocal * rw = tr.worlds[j];
+	for ( int j = 0; j < tr->worlds.Num(); j++ ) {
+		idRenderWorldLocal * rw = tr->worlds[j];
 
 		for ( int i = 0; i < rw->entityDefs.Num(); i++ ) {
 			idRenderEntityLocal	* def = rw->entityDefs[i];
@@ -638,10 +638,10 @@ ReloadModels and RegenerateWorld call this
 void R_ReCreateWorldReferences() {
 	// let the interaction generation code know this
 	// shouldn't be optimized for a particular view
-	tr.viewDef = NULL;
+	tr->viewDef = NULL;
 
-	for ( int j = 0; j < tr.worlds.Num(); j++ ) {
-		idRenderWorldLocal * rw = tr.worlds[j];
+	for ( int j = 0; j < tr->worlds.Num(); j++ ) {
+		idRenderWorldLocal * rw = tr->worlds[j];
 
 		for ( int i = 0; i < rw->entityDefs.Num(); i++ ) {
 			idRenderEntityLocal * def = rw->entityDefs[i];
@@ -679,7 +679,7 @@ designers can easily test different color schemes
 ====================
 */
 void R_ModulateLights_f( const idCmdArgs &args ) {
-	if ( !tr.primaryWorld ) {
+	if ( !tr->primaryWorld ) {
 		return;
 	}
 	if ( args.Argc() != 4 ) {
@@ -693,8 +693,8 @@ void R_ModulateLights_f( const idCmdArgs &args ) {
 	}
 
 	int count = 0;
-	for ( int i = 0; i < tr.primaryWorld->lightDefs.Num(); i++ ) {
-		idRenderLightLocal * light = tr.primaryWorld->lightDefs[i];
+	for ( int i = 0; i < tr->primaryWorld->lightDefs.Num(); i++ ) {
+		idRenderLightLocal * light = tr->primaryWorld->lightDefs[i];
 		if ( light != NULL ) {
 			count++;
 			for ( int j = 0; j < 3; j++ ) {

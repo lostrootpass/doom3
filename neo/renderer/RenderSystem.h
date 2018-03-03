@@ -352,6 +352,8 @@ public:
 
 extern idRenderSystem *			renderSystem;
 
+void R_InitRenderBackend();
+
 //
 // functions mainly intended for editor and dmap integration
 //

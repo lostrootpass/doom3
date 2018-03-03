@@ -199,7 +199,7 @@ public:
 	idVec3					globalLightOrigin;		// accounting for lightCenter and parallel
 	idBounds				globalLightBounds;
 
-	int						viewCount;				// if == tr.viewCount, the light is on the viewDef->viewLights list
+	int						viewCount;				// if == tr->viewCount, the light is on the viewDef->viewLights list
 	viewLight_t *			viewLight;
 
 	areaReference_t *		references;				// each area the light is present in will have a lightRef
@@ -242,7 +242,7 @@ public:
 
 	idRenderModel *			dynamicModel;			// if parms.model->IsDynamicModel(), this is the generated data
 	int						dynamicModelFrameCount;	// continuously animating dynamic models will recreate
-													// dynamicModel if this doesn't == tr.viewCount
+													// dynamicModel if this doesn't == tr->viewCount
 	idRenderModel *			cachedDynamicModel;
 
 
@@ -255,7 +255,7 @@ public:
 
 	// a viewEntity_t is created whenever a idRenderEntityLocal is considered for inclusion
 	// in a given view, even if it turns out to not be visible
-	int						viewCount;				// if tr.viewCount == viewCount, viewEntity is valid,
+	int						viewCount;				// if tr->viewCount == viewCount, viewEntity is valid,
 													// but the entity may still be off screen
 	viewEntity_t *			viewEntity;				// in frame temporary memory
 
@@ -973,8 +973,7 @@ private:
 };
 
 extern backEndState_t		backEnd;
-extern idRenderSystemVk	tr;
-//extern idRenderSystemLocal	tr;
+extern idRenderSystemLocal* tr;
 extern glconfig_t			glConfig;		// outside of TR since it shouldn't be cleared during ref re-init
 
 //

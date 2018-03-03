@@ -1447,7 +1447,7 @@ void R_DeriveTangents( srfTriangles_t *tri ) {
 		return;
 	}
 
-	tr.pc.c_tangentIndexes += tri->numIndexes;
+	tr->pc.c_tangentIndexes += tri->numIndexes;
 
 	if ( tri->dominantTris != NULL ) {
 		R_DeriveUnsmoothedNormalsAndTangents( tri );

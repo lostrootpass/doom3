@@ -32,10 +32,10 @@ If you have questions concerning this license or the applicable additional terms
 #include "tr_local.h"
 #include "framework/Common_local.h"
 #include "Vulkan/vk_RenderBackend.h"
+#include "OpenGL/gl_RenderBackend.h"
 
-//idRenderSystemLocal	tr;
-idRenderSystemVk	tr;
-idRenderSystem * renderSystem = &tr;
+idRenderSystemLocal*	tr = nullptr;
+idRenderSystem * renderSystem = nullptr;
 
 /*
 =====================
@@ -48,7 +48,7 @@ only be called when the back end thread is idle.
 static void R_PerformanceCounters() {
 	if ( r_showPrimitives.GetInteger() != 0 ) {
 		common->Printf( "views:%i draws:%i tris:%i (shdw:%i)\n",
-			tr.pc.c_numViews,
+			tr->pc.c_numViews,
 			backEnd.pc.c_drawElements + backEnd.pc.c_shadowElements,
 			( backEnd.pc.c_drawIndexes + backEnd.pc.c_shadowIndexes ) / 3,
 			backEnd.pc.c_shadowIndexes / 3
@@ -57,36 +57,36 @@ static void R_PerformanceCounters() {
 
 	if ( r_showDynamic.GetBool() ) {
 		common->Printf( "callback:%i md5:%i dfrmVerts:%i dfrmTris:%i tangTris:%i guis:%i\n",
-			tr.pc.c_entityDefCallbacks,
-			tr.pc.c_generateMd5,
-			tr.pc.c_deformedVerts,
-			tr.pc.c_deformedIndexes/3,
-			tr.pc.c_tangentIndexes/3,
-			tr.pc.c_guiSurfs
+			tr->pc.c_entityDefCallbacks,
+			tr->pc.c_generateMd5,
+			tr->pc.c_deformedVerts,
+			tr->pc.c_deformedIndexes/3,
+			tr->pc.c_tangentIndexes/3,
+			tr->pc.c_guiSurfs
 			); 
 	}
 
 	if ( r_showCull.GetBool() ) {
 		common->Printf( "%i box in %i box out\n",
-			tr.pc.c_box_cull_in, tr.pc.c_box_cull_out );
+			tr->pc.c_box_cull_in, tr->pc.c_box_cull_out );
 	}
 	
 	if ( r_showAddModel.GetBool() ) {
 		common->Printf( "callback:%i createInteractions:%i createShadowVolumes:%i\n",
-			tr.pc.c_entityDefCallbacks, tr.pc.c_createInteractions, tr.pc.c_createShadowVolumes );
-		common->Printf( "viewEntities:%i  shadowEntities:%i  viewLights:%i\n", tr.pc.c_visibleViewEntities,
-			tr.pc.c_shadowViewEntities, tr.pc.c_viewLights );
+			tr->pc.c_entityDefCallbacks, tr->pc.c_createInteractions, tr->pc.c_createShadowVolumes );
+		common->Printf( "viewEntities:%i  shadowEntities:%i  viewLights:%i\n", tr->pc.c_visibleViewEntities,
+			tr->pc.c_shadowViewEntities, tr->pc.c_viewLights );
 	}
 	if ( r_showUpdates.GetBool() ) {
 		common->Printf( "entityUpdates:%i  entityRefs:%i  lightUpdates:%i  lightRefs:%i\n", 
-			tr.pc.c_entityUpdates, tr.pc.c_entityReferences,
-			tr.pc.c_lightUpdates, tr.pc.c_lightReferences );
+			tr->pc.c_entityUpdates, tr->pc.c_entityReferences,
+			tr->pc.c_lightUpdates, tr->pc.c_lightReferences );
 	}
 	if ( r_showMemory.GetBool() ) {
 		common->Printf( "frameData: %i (%i)\n", frameData->frameMemoryAllocated.GetValue(), frameData->highWaterAllocated );
 	}
 
-	memset( &tr.pc, 0, sizeof( tr.pc ) );
+	memset( &tr->pc, 0, sizeof( tr->pc ) );
 	memset( &backEnd.pc, 0, sizeof( backEnd.pc ) );
 }
 
@@ -118,10 +118,10 @@ void idRenderSystemLocal::RenderCommandBuffers( const emptyCommand_t * const cmd
 	// draw 2D graphics
 	if ( !r_skipBackEnd.GetBool() ) {
 		if ( glConfig.timerQueryAvailable ) {
-			if ( tr.timerQueryId == 0 ) {
-				qglGenQueriesARB( 1, & tr.timerQueryId );
+			if ( tr->timerQueryId == 0 ) {
+				qglGenQueriesARB( 1, & tr->timerQueryId );
 			}
-			qglBeginQueryARB( GL_TIME_ELAPSED_EXT, tr.timerQueryId );
+			qglBeginQueryARB( GL_TIME_ELAPSED_EXT, tr->timerQueryId );
 			RB_ExecuteBackEndCommands( cmdHead );
 			qglEndQueryARB( GL_TIME_ELAPSED_EXT );
 			qglFlush();
@@ -270,7 +270,7 @@ void	R_AddDrawViewCmd( viewDef_t *parms, bool guiOnly ) {
 
 	cmd->viewDef = parms;
 
-	tr.pc.c_numViews++;
+	tr->pc.c_numViews++;
 
 	R_ViewStatistics( parms );
 }
@@ -369,6 +369,7 @@ idRenderSystemLocal::idRenderSystemLocal() :
 	unitSquareTriangles( NULL ),
 	zeroOneCubeTriangles( NULL ),
 	testImageTriangles( NULL ) {
+	renderBackend = new idRenderBackendGL();
 	Clear();
 }
 
@@ -850,8 +851,8 @@ void idRenderSystemLocal::SwapCommandBuffers_FinishRendering(
 	// read back the start and end timer queries from the previous frame
 	if ( glConfig.timerQueryAvailable ) {
 		uint64 drawingTimeNanoseconds = 0;
-		if ( tr.timerQueryId != 0 ) {
-			qglGetQueryObjectui64vEXT( tr.timerQueryId, GL_QUERY_RESULT, &drawingTimeNanoseconds );
+		if ( tr->timerQueryId != 0 ) {
+			qglGetQueryObjectui64vEXT( tr->timerQueryId, GL_QUERY_RESULT, &drawingTimeNanoseconds );
 		}
 		if ( gpuMicroSec != NULL ) {
 			*gpuMicroSec = drawingTimeNanoseconds / 1000;
@@ -886,7 +887,6 @@ void idRenderSystemVk::SwapCommandBuffers_FinishRendering(
 												uint64 * backEndMicroSec,
 												uint64 * shadowMicroSec,
 												uint64 * gpuMicroSec )  {
-#ifdef DOOM3_VULKAN
 	vertexCache->frameData[vertexCache->listNum].vertexBuffer->Sync();
 	vertexCache->frameData[vertexCache->listNum].indexBuffer->Sync();
 	vertexCache->frameData[vertexCache->listNum].jointBuffer->Sync();
@@ -906,7 +906,6 @@ void idRenderSystemVk::SwapCommandBuffers_FinishRendering(
 	purgeQueue.Clear();
 
 	Vk_FlipPresent();
-#endif
 }
 
 /*
@@ -931,9 +930,9 @@ const emptyCommand_t * idRenderSystemLocal::SwapCommandBuffers_FinishCommandBuff
 
 	// copy the code-used drawsurfs that were
 	// allocated at the start of the buffer memory to the backEnd referenced locations
-	backEnd.unitSquareSurface = tr.unitSquareSurface_;
-	backEnd.zeroOneCubeSurface = tr.zeroOneCubeSurface_;
-	backEnd.testImageSurface = tr.testImageSurface_;
+	backEnd.unitSquareSurface = tr->unitSquareSurface_;
+	backEnd.zeroOneCubeSurface = tr->zeroOneCubeSurface_;
+	backEnd.testImageSurface = tr->testImageSurface_;
 
 	// use the other buffers next frame, because another CPU
 	// may still be rendering into the current buffers
@@ -959,9 +958,9 @@ const emptyCommand_t * idRenderSystemLocal::SwapCommandBuffers_FinishCommandBuff
 	// scene generation, the basic surfaces needed for drawing the buffers will
 	// always be present.
 	//------------------------------
-	R_InitDrawSurfFromTri( tr.unitSquareSurface_, *tr.unitSquareTriangles );
-	R_InitDrawSurfFromTri( tr.zeroOneCubeSurface_, *tr.zeroOneCubeTriangles );
-	R_InitDrawSurfFromTri( tr.testImageSurface_, *tr.testImageTriangles );
+	R_InitDrawSurfFromTri( tr->unitSquareSurface_, *tr->unitSquareTriangles );
+	R_InitDrawSurfFromTri( tr->zeroOneCubeSurface_, *tr->zeroOneCubeTriangles );
+	R_InitDrawSurfFromTri( tr->testImageSurface_, *tr->testImageTriangles );
 
 	// Reset render crop to be the full screen
 	renderCrops[0].x1 = 0;

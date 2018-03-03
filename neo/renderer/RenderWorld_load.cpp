@@ -349,7 +349,7 @@ idRenderModel *idRenderWorldLocal::ParseShadowModel( idLexer *src, idFile *fileO
 	// add the completed surface to the model
 	modelSurface_t surf;
 	surf.id = 0;
-	surf.shader = tr.defaultMaterial;
+	surf.shader = tr->defaultMaterial;
 	surf.geometry = tri;
 
 	model->AddSurface( surf );

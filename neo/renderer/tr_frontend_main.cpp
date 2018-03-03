@@ -187,7 +187,7 @@ R_StaticAlloc
 =================
 */
 void *R_StaticAlloc( int bytes, const memTag_t tag ) {
-	tr.pc.c_alloc++;
+	tr->pc.c_alloc++;
 
     void * buf = Mem_Alloc( bytes, tag );
 
@@ -215,7 +215,7 @@ R_StaticFree
 =================
 */
 void R_StaticFree( void *data ) {
-	tr.pc.c_free++;
+	tr->pc.c_free++;
     Mem_Free( data );
 }
 
@@ -353,39 +353,39 @@ Parms will typically be allocated with R_FrameAlloc
 */
 void R_RenderView( viewDef_t *parms ) {
 	// save view in case we are a subview
-	viewDef_t * oldView = tr.viewDef;
+	viewDef_t * oldView = tr->viewDef;
 
-	tr.viewDef = parms;
+	tr->viewDef = parms;
 
 	// setup the matrix for world space to eye space
-	R_SetupViewMatrix( tr.viewDef );
+	R_SetupViewMatrix( tr->viewDef );
 
 	// we need to set the projection matrix before doing
 	// portal-to-screen scissor calculations
-	R_SetupProjectionMatrix( tr.viewDef );
+	R_SetupProjectionMatrix( tr->viewDef );
 
 	// setup render matrices for faster culling
-	idRenderMatrix::Transpose( *(idRenderMatrix *)tr.viewDef->projectionMatrix, tr.viewDef->projectionRenderMatrix );
+	idRenderMatrix::Transpose( *(idRenderMatrix *)tr->viewDef->projectionMatrix, tr->viewDef->projectionRenderMatrix );
 	idRenderMatrix viewRenderMatrix;
-	idRenderMatrix::Transpose( *(idRenderMatrix *)tr.viewDef->worldSpace.modelViewMatrix, viewRenderMatrix );
-	idRenderMatrix::Multiply( tr.viewDef->projectionRenderMatrix, viewRenderMatrix, tr.viewDef->worldSpace.mvp );
+	idRenderMatrix::Transpose( *(idRenderMatrix *)tr->viewDef->worldSpace.modelViewMatrix, viewRenderMatrix );
+	idRenderMatrix::Multiply( tr->viewDef->projectionRenderMatrix, viewRenderMatrix, tr->viewDef->worldSpace.mvp );
 
 	// the planes of the view frustum are needed for portal visibility culling
-	idRenderMatrix::GetFrustumPlanes( tr.viewDef->frustum, tr.viewDef->worldSpace.mvp, false, true );
+	idRenderMatrix::GetFrustumPlanes( tr->viewDef->frustum, tr->viewDef->worldSpace.mvp, false, true );
 
 	// the DOOM 3 frustum planes point outside the frustum
 	for ( int i = 0; i < 6; i++ ) {
-		tr.viewDef->frustum[i] = - tr.viewDef->frustum[i];
+		tr->viewDef->frustum[i] = - tr->viewDef->frustum[i];
 	}
 	// remove the Z-near to avoid portals from being near clipped
-	tr.viewDef->frustum[4][3] -= r_znear.GetFloat();
+	tr->viewDef->frustum[4][3] -= r_znear.GetFloat();
 
 	// identify all the visible portal areas, and create view lights and view entities
 	// for all the the entityDefs and lightDefs that are in the visible portal areas
 	static_cast<idRenderWorldLocal *>(parms->renderWorld)->FindViewLightsAndEntities();
 
 	// wait for any shadow volume jobs from the previous frame to finish
-	tr.frontEndJobList->Wait();
+	tr->frontEndJobList->Wait();
 
 	// make sure that interactions exist for all light / entity combinations that are visible
 	// add any pre-generated light shadows, and calculate the light shader values
@@ -395,16 +395,16 @@ void R_RenderView( viewDef_t *parms ) {
 	R_AddModels();
 
 	// build up the GUIs on world surfaces
-	R_AddInGameGuis( tr.viewDef->drawSurfs, tr.viewDef->numDrawSurfs );
+	R_AddInGameGuis( tr->viewDef->drawSurfs, tr->viewDef->numDrawSurfs );
 
 	// any viewLight that didn't have visible surfaces can have it's shadows removed
 	R_OptimizeViewLightsList();
 
 	// sort all the ambient surfaces for translucency ordering
-	R_SortDrawSurfs( tr.viewDef->drawSurfs, tr.viewDef->numDrawSurfs );
+	R_SortDrawSurfs( tr->viewDef->drawSurfs, tr->viewDef->numDrawSurfs );
 
 	// generate any subviews (mirrors, cameras, etc) before adding this view
-	if ( R_GenerateSubViews( tr.viewDef->drawSurfs, tr.viewDef->numDrawSurfs ) ) {
+	if ( R_GenerateSubViews( tr->viewDef->drawSurfs, tr->viewDef->numDrawSurfs ) ) {
 		// if we are debugging subviews, allow the skipping of the main view draw
 		if ( r_subviewOnly.GetBool() ) {
 			return;
@@ -413,14 +413,14 @@ void R_RenderView( viewDef_t *parms ) {
 
 	// write everything needed to the demo file
 	if ( common->WriteDemo() ) {
-		static_cast<idRenderWorldLocal *>(parms->renderWorld)->WriteVisibleDefs( tr.viewDef );
+		static_cast<idRenderWorldLocal *>(parms->renderWorld)->WriteVisibleDefs( tr->viewDef );
 	}
 
 	// add the rendering commands for this viewDef
 	R_AddDrawViewCmd( parms, false );
 
 	// restore view in case we are a subview
-	tr.viewDef = oldView;
+	tr->viewDef = oldView;
 }
 
 /*
@@ -432,9 +432,9 @@ pass happens after the active view and its subviews is done rendering.
 ================
 */
 void R_RenderPostProcess( viewDef_t *parms ) {
-	viewDef_t * oldView = tr.viewDef;
+	viewDef_t * oldView = tr->viewDef;
 
 	R_AddDrawPostProcess( parms );
 
-	tr.viewDef = oldView;
+	tr->viewDef = oldView;
 }

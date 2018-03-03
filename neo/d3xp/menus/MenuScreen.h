@@ -1179,6 +1179,7 @@ public:
 			SYSTEM_FIELD_VSYNC,
 			SYSTEM_FIELD_ANTIALIASING,
 			SYSTEM_FIELD_MOTIONBLUR,
+			SYSTEM_FIELD_RENDERER,
 			SYSTEM_FIELD_LODBIAS,
 			SYSTEM_FIELD_BRIGHTNESS,
 			SYSTEM_FIELD_VOLUME,
@@ -1209,6 +1210,7 @@ public:
 		int originalAntialias;
 		int originalMotionBlur;
 		int originalVsync;
+		int originalRenderer;
 		float originalBrightness;
 		float originalVolume;
 

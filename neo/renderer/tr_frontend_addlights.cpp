@@ -66,7 +66,7 @@ idRenderEntityLocal::IsDirectlyVisible()
 ============================
 */
 bool idRenderEntityLocal::IsDirectlyVisible() const {
-	if ( viewCount != tr.viewCount ) {
+	if ( viewCount != tr->viewCount ) {
 		return false;
 	}
 	if ( viewEntity->scissorRect.IsEmpty() ) {
@@ -100,7 +100,7 @@ static void R_AddSingleLight( viewLight_t * vLight ) {
 	vLight->preLightShadowVolumes = NULL;
 
 	// globals we really should pass in...
-	const viewDef_t * viewDef = tr.viewDef;
+	const viewDef_t * viewDef = tr->viewDef;
 
 	const idRenderLightLocal *light = vLight->lightDef;
 	const idMaterial * lightShader = light->lightShader;
@@ -124,7 +124,7 @@ static void R_AddSingleLight( viewLight_t * vLight ) {
 	// evaluate the light shader registers
 	float * lightRegs = (float *)R_FrameAlloc( lightShader->GetNumRegisters() * sizeof( float ), FRAME_ALLOC_SHADER_REGISTER );
 	lightShader->EvaluateRegisters( lightRegs, light->parms.shaderParms, viewDef->renderView.shaderParms, 
-		tr.viewDef->renderView.time[0] * 0.001f, light->parms.referenceSound );
+		tr->viewDef->renderView.time[0] * 0.001f, light->parms.referenceSound );
 		
 	// if this is a purely additive light and no stage in the light shader evaluates
 	// to a positive light value, we can completely skip the light
@@ -428,7 +428,7 @@ static void R_AddSingleLight( viewLight_t * vLight ) {
 			shadowParms->shadowVolumeState = & shadowDrawSurf->shadowVolumeState;
 
 			// the pre-light shadow volume "_prelight_light_3297" in "d3xpdm2" is malformed in that it contains the light origin so the precise inside test always fails
-			if ( tr.primaryWorld->mapName.IcmpPath( "maps/game/mp/d3xpdm2.map" ) == 0 && idStr::Icmp( light->parms.prelightModel->Name(), "_prelight_light_3297" ) == 0 ) {
+			if ( tr->primaryWorld->mapName.IcmpPath( "maps/game/mp/d3xpdm2.map" ) == 0 && idStr::Icmp( light->parms.prelightModel->Name(), "_prelight_light_3297" ) == 0 ) {
 				shadowParms->useShadowPreciseInsideTest = false;
 			}
 
@@ -459,13 +459,13 @@ void R_AddLights() {
 	//-------------------------------------------------
 
 	if ( r_useParallelAddLights.GetBool() ) {
-		for ( viewLight_t * vLight = tr.viewDef->viewLights; vLight != NULL; vLight = vLight->next ) {
-			tr.frontEndJobList->AddJob( (jobRun_t)R_AddSingleLight, vLight );
+		for ( viewLight_t * vLight = tr->viewDef->viewLights; vLight != NULL; vLight = vLight->next ) {
+			tr->frontEndJobList->AddJob( (jobRun_t)R_AddSingleLight, vLight );
 		}
-		tr.frontEndJobList->Submit();
-		tr.frontEndJobList->Wait();
+		tr->frontEndJobList->Submit();
+		tr->frontEndJobList->Wait();
 	} else {
-		for ( viewLight_t * vLight = tr.viewDef->viewLights; vLight != NULL; vLight = vLight->next ) {
+		for ( viewLight_t * vLight = tr->viewDef->viewLights; vLight != NULL; vLight = vLight->next ) {
 			R_AddSingleLight( vLight );
 		}
 	}
@@ -474,8 +474,8 @@ void R_AddLights() {
 	// cull lights from the list if they turned out to not be needed
 	//-------------------------------------------------
 
-	tr.pc.c_viewLights = 0;
-	viewLight_t **ptr = &tr.viewDef->viewLights;
+	tr->pc.c_viewLights = 0;
+	viewLight_t **ptr = &tr->viewDef->viewLights;
 	while ( *ptr != NULL ) {
 		viewLight_t *vLight = *ptr;
 
@@ -488,7 +488,7 @@ void R_AddLights() {
 		ptr = &vLight->next;
 
 		// serial work
-		tr.pc.c_viewLights++;
+		tr->pc.c_viewLights++;
 
 		for ( shadowOnlyEntity_t * shadEnt = vLight->shadowOnlyViewEntities; shadEnt != NULL; shadEnt = shadEnt->next ) {
 			// this will add it to the viewEntities list, but with an empty scissor rect
@@ -505,16 +505,16 @@ void R_AddLights() {
 	//-------------------------------------------------
 
 	if ( r_useParallelAddShadows.GetInteger() == 1 ) {
-		for ( viewLight_t * vLight = tr.viewDef->viewLights; vLight != NULL; vLight = vLight->next ) {
+		for ( viewLight_t * vLight = tr->viewDef->viewLights; vLight != NULL; vLight = vLight->next ) {
 			for ( preLightShadowVolumeParms_t * shadowParms = vLight->preLightShadowVolumes; shadowParms != NULL; shadowParms = shadowParms->next ) {
-				tr.frontEndJobList->AddJob( (jobRun_t)PreLightShadowVolumeJob, shadowParms );
+				tr->frontEndJobList->AddJob( (jobRun_t)PreLightShadowVolumeJob, shadowParms );
 			}
 			vLight->preLightShadowVolumes = NULL;
 		}
 	} else {
 		int start = Sys_Microseconds();
 
-		for ( viewLight_t * vLight = tr.viewDef->viewLights; vLight != NULL; vLight = vLight->next ) {
+		for ( viewLight_t * vLight = tr->viewDef->viewLights; vLight != NULL; vLight = vLight->next ) {
 			for ( preLightShadowVolumeParms_t * shadowParms = vLight->preLightShadowVolumes; shadowParms != NULL; shadowParms = shadowParms->next ) {
 				PreLightShadowVolumeJob( shadowParms );
 			}
@@ -534,7 +534,7 @@ R_OptimizeViewLightsList
 void R_OptimizeViewLightsList() {
 	// go through each visible light
 	int numViewLights = 0;
-	for ( viewLight_t * vLight = tr.viewDef->viewLights; vLight != NULL; vLight = vLight->next ) {
+	for ( viewLight_t * vLight = tr->viewDef->viewLights; vLight != NULL; vLight = vLight->next ) {
 		numViewLights++;
 		// If the light didn't have any lit surfaces visible, there is no need to
 		// draw any of the shadows.  We still keep the vLight for debugging draws.
@@ -548,7 +548,7 @@ void R_OptimizeViewLightsList() {
 		// shrink the light scissor rect to only intersect the surfaces that will actually be drawn.
 		// This doesn't seem to actually help, perhaps because the surface scissor
 		// rects aren't actually the surface, but only the portal clippings.
-		for ( viewLight_t * vLight = tr.viewDef->viewLights; vLight; vLight = vLight->next ) {
+		for ( viewLight_t * vLight = tr->viewDef->viewLights; vLight; vLight = vLight->next ) {
 			drawSurf_t * surf;
 			idScreenRect surfRect;
 
@@ -591,7 +591,7 @@ void R_OptimizeViewLightsList() {
 	};
 	sortLight_t * sortLights = (sortLight_t *)_alloca( sizeof( sortLight_t ) * numViewLights );
 	int	numSortLightsFilled = 0;
-	for ( viewLight_t * vLight = tr.viewDef->viewLights; vLight != NULL; vLight = vLight->next ) {
+	for ( viewLight_t * vLight = tr->viewDef->viewLights; vLight != NULL; vLight = vLight->next ) {
 		sortLights[ numSortLightsFilled ].vLight = vLight;
 		sortLights[ numSortLightsFilled ].screenArea = vLight->scissorRect.GetArea();
 		numSortLightsFilled++;
@@ -600,9 +600,9 @@ void R_OptimizeViewLightsList() {
 	qsort( sortLights, numSortLightsFilled, sizeof( sortLights[0] ), sortLight_t::sort );
 
 	// rebuild the linked list in order
-	tr.viewDef->viewLights = NULL;
+	tr->viewDef->viewLights = NULL;
 	for ( int i = 0; i < numSortLightsFilled; i++ ) {
-		sortLights[i].vLight->next = tr.viewDef->viewLights;
-		tr.viewDef->viewLights = sortLights[i].vLight;
+		sortLights[i].vLight->next = tr->viewDef->viewLights;
+		tr->viewDef->viewLights = sortLights[i].vLight;
 	}
 }

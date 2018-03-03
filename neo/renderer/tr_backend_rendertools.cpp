@@ -827,9 +827,9 @@ static void RB_ShowSurfaceInfo( drawSurf_t **drawSurfs, int numDrawSurfs ) {
 	}
 
 	// start far enough away that we don't hit the player model
-	start = tr.primaryView->renderView.vieworg + tr.primaryView->renderView.viewaxis[0] * 16;
-	end = start + tr.primaryView->renderView.viewaxis[0] * 1000.0f;
-	if ( !tr.primaryWorld->Trace( mt, start, end, 0.0f, false ) ) {
+	start = tr->primaryView->renderView.vieworg + tr->primaryView->renderView.viewaxis[0] * 16;
+	end = start + tr->primaryView->renderView.viewaxis[0] * 1000.0f;
+	if ( !tr->primaryWorld->Trace( mt, start, end, 0.0f, false ) ) {
 		return;
 	}
 
@@ -850,10 +850,10 @@ static void RB_ShowSurfaceInfo( drawSurf_t **drawSurfs, int numDrawSurfs ) {
 	// transform the object verts into global space
 	R_AxisToModelMatrix( mt.entity->axis, mt.entity->origin, matrix );
 
-	tr.primaryWorld->DrawText( mt.entity->hModel->Name(), mt.point + tr.primaryView->renderView.viewaxis[2] * 12,
-		0.35f, colorRed, tr.primaryView->renderView.viewaxis );
-	tr.primaryWorld->DrawText( mt.material->GetName(), mt.point, 
-		0.35f, colorBlue, tr.primaryView->renderView.viewaxis );
+	tr->primaryWorld->DrawText( mt.entity->hModel->Name(), mt.point + tr->primaryView->renderView.viewaxis[2] * 12,
+		0.35f, colorRed, tr->primaryView->renderView.viewaxis );
+	tr->primaryWorld->DrawText( mt.material->GetName(), mt.point, 
+		0.35f, colorBlue, tr->primaryView->renderView.viewaxis );
 }
 
 /*
@@ -915,11 +915,11 @@ static void RB_ShowViewEntitys( viewEntity_t *vModels ) {
 			idVec3 corner;
 			R_LocalPointToGlobal( vModel->modelMatrix, edef->localReferenceBounds[1], corner );
 
-			tr.primaryWorld->DrawText( 
+			tr->primaryWorld->DrawText( 
 				va( "%i:%s", edef->index, edef->parms.hModel->Name() ), 
 				corner,
 				0.25f, color, 
-				tr.primaryView->renderView.viewaxis );
+				tr->primaryView->renderView.viewaxis );
 		}
 
 		// draw the actual bounds in yellow if different
@@ -2168,13 +2168,13 @@ void RB_ShowLines() {
 
 	const int start = ( r_showLines.GetInteger() > 2 );	// 1,3 = horizontal, 2,4 = vertical
 	if ( r_showLines.GetInteger() == 1 || r_showLines.GetInteger() == 3 ) {
-		for ( int i = start ; i < tr.GetHeight() ; i+=2 ) {
-			glScissor( 0, i, tr.GetWidth(), 1 );
+		for ( int i = start ; i < tr->GetHeight() ; i+=2 ) {
+			glScissor( 0, i, tr->GetWidth(), 1 );
 			glClear( GL_COLOR_BUFFER_BIT );
 		}
 	} else {
-		for ( int i = start ; i < tr.GetWidth() ; i+=2 ) {
-			glScissor( i, 0, 1, tr.GetHeight() );
+		for ( int i = start ; i < tr->GetWidth() ; i+=2 ) {
+			glScissor( i, 0, 1, tr->GetHeight() );
 			glClear( GL_COLOR_BUFFER_BIT );
 		}
 	}
@@ -2337,21 +2337,21 @@ void RB_TestImage() {
 	int		max;
 	float	w, h;
 
-	image = tr.testImage;
+	image = tr->testImage;
 	if ( !image ) {
 		return;
 	}
 
-	if ( tr.testVideo ) {
+	if ( tr->testVideo ) {
 		cinData_t	cin;
 
-		cin = tr.testVideo->ImageForTime( backEnd.viewDef->renderView.time[1] - tr.testVideoStartTime );
+		cin = tr->testVideo->ImageForTime( backEnd.viewDef->renderView.time[1] - tr->testVideoStartTime );
 		if ( cin.imageY != NULL ) {
 			image = cin.imageY;
 			imageCr = cin.imageCr;
 			imageCb = cin.imageCb;
 		} else {
-			tr.testImage = NULL;
+			tr->testImage = NULL;
 			return;
 		}
 		w = 0.25;
