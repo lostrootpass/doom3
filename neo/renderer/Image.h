@@ -173,6 +173,8 @@ private:
 #ifdef DOOM3_VULKAN
 	bool AllocImageInternal(VkImage& newImage, VkImageView& newView);
 	void UpdateDescriptorSet();
+	void CopyImageInternal(int imageWidth, int imageHeight, VkImage img, VkImageAspectFlags aspect);
+	ID_INLINE VkImageAspectFlags Aspect() const;
 #endif
 
 	// parameters that define this image

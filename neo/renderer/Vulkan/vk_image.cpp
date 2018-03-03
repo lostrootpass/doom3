@@ -95,7 +95,7 @@ void idImage::FinaliseImageUpload()
 
 			VkBufferImageCopy copy = {};
 			copy.imageExtent = { mipWidth, mipHeight, 1 };
-			copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			copy.imageSubresource.aspectMask = Aspect();
 			copy.imageSubresource.baseArrayLayer = f;
 			copy.imageSubresource.layerCount = 1;
 			copy.imageSubresource.mipLevel = i;
@@ -124,7 +124,7 @@ void idImage::FinaliseImageUpload()
 	VkImageSubresourceRange range = {};
 	range.layerCount = layerCount;
 	range.levelCount = opts.numLevels;
-	range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	range.aspectMask = Aspect();
 	Vk_SetImageLayout(image, format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, range);
 
@@ -386,7 +386,7 @@ void idImage::AllocImage() {
 	VkImageSubresourceRange range = {};
 	range.layerCount = opts.textureType == TT_CUBIC ? 6 : 1;
 	range.levelCount = opts.numLevels;
-	range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	range.aspectMask = Aspect();
 
 	Vk_SetImageLayout(image, format, VK_IMAGE_LAYOUT_UNDEFINED,
 		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, range);
@@ -506,66 +506,8 @@ CopyFramebuffer
 ====================
 */
 void idImage::CopyFramebuffer(int x, int y, int imageWidth, int imageHeight) {
-	//Consider this more of a "pause" than an "end" - 
-	//after we copy, we resume rendering to the same backbuffer w/o clearing
-	Vk_EndRenderPass();
-
-	//If the backbuffer has been resized then we need to resize this image too
-	if (!(opts.width == imageWidth && opts.height == imageHeight))
-	{
-		Resize(imageWidth, imageHeight);
-	}
-
-	VkImage img = Vk_ActiveColorBuffer();
-
-	VkImageSubresourceRange range = {};
-	range.layerCount = 1;
-	range.levelCount = 1;
-	range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-
-	VkImageMemoryBarrier prep = {};
-	prep.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-	prep.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	prep.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-	prep.image = image;
-	prep.subresourceRange = range;
-	prep.srcAccessMask = 0;
-	prep.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-
-	vkCmdPipelineBarrier(Vk_ActiveCommandBuffer(),
-		VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-		VK_PIPELINE_STAGE_TRANSFER_BIT,
-		VK_DEPENDENCY_BY_REGION_BIT,
-		0, nullptr, 0, nullptr, 1, &prep);
-
-	VkImageCopy region = {};
-	region.extent = { (uint32_t)opts.width, (uint32_t)opts.height, 1};
-	region.dstSubresource.layerCount = 1;
-	region.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	region.srcSubresource.layerCount = 1;
-	region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-
-	vkCmdCopyImage(Vk_ActiveCommandBuffer(), 
-		img, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-		image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-		1, &region);
-
-	VkImageMemoryBarrier barrier = {};
-	barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-	barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-	barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-	barrier.image = image;
-	barrier.subresourceRange = range;
-	barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-	barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-
-	vkCmdPipelineBarrier(Vk_ActiveCommandBuffer(),
-		VK_PIPELINE_STAGE_TRANSFER_BIT,
-		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-		VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 0, nullptr, 1, &barrier);
-
-	//Restart the render pass to continue rendering, but don't clear.
-	Vk_StartRenderPass();
+	CopyImageInternal(imageWidth, imageHeight, Vk_ActiveColorBuffer(),
+		VK_IMAGE_ASPECT_COLOR_BIT);
 }
 
 
@@ -575,7 +517,8 @@ CopyDepthbuffer
 ====================
 */
 void idImage::CopyDepthbuffer(int x, int y, int imageWidth, int imageHeight) {
-
+	CopyImageInternal(imageWidth, imageHeight, Vk_ActiveDepthBuffer(),
+		VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
 }
 
 bool idImage::AllocImageInternal(VkImage& newImage, VkImageView& newView)
@@ -614,7 +557,7 @@ bool idImage::AllocImageInternal(VkImage& newImage, VkImageView& newView)
 		format = VK_FORMAT_BC3_UNORM_BLOCK;
 		break;
 	case FMT_DEPTH:
-		format = VK_FORMAT_UNDEFINED;
+		format = VK_FORMAT_D32_SFLOAT_S8_UINT;
 		break;
 	case FMT_X16:
 		format = VK_FORMAT_R16_UNORM;
@@ -694,7 +637,7 @@ bool idImage::AllocImageInternal(VkImage& newImage, VkImageView& newView)
 	VkImageSubresourceRange range = {};
 	range.layerCount = layerCount;
 	range.levelCount = opts.numLevels;
-	range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	range.aspectMask = Aspect();
 
 	VkImageViewCreateInfo view = {};
 	view.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -728,6 +671,76 @@ void idImage::UpdateDescriptorSet()
 	write.pImageInfo = &imageInfo;
 			
 	vkUpdateDescriptorSets(Vk_GetDevice(), 1, &write, 0, 0);
+}
+
+void idImage::CopyImageInternal(int imageWidth, int imageHeight, VkImage img, VkImageAspectFlags aspect)
+{
+	//Consider this more of a "pause" than an "end" - 
+	//after we copy, we resume rendering to the same backbuffer w/o clearing
+	Vk_EndRenderPass();
+
+	//If the backbuffer has been resized then we need to resize this image too
+	if (!(opts.width == imageWidth && opts.height == imageHeight))
+	{
+		Resize(imageWidth, imageHeight);
+	}
+
+	VkImageSubresourceRange range = {};
+	range.layerCount = 1;
+	range.levelCount = 1;
+	range.aspectMask = aspect;
+
+	VkImageMemoryBarrier prep = {};
+	prep.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	prep.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	prep.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+	prep.image = image;
+	prep.subresourceRange = range;
+	prep.srcAccessMask = 0;
+	prep.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+	vkCmdPipelineBarrier(Vk_ActiveCommandBuffer(),
+		VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+		VK_PIPELINE_STAGE_TRANSFER_BIT,
+		VK_DEPENDENCY_BY_REGION_BIT,
+		0, nullptr, 0, nullptr, 1, &prep);
+
+	VkImageCopy region = {};
+	region.extent = { (uint32_t)opts.width, (uint32_t)opts.height, 1};
+	region.dstSubresource.layerCount = 1;
+	region.dstSubresource.aspectMask = aspect;
+	region.srcSubresource.layerCount = 1;
+	region.srcSubresource.aspectMask = aspect;
+
+	vkCmdCopyImage(Vk_ActiveCommandBuffer(), 
+		img, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+		image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		1, &region);
+
+	VkImageMemoryBarrier barrier = {};
+	barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+	barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	barrier.image = image;
+	barrier.subresourceRange = range;
+	barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+	barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+	vkCmdPipelineBarrier(Vk_ActiveCommandBuffer(),
+		VK_PIPELINE_STAGE_TRANSFER_BIT,
+		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+		VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 0, nullptr, 1, &barrier);
+
+	//Restart the render pass to continue rendering, but don't clear.
+	Vk_StartRenderPass();
+}
+
+ID_INLINE VkImageAspectFlags idImage::Aspect() const
+{
+	if (opts.format == FMT_DEPTH)
+		return VK_IMAGE_ASPECT_STENCIL_BIT | VK_IMAGE_ASPECT_DEPTH_BIT;
+	else
+		return VK_IMAGE_ASPECT_COLOR_BIT;
 }
 
 #endif

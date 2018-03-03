@@ -1238,6 +1238,7 @@ VkDescriptorSet Vk_JointBufferSetForFrame(int idx);
 void Vk_FreeDescriptorSet(const VkDescriptorSet set);
 void Vk_ClearAttachments(uint32_t mask, byte stencilValue = 0);
 VkImage Vk_ActiveColorBuffer();
+VkImage Vk_ActiveDepthBuffer();
 void Vk_QueueDestroyDescriptorSet(VkDescriptorSet set);
 #endif
 

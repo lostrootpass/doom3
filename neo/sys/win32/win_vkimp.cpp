@@ -327,7 +327,7 @@ static void Vk_CreateDepthBuffer(RenderImage* renderImage)
 
 	VkImageCreateInfo info = {};
 	info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-	info.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+	info.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 	info.tiling = VK_IMAGE_TILING_OPTIMAL;
 	info.extent.width = surfaceCaps.currentExtent.width;
 	info.extent.height = surfaceCaps.currentExtent.height;
@@ -598,7 +598,7 @@ static void Vk_CreateRenderPass()
 	depthDesc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE;
 	depthDesc.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 	depthDesc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	depthDesc.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+	depthDesc.finalLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
 	depthDesc.format = VK_FORMAT_D32_SFLOAT_S8_UINT;
 
 
@@ -866,6 +866,16 @@ void Vk_EndFrame()
 
 		vkCmdPipelineBarrier(commandBuffers[activeCommandBufferIdx],
 			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+			VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+			0, 0, nullptr, 0, nullptr, 1, &barrier);
+
+
+		range.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+		barrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+		barrier.subresourceRange = range;
+		barrier.image = screenRenderPass.depth.image;
+		vkCmdPipelineBarrier(commandBuffers[activeCommandBufferIdx],
+			VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
 			VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
 			0, 0, nullptr, 0, nullptr, 1, &barrier);
 	}
@@ -1778,25 +1788,33 @@ void Vk_ClearAttachments(uint32_t mask, byte stencilValue)
 	if (mask == 0)
 		return;
 
-	VkClearAttachment attachment = {};
-	attachment.aspectMask = 0;
+	std::vector<VkClearAttachment> attachments;
 
-	if (mask & VK_IMAGE_ASPECT_DEPTH_BIT)
+	if (mask & VK_IMAGE_ASPECT_DEPTH_BIT || mask & VK_IMAGE_ASPECT_STENCIL_BIT)
 	{
-		attachment.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-		attachment.clearValue.depthStencil.depth = 1.0f;
-	}
+		VkClearAttachment attachment = {};
+		if (mask & VK_IMAGE_ASPECT_DEPTH_BIT)
+		{
+			attachment.aspectMask |= VK_IMAGE_ASPECT_DEPTH_BIT;
+			attachment.clearValue.depthStencil.depth = 1.0f;
+		}
 
-	if (mask & VK_IMAGE_ASPECT_STENCIL_BIT)
-	{
-		attachment.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
-		attachment.clearValue.depthStencil.stencil = stencilValue;
+		if (mask & VK_IMAGE_ASPECT_STENCIL_BIT)
+		{
+			attachment.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+			attachment.clearValue.depthStencil.stencil = stencilValue;
+		}
+
+		attachments.push_back(attachment);
 	}
 
 	if (mask & VK_IMAGE_ASPECT_COLOR_BIT)
 	{
+		VkClearAttachment attachment = {};
 		attachment.aspectMask |= VK_IMAGE_ASPECT_COLOR_BIT;
-		attachment.clearValue.color = { 0.0f, 0.0f, 0.5f, 1.0f };
+		attachment.clearValue.color = { 0.0f, 0.0f, 0.0f, 1.0f };
+
+		attachments.push_back(attachment);
 	}
 
 	VkClearRect rect = {};
@@ -1806,12 +1824,18 @@ void Vk_ClearAttachments(uint32_t mask, byte stencilValue)
 		(uint32_t)renderSystem->GetWidth(), (uint32_t)renderSystem->GetHeight()
 	};
 
-	vkCmdClearAttachments(Vk_ActiveCommandBuffer(), 1, &attachment, 1, &rect);
+	vkCmdClearAttachments(Vk_ActiveCommandBuffer(), attachments.size(),
+		attachments.data(), 1, &rect);
 }
 
 VkImage Vk_ActiveColorBuffer()
 {
 	return framebuffers[activeCommandBufferIdx].image;
+}
+
+VkImage Vk_ActiveDepthBuffer()
+{
+	return screenRenderPass.depth.image;
 }
 
 void Vk_QueueDestroyDescriptorSet(VkDescriptorSet set)

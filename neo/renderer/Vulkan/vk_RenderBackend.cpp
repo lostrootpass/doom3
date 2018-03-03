@@ -756,6 +756,11 @@ void idRenderBackendVk::DrawViewInternal(const viewDef_t* viewDef, const int ste
 		// Set Projection Matrix
 		float projMatrixTranspose[16];
 		R_MatrixTranspose( backEnd.viewDef->projectionMatrix, projMatrixTranspose );
+		//Most shaders uses MVPMATRIX rather than PROJMATRIX - but for the shaders
+		//that do, we should still Vulkanize this matrix (inv Y, half Z)
+		projMatrixTranspose[5] *= -1.0f;
+		projMatrixTranspose[10] *= 0.5f;
+		projMatrixTranspose[11] *= 0.5f;
 		SetVertexParms( RENDERPARM_PROJMATRIX_X, projMatrixTranspose, 4 );
 	}
 
@@ -1743,6 +1748,112 @@ void idRenderBackendVk::LoadShaderTextureMatrix(const float *shaderRegisters, co
 
 void idRenderBackendVk::MotionBlur()
 {
+	if ( !backEnd.viewDef->viewEntitys ) {
+		// 3D views only
+		return;
+	}
+	if ( r_motionBlur.GetInteger() <= 0 ) {
+		return;
+	}
+	if ( backEnd.viewDef->isSubview ) {
+		return;
+	}
+
+	const idScreenRect & viewport = backEnd.viewDef->viewport;
+	// clear the alpha buffer and draw only the hands + weapon into it so
+	// we can avoid blurring them
+	GL_State( GLS_COLORMASK | GLS_DEPTHMASK );
+	GL_Color( 0, 0, 0, 1 );
+
+	idRenderMatrix mat( 1.0f,  0.0f, 0.0f, 0.0f,
+						0.0f, -1.0f, 0.0f, 0.0f,
+						0.0f,  0.0f, 0.0f, 0.0f,
+						0.0f,  0.0f, 0.0f, 1.0f);
+	SetVertexParms( RENDERPARM_MVPMATRIX_X, mat[0], 4 );
+	GL_Scissor(viewport);
+	GL_Cull(CT_TWO_SIDED);
+
+	//We can't actually do alpha-clears on Vulkan - vkCmdClearAttachments
+	//isn't affected by pipeline state and therefore color masks,
+	//so simulate an alpha clear with big ol' friendly quad
+	renderProgManager->BindShader_Color();
+	DrawElementsWithCounters(&backEnd.unitSquareSurface);
+
+	backEnd.currentSpace = NULL;
+	GL_SelectTexture( 0 );
+	globalImages->blackImage->Bind();
+	GL_Color(0, 0, 0, 0);
+
+	drawSurf_t **drawSurfs = (drawSurf_t **)&backEnd.viewDef->drawSurfs[0];
+	for ( int surfNum = 0; surfNum < backEnd.viewDef->numDrawSurfs; surfNum++ ) {
+		const drawSurf_t * surf = drawSurfs[ surfNum ];
+
+		if ( !surf->space->weaponDepthHack && !surf->space->skipMotionBlur && !surf->material->HasSubview() ) {
+			// Apply motion blur to this object
+			continue;
+		}
+
+		const idMaterial * shader = surf->material;
+		if ( shader->Coverage() == MC_TRANSLUCENT ) {
+			// muzzle flash, etc
+			continue;
+		}
+
+		// set mvp matrix
+		if ( surf->space != backEnd.currentSpace ) {
+			SetMVP( surf->space->mvp );
+			backEnd.currentSpace = surf->space;
+		}
+
+		// this could just be a color, but we don't have a skinned color-only prog
+		if ( surf->jointCache ) {
+			renderProgManager->BindShader_TextureVertexColorSkinned();
+		} else {
+			renderProgManager->BindShader_TextureVertexColor();
+		}
+
+		// draw it solid
+		DrawElementsWithCounters( surf );
+	}
+	GL_State( GLS_DEPTHFUNC_ALWAYS );
+
+	// copy off the color buffer and the depth buffer for the motion blur prog
+	// we use the viewport dimensions for copying the buffers in case resolution scaling is enabled.
+	//const idScreenRect & viewport = backEnd.viewDef->viewport;
+	globalImages->currentRenderImage->CopyFramebuffer( viewport.x1, viewport.y1, viewport.GetWidth(), viewport.GetHeight() );
+
+	// in stereo rendering, each eye needs to get a separate previous frame mvp
+	int mvpIndex = ( backEnd.viewDef->renderView.viewEyeBuffer == 1 ) ? 1 : 0;
+
+	// derive the matrix to go from current pixels to previous frame pixels
+	idRenderMatrix	inverseMVP;
+	idRenderMatrix::Inverse( backEnd.viewDef->worldSpace.mvp, inverseMVP );
+
+	idRenderMatrix	motionMatrix;
+	idRenderMatrix::Multiply( backEnd.prevMVP[mvpIndex], inverseMVP, motionMatrix );
+
+	backEnd.prevMVP[mvpIndex] = backEnd.viewDef->worldSpace.mvp;
+
+	//This is basically just a bunch of data for calculations piggybacking
+	//on the MVPMATRIX param so set it directly and don't send it through 
+	//SetMVP which would convert it into a Vulkan matrix unnecessarily.
+	SetVertexParms( RENDERPARM_MVPMATRIX_X, motionMatrix[0], 4 );
+
+	GL_State( GLS_DEPTHFUNC_ALWAYS );
+	GL_Cull( CT_TWO_SIDED );
+
+	renderProgManager->BindShader_MotionBlur();
+
+	// let the fragment program know how many samples we are going to use
+	idVec4 samples( (float)( 1 << r_motionBlur.GetInteger() ) );
+	SetFragmentParm( RENDERPARM_OVERBRIGHT, samples.ToFloatPtr() );
+
+	GL_SelectTexture( 0 );
+	globalImages->currentRenderImage->Bind();
+	GL_SelectTexture( 1 );
+	globalImages->currentDepthImage->Bind();
+
+	DrawElementsWithCounters( &backEnd.unitSquareSurface );
 }
 
 void idRenderBackendVk::RenderInteractions(const drawSurf_t *surfList, const viewLight_t * vLight, int depthFunc, bool performStencilTest, bool useLightDepthBounds)
