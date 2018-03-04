@@ -4,6 +4,8 @@
 #include "../tr_local.h"
 #include "../RenderParms.h"
 
+#ifdef DOOM3_VULKAN
+
 #include "vk_RenderBackend.h"
 
 idRenderBackendVk::idRenderBackendVk()
@@ -2495,3 +2497,5 @@ void idRenderBackendVk::StencilShadowPass(const drawSurf_t *drawSurfs, const vie
 		}
 	}
 }
+
+#endif

@@ -304,10 +304,14 @@ PFNGLGETSTRINGIPROC						qglGetStringi;
 
 void R_InitRenderBackend()
 {
+#ifdef DOOM3_VULKAN
 	if (r_openGL.GetBool())
 		renderSystem = tr = new idRenderSystemLocal();
 	else
 		renderSystem = tr = new idRenderSystemVk();
+#else
+	renderSystem = tr = new idRenderSystemLocal();
+#endif
 
 	renderSystem->InitRenderBackend();
 }
@@ -647,6 +651,10 @@ bool R_IsInitialized() {
 	return r_initialized;
 }
 
+void R_Uninitialize() {
+	r_initialized = false;
+}
+
 /*
 =============================
 R_SetNewMode
@@ -761,6 +769,7 @@ safeMode:
 }
 
 void R_SetNewModeVk( const bool fullInit ) {
+#ifdef DOOM3_VULKAN
 	// try up to three different configurations
 
 	for ( int i = 0 ; i < 3 ; i++ ) {
@@ -852,6 +861,7 @@ safeMode:
 		r_displayRefresh.SetInteger( 0 );
 		r_multiSamples.SetInteger( 0 );
 	}
+#endif
 }
 
 
@@ -971,7 +981,7 @@ void R_InitOpenGL() {
 }
 
 void R_InitVulkan() {
-
+#ifdef DOOM3_VULKAN
 	common->Printf("----- R_InitVulkan -----");
 	
 	if (R_IsInitialized()) {
@@ -996,6 +1006,7 @@ void R_InitVulkan() {
 	R_InitFrameData();
 
 	R_SetColorMappings();
+#endif
 }
 
 /*
@@ -1379,10 +1390,6 @@ void idRenderSystemLocal::TakeScreenshot( int width, int height, const char *fil
 
 	takingScreenshot = false;
 }
-
-void idRenderSystemVk::TakeScreenshot(int width, int height, const char *fileName, int blends, renderView_t *ref) {
-}
-
 /* 
 ================== 
 R_ScreenshotFilename
@@ -2077,10 +2084,6 @@ void idRenderSystemLocal::Clear() {
 
 	frontEndJobList = NULL;
 }
-
-void idRenderSystemVk::Clear() {
-}
-
 /*
 =============
 R_MakeFullScreenTris
@@ -2339,10 +2342,6 @@ void idRenderSystemLocal::Init() {
 	common->Printf( "--------------------------------------\n" );
 }
 
-void idRenderSystemVk::Init() {
-	idRenderSystemLocal::Init();
-}
-
 /*
 ===============
 idRenderSystemLocal::Shutdown
@@ -2382,48 +2381,6 @@ void idRenderSystemLocal::Shutdown() {
 
 	ShutdownRenderBackend();
 }
-
-void idRenderSystemVk::Shutdown() {
-	common->Printf( "idRenderSystem::Shutdown()\n" );
-
-	fonts.DeleteContents();
-
-	if ( R_IsInitialized() ) {
-		globalImages->PurgeAllImages();
-	}
-
-	for (int i = 0; i < purgeQueue.Num(); ++i)
-	{
-		purgeQueue[i]->ActuallyPurgeImage();
-	}
-
-	purgeQueue.Clear();
-
-
-	renderModelManager->Shutdown();
-
-	idCinematic::ShutdownCinematic( );
-
-	globalImages->Shutdown();
-	
-	// free frame memory
-	R_ShutdownFrameData();
-
-	// free the vertex cache, which should have nothing allocated now
-	vertexCache->Shutdown();
-	delete vertexCache;
-
-	RB_ShutdownDebugTools();
-
-	delete guiModel;
-
-	parallelJobManager->FreeJobList( frontEndJobList );
-
-	Clear();
-
-	ShutdownRenderBackend();
-}
-
 /*
 ========================
 idRenderSystemLocal::ResetGuiModels
@@ -2435,10 +2392,6 @@ void idRenderSystemLocal::ResetGuiModels() {
 	guiModel->Clear();
 	guiModel->BeginFrame();
 	tr_guiModel = guiModel;	// for DeviceContext fast path
-}
-
-void idRenderSystemVk::ResetGuiModels() {
-	idRenderSystemLocal::ResetGuiModels();
 }
 
 /*
@@ -2454,20 +2407,12 @@ void idRenderSystemLocal::BeginLevelLoad() {
 	R_InitMaterials();
 }
 
-void idRenderSystemVk::BeginLevelLoad() {
-	idRenderSystemLocal::BeginLevelLoad();
-}
-
 /*
 ========================
 idRenderSystemLocal::LoadLevelImages
 ========================
 */
 void idRenderSystemLocal::LoadLevelImages() {
-	globalImages->LoadLevelImages( false );
-}
-
-void idRenderSystemVk::LoadLevelImages() {
 	globalImages->LoadLevelImages( false );
 }
 
@@ -2482,11 +2427,6 @@ void idRenderSystemLocal::Preload( const idPreloadManifest &manifest, const char
 	renderModelManager->Preload( manifest );
 }
 
-void idRenderSystemVk::Preload( const idPreloadManifest &manifest, const char *mapName ) {
-	globalImages->Preload( manifest, true );
-	uiManager->Preload( mapName );
-	renderModelManager->Preload( manifest );
-}
 
 /*
 ========================
@@ -2498,10 +2438,6 @@ void idRenderSystemLocal::EndLevelLoad() {
 	globalImages->EndLevelLoad();
 }
 
-void idRenderSystemVk::EndLevelLoad() {
-	renderModelManager->EndLevelLoad();
-	globalImages->EndLevelLoad();
-}
 
 /*
 ========================
@@ -2511,8 +2447,6 @@ idRenderSystemLocal::BeginAutomaticBackgroundSwaps
 void idRenderSystemLocal::BeginAutomaticBackgroundSwaps( autoRenderIconType_t icon ) {
 }
 
-void idRenderSystemVk::BeginAutomaticBackgroundSwaps( autoRenderIconType_t icon ) {
-}
 
 /*
 ========================
@@ -2522,8 +2456,6 @@ idRenderSystemLocal::EndAutomaticBackgroundSwaps
 void idRenderSystemLocal::EndAutomaticBackgroundSwaps() {
 }
 
-void idRenderSystemVk::EndAutomaticBackgroundSwaps() {
-}
 
 /*
 ========================
@@ -2534,9 +2466,6 @@ bool idRenderSystemLocal::AreAutomaticBackgroundSwapsRunning( autoRenderIconType
 	return false;
 }
 
-bool idRenderSystemVk::AreAutomaticBackgroundSwapsRunning( autoRenderIconType_t * icon ) const {
-	return false;
-}
 
 /*
 ============
@@ -2558,9 +2487,6 @@ idFont * idRenderSystemLocal::RegisterFont( const char * fontName ) {
 	return newFont;
 }
 
-idFont * idRenderSystemVk::RegisterFont( const char * fontName ) {
-	return idRenderSystemLocal::RegisterFont(fontName);
-}
 
 /*
 ========================
@@ -2571,9 +2497,6 @@ void idRenderSystemLocal::ResetFonts() {
 	fonts.DeleteContents( true );
 }
 
-void idRenderSystemVk::ResetFonts() {
-	fonts.DeleteContents(true);
-}
 
 /*
 ========================
@@ -2595,13 +2518,7 @@ void idRenderSystemLocal::InitRenderBackend() {
 	}
 }
 
-void idRenderSystemVk::InitRenderBackend() {
-	if (!R_IsInitialized()) {
-		R_InitVulkan();
 
-		globalImages->ReloadImages(true);
-	}
-}
 
 /*
 ========================
@@ -2615,12 +2532,6 @@ void idRenderSystemLocal::ShutdownRenderBackend() {
 	r_initialized = false;
 }
 
-void idRenderSystemVk::ShutdownRenderBackend() {
-	R_ShutdownFrameData();
-	VkImp_Shutdown();
-	r_initialized = false;
-}
-
 /*
 ========================
 idRenderSystemLocal::IsOpenGLRunning
@@ -2630,20 +2541,12 @@ bool idRenderSystemLocal::IsRenderBackendRunning() const {
 	return R_IsInitialized();
 }
 
-bool idRenderSystemVk::IsRenderBackendRunning() const {
-	return R_IsInitialized();
-}
-
 /*
 ========================
 idRenderSystemLocal::IsFullScreen
 ========================
 */
 bool idRenderSystemLocal::IsFullScreen() const {
-	return glConfig.isFullscreen != 0;
-}
-
-bool idRenderSystemVk::IsFullScreen() const {
 	return glConfig.isFullscreen != 0;
 }
 
@@ -2657,10 +2560,6 @@ int idRenderSystemLocal::GetWidth() const {
 		return glConfig.nativeScreenWidth >> 1;
 	}
 	return glConfig.nativeScreenWidth;
-}
-
-int idRenderSystemVk::GetWidth() const {
-	return idRenderSystemLocal::GetWidth();
 }
 
 /*
@@ -2683,10 +2582,6 @@ int idRenderSystemLocal::GetHeight() const {
 	return glConfig.nativeScreenHeight;
 }
 
-int idRenderSystemVk::GetHeight() const {
-	return idRenderSystemLocal::GetHeight();
-}
-
 /*
 ========================
 idRenderSystemLocal::GetStereo3DMode
@@ -2696,9 +2591,6 @@ stereo3DMode_t idRenderSystemLocal::GetStereo3DMode() const {
 	return glConfig.stereo3Dmode;
 }
 
-stereo3DMode_t idRenderSystemVk::GetStereo3DMode() const {
-	return STEREO3D_OFF;
-}
 
 /*
 ========================
@@ -2707,10 +2599,6 @@ idRenderSystemLocal::IsStereoScopicRenderingSupported
 */
 bool idRenderSystemLocal::IsStereoScopicRenderingSupported() const {
 	return true;
-}
-
-bool idRenderSystemVk::IsStereoScopicRenderingSupported() const {
-	return false;
 }
 
 /*
@@ -2722,10 +2610,6 @@ bool idRenderSystemLocal::HasQuadBufferSupport() const {
 	return glConfig.stereoPixelFormatAvailable;
 }
 
-bool idRenderSystemVk::HasQuadBufferSupport() const {
-	return false;
-}
-
 /*
 ========================
 idRenderSystemLocal::GetStereoScopicRenderingMode
@@ -2735,10 +2619,6 @@ stereo3DMode_t idRenderSystemLocal::GetStereoScopicRenderingMode() const {
 	return ( !IsStereoScopicRenderingSupported() ) ? STEREO3D_OFF : (stereo3DMode_t)stereoRender_enable.GetInteger();
 }
 
-stereo3DMode_t idRenderSystemVk::GetStereoScopicRenderingMode() const {
-	return STEREO3D_OFF;
-}
-
 /*
 ========================
 idRenderSystemLocal::IsStereoScopicRenderingSupported
@@ -2746,9 +2626,6 @@ idRenderSystemLocal::IsStereoScopicRenderingSupported
 */
 void idRenderSystemLocal::EnableStereoScopicRendering( const stereo3DMode_t mode ) const {
 	stereoRender_enable.SetInteger( mode );
-}
-
-void idRenderSystemVk::EnableStereoScopicRendering( const stereo3DMode_t mode ) const {
 }
 
 /*
@@ -2768,10 +2645,6 @@ float idRenderSystemLocal::GetPixelAspect() const {
 	}
 }
 
-float idRenderSystemVk::GetPixelAspect() const {
-	return idRenderSystemLocal::GetPixelAspect();
-}
-
 /*
 ========================
 idRenderSystemLocal::GetPhysicalScreenWidthInCentimeters
@@ -2785,13 +2658,4 @@ float idRenderSystemLocal::GetPhysicalScreenWidthInCentimeters() const {
 		return r_forceScreenWidthCentimeters.GetFloat();
 	}
 	return glConfig.physicalScreenWidthInCentimeters;
-}
-
-float idRenderSystemVk::GetPhysicalScreenWidthInCentimeters() const {
-	return 0.0f;
-}
-
-void idRenderSystemVk::QueueImagePurge(idImage* image)
-{
-	purgeQueue.Append(image);
 }

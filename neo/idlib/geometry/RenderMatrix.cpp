@@ -3229,7 +3229,7 @@ static int ClipHomogeneousPolygonToUnitCube_Generic( idVec4 * points, int numPoi
 	assert( numPoints < 16 - 6 );
 	ALIGNTYPE16 idVec4 newPoints[2 * 16];	// the C clip code temporarily doubles the points
 
-#if defined( CLIP_SPACE_D3D )	// the D3D near plane is at Z=0 instead of Z=-1
+#if defined( CLIP_SPACE_D3D ) // the D3D near plane is at Z=0 instead of Z=-1
 	numPoints = ClipHomogeneousPolygonToSide_Generic( newPoints, points, numPoints, 2, -1.0f, 0.0f );	// near
 #else
 	numPoints = ClipHomogeneousPolygonToSide_Generic( newPoints, points, numPoints, 2, -1.0f, 1.0f );	// near

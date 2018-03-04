@@ -50,10 +50,14 @@ int BitsForFormat( textureFormat_t format ) {
 		case FMT_DXT1:		return 4;
 		case FMT_DXT5:		return 8;
 		case FMT_DEPTH: {
+#ifdef DOOM3_VULKAN
 			if (r_openGL.GetBool())
 				return 32;
 			else
 				return 40; //Vulkan is 32-bit Depth + 8bit stencil
+#else
+			return 32;
+#endif
 		}
 		case FMT_X16:		return 16;
 		case FMT_Y16_X16:	return 32;

@@ -5,7 +5,7 @@
     <_PropertySheetDisplayName>PC Libs</_PropertySheetDisplayName>
   </PropertyGroup>
   <ItemDefinitionGroup>
-    <Link Condition="'$(Configuration)'=='Debug'">
+    <Link Condition="$(Configuration).Contains('Debug')">
       <AdditionalDependencies>libcmtd.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <IgnoreSpecificDefaultLibraries>libcmtd.lib;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
     </Link>

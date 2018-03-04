@@ -428,11 +428,15 @@ void idImageManager::CreateIntrinsicImages() {
 	scratchImage2 = ImageFromFunction("_scratch2", R_RGBA8Image );
 	accumImage = ImageFromFunction("_accum", R_RGBA8Image );
 
+#ifdef DOOM3_VULKAN
 	//For Vulkan, generate a BGRA8 image instead.
 	if (r_openGL.GetBool())
 		currentRenderImage = ImageFromFunction("_currentRender", R_RGBA8Image);
 	else
 		currentRenderImage = ImageFromFunction("_currentRender", R_BufferSampleImage );
+#else
+	currentRenderImage = ImageFromFunction("_currentRender", R_RGBA8Image);
+#endif
 
 	currentDepthImage = ImageFromFunction("_currentDepth", R_DepthImage );
 

@@ -240,10 +240,14 @@ idImage *idImageManager::AllocImage( const char *name ) {
 
 	idImage * image = nullptr;
 	
+#ifdef DOOM3_VULKAN
 	if (r_openGL.GetBool())
 		image = new (TAG_IMAGE) idImageGL(name);
 	else
 		image = new (TAG_IMAGE) idImageVk(name);
+#else
+	image = new (TAG_IMAGE) idImageGL(name);
+#endif
 
 	imageHash.Add( hash, images.Append( image ) );
 
@@ -265,10 +269,14 @@ idImage *idImageManager::AllocStandaloneImage( const char *name ) {
 
 	idImage * image = nullptr;
 	
+#ifdef DOOM3_VULKAN
 	if (r_openGL.GetBool())
 		image = new (TAG_IMAGE) idImageGL(name);
 	else
 		image = new (TAG_IMAGE) idImageVk(name);
+#else
+	image = new (TAG_IMAGE) idImageGL(name);
+#endif
 
 	return image;
 }

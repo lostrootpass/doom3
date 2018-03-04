@@ -2,7 +2,7 @@
 # This .gitignore file was automatically created by Microsoft(R) Visual Studio.
 ################################################################################
 
-/build/Win32/Debug
+/build/Win32
 *.db
 /neo/amplitude/Debug
 /neo/ipch
@@ -10,3 +10,4 @@
 *.user
 /base/renderprogs/glsl
 *.bak
+/neo/amplitude/

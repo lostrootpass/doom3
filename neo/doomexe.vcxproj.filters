@@ -552,6 +552,7 @@
     <ClInclude Include="renderer\RenderParms.h" />
     <ClInclude Include="renderer\Vulkan\vk_image.h" />
     <ClInclude Include="renderer\OpenGL\gl_image.h" />
+    <ClInclude Include="renderer\Vulkan\vk_RenderSystem.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="cm\CollisionModel_contacts.cpp">
@@ -1166,6 +1167,8 @@
     <ClCompile Include="renderer\OpenGL\gl_RenderBackend.cpp" />
     <ClCompile Include="renderer\tr_backend_draw.cpp" />
     <ClCompile Include="renderer\Vulkan\vk_RenderSystem.cpp" />
+    <ClCompile Include="renderer\Vulkan\vk_RenderProgs.cpp" />
+    <ClCompile Include="renderer\GLSLParmNames.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="sys\win32\rc\res\doom.ico">
