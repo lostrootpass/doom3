@@ -48,7 +48,7 @@ If you have questions concerning this license or the applicable additional terms
 #if defined(_WIN32)
 	// _WIN32 always defined
 	// _WIN64 also defined for x64 target
-/*
+
 	#if !defined( _MANAGED )
 		#if !defined( _WIN64 )
 			#define ID_WIN_X86_ASM
@@ -68,7 +68,7 @@ If you have questions concerning this license or the applicable additional terms
 			#define ID_WIN_X86_SSE3_INTRIN
 		#endif
 	#endif
-*/
+
 
 	#define ID_PC
 	#define ID_PC_WIN
