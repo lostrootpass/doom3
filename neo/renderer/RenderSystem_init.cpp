@@ -305,7 +305,7 @@ PFNGLGETSTRINGIPROC						qglGetStringi;
 void R_InitRenderBackend()
 {
 #ifdef DOOM3_VULKAN
-	if (r_openGL.GetBool())
+	if (r_openGL.GetBool() || !R_IsVulkanAvailable())
 		renderSystem = tr = new idRenderSystemLocal();
 	else
 		renderSystem = tr = new idRenderSystemVk();

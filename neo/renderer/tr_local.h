@@ -1080,16 +1080,13 @@ void		GLimp_EnableLogging( bool enable );
 
 
 /* Vulkan-specific functions */
-
-typedef glimpParms_t VkImpParams_t;
-
-bool		VkImp_Init( VkImpParams_t params );
-void VkImp_Shutdown();
-
-void Vk_FlipPresent();
-
 //TODO: move these
 #ifdef DOOM3_VULKAN
+typedef glimpParms_t VkImpParams_t;
+bool		VkImp_Init( VkImpParams_t params );
+void VkImp_Shutdown();
+void Vk_FlipPresent();
+bool R_IsVulkanAvailable();
 VkBuffer Vk_CreateAndBindBuffer(const VkBufferCreateInfo& info, VkMemoryPropertyFlags flags, VkDeviceMemory& memory);
 VkImage Vk_AllocAndCreateImage(const VkImageCreateInfo& info, VkDeviceMemory& memory);
 VkImageView Vk_CreateImageView(const VkImageViewCreateInfo& info);

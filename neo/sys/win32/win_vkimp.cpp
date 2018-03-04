@@ -137,7 +137,15 @@ static void Vk_CreateInstance()
 		createInfo.enabledLayerCount = 0;
 	}
 	
-	VkCheck(vkCreateInstance(&createInfo, nullptr, &vkInstance));
+	bool res = vkCreateInstance(&createInfo, nullptr, &vkInstance);
+}
+
+bool R_IsVulkanAvailable()
+{
+	if(vkInstance == VK_NULL_HANDLE)
+		Vk_CreateInstance();
+
+	return (vkInstance != VK_NULL_HANDLE);
 }
 
 static int Vk_ChoosePixelFormat(const HDC hdc, const int multisamples, const bool stereo3D) {
@@ -1073,8 +1081,6 @@ static void Vk_RegisterDebugger()
 
 static bool Vk_InitDriver(VkImpParams_t params)
 {
-	Vk_CreateInstance();
-
 	PIXELFORMATDESCRIPTOR src = 
 	{
 		sizeof(PIXELFORMATDESCRIPTOR),	// size of this pfd
@@ -1287,34 +1293,10 @@ bool VkImp_Init(VkImpParams_t params)
 	// create our window classes if we haven't already
 	GFX_CreateWindowClasses();
 
-	// this will load the dll and set all our qgl* function pointers,
-	// but doesn't create a window
-
-	// r_glDriver is only intended for using instrumented OpenGL
-	// dlls.  Normal users should never have to use it, and it is
-	// not archived.
-	//driverName = r_glDriver.GetString()[0] ? r_glDriver.GetString() : "opengl32";
-	//if ( !QGL_Init( driverName ) ) {
-		//common->Printf( "^3GLimp_Init() could not load r_glDriver \"%s\"^0\n", driverName );
-		//return false;
-	//}
-
-	// getting the wgl extensions involves creating a fake window to get a context,
-	// which is pretty disgusting, and seems to mess with the AGP VAR allocation
-	//GLW_GetWGLExtensionsWithFakeWindow();
-
-
-
-	// Optionally ChangeDisplaySettings to get a different fullscreen resolution.
-	//if ( !GLW_ChangeDislaySettingsIfNeeded( params ) ) {
-		//GLimp_Shutdown();
-		//return false;
-	//}
-
 	// try to create a window with the correct pixel format
 	// and init the renderer context
 	if ( !Vk_CreateWindow( params ) ) {
-		//GLimp_Shutdown();
+		VkImp_Shutdown();
 		return false;
 	}
 
