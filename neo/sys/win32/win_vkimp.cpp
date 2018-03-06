@@ -81,6 +81,8 @@ VkDescriptorSetLayout jointSetLayout;
 
 std::vector<VkDescriptorSet> destructionQueue;
 
+VkQueryPool queryPool;
+
 struct ImageMemBlock
 {
 	VkDeviceSize size = 0 ;
@@ -102,6 +104,16 @@ static void CreateVulkanContextOnHWND(HWND hwnd, bool isDebug)
 	createInfo.hwnd = hwnd;
 	
 	VkCheck(vkCreateWin32SurfaceKHR(vkInstance, &createInfo, nullptr, &vkSurface));
+}
+
+static void Vk_CreateQueryPool()
+{
+	VkQueryPoolCreateInfo create = {};
+	create.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
+	create.queryCount = 2;
+	create.queryType = VK_QUERY_TYPE_TIMESTAMP;
+	
+	VkCheck(vkCreateQueryPool(vkDevice, &create, nullptr, &queryPool));
 }
 
 static void Vk_CreateInstance()
@@ -908,6 +920,8 @@ VkCommandBuffer Vk_StartFrame()
 	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
 	VkCheck(vkBeginCommandBuffer(cmd, &beginInfo));
 
+	vkCmdResetQueryPool(Vk_ActiveCommandBuffer(), queryPool, 0, 2);
+
 	return commandBuffers[activeCommandBufferIdx];
 }
 
@@ -1284,6 +1298,8 @@ static bool Vk_InitDriver(VkImpParams_t params)
 
 	Vk_RegisterDebugger();
 
+	Vk_CreateQueryPool();
+
 	return true;
 }
 
@@ -1457,6 +1473,7 @@ void VkImp_Shutdown()
 	Vk_FreeRenderImage(&screenRenderPass.depth);
 	vkDestroyRenderPass(vkDevice, screenRenderPass.handle, nullptr);
 
+	vkDestroyQueryPool(vkDevice, queryPool, nullptr);
 	vkFreeDescriptorSets(vkDevice, descriptorPool, VERTCACHE_NUM_FRAMES, vkJointDescriptorSets);
 	vkFreeDescriptorSets(vkDevice, descriptorPool, 1, &vkDescriptorSet);
 	vkDestroyDescriptorSetLayout(vkDevice, uniformSetLayout, nullptr);
@@ -1982,6 +1999,36 @@ VkSampleCountFlagBits Vk_SampleCount()
 	}
 
 	return VK_SAMPLE_COUNT_1_BIT;
+}
+
+void Vk_StartFrameTimeCounter()
+{
+	vkCmdWriteTimestamp(Vk_ActiveCommandBuffer(),
+		VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, queryPool, 0);
+}
+
+void Vk_EndFrameTimeCounter()
+{
+	vkCmdWriteTimestamp(Vk_ActiveCommandBuffer(),
+		VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, queryPool, 1);
+}
+
+uint64_t Vk_GetFrameTimeCounter()
+{
+	uint64_t results[2] = { 0, 0 };
+
+	VkResult res = vkGetQueryPoolResults(vkDevice, queryPool, 0, 2, 
+		sizeof(results), results, sizeof(uint64_t), VK_QUERY_RESULT_64_BIT);
+
+	if (res != VK_SUCCESS)
+		return 0;
+
+	uint64_t time = (results[1] - results[0]);
+
+	//internal units (whatever the timestamp period is) to ms
+	time /= 1000 / vkPhysicalDeviceProperties.limits.timestampPeriod;
+
+	return time;
 }
 
 #endif

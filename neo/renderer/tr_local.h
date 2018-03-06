@@ -1127,6 +1127,9 @@ VkImage Vk_ActiveDepthBuffer();
 void Vk_QueueDestroyDescriptorSet(VkDescriptorSet set);
 VkSampleCountFlagBits Vk_MaxSupportedSampleCount();
 VkSampleCountFlagBits Vk_SampleCount();
+void Vk_StartFrameTimeCounter();
+void Vk_EndFrameTimeCounter();
+uint64_t Vk_GetFrameTimeCounter();
 #endif
 
 /*

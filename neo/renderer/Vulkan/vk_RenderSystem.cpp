@@ -44,14 +44,10 @@ void idRenderSystemVk::RenderCommandBuffers(const emptyCommand_t * const cmdHead
 		}
 
 		uint64 backEndStartTime = Sys_Microseconds();
+		Vk_StartFrameTimeCounter();
 
 		// needed for editor rendering
 		renderSystem->SetDefaultState();
-
-		// If we have a stereo pixel format, this will draw to both
-		// the back left and back right buffers, which will have a
-		// performance penalty.
-		//qglDrawBuffer( GL_BACK );
 
 		for ( ; cmds != NULL; cmds = (const emptyCommand_t *)cmds->next ) {
 			switch ( cmds->commandId ) {
@@ -82,16 +78,11 @@ void idRenderSystemVk::RenderCommandBuffers(const emptyCommand_t * const cmdHead
 			}
 		}
 
-		//RB_DrawFlickerBox();
-
-		// Fix for the steam overlay not showing up while in game without Shell/Debug/Console/Menu also rendering
-		//qglColorMask( 1, 1, 1, 1 );
-
-		//qglFlush();
-
 		// stop rendering on this thread
 		uint64 backEndFinishTime = Sys_Microseconds();
 		backEnd.pc.totalMicroSec = backEndFinishTime - backEndStartTime;
+
+		Vk_EndFrameTimeCounter();
 
 		if ( r_debugRenderToTexture.GetInteger() == 1 ) {
 			common->Printf( "3d: %i, 2d: %i, SetBuf: %i, CpyRenders: %i, CpyFrameBuf: %i\n", c_draw3d, c_draw2d, c_setBuffers, c_copyRenders, backEnd.pc.c_copyFrameBuffer );
@@ -117,6 +108,9 @@ void idRenderSystemVk::SwapCommandBuffers_FinishRendering(
 	//vertexCache->staticData.jointBuffer->Sync();
 	Vk_EndRenderPass();
 	Vk_EndFrame();
+
+	if (gpuMicroSec)
+		*gpuMicroSec = Vk_GetFrameTimeCounter();
 
 	//Need to do this here to avoid invalidating the command buffers
 	for (int i = 0; i < purgeQueue.Num(); ++i)
