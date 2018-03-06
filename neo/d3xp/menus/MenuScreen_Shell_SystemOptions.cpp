@@ -377,7 +377,7 @@ idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::IsRestartRequ
 ========================
 */
 bool idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::IsRestartRequired() const {
-	if ( originalAntialias != r_multiSamples.GetInteger() ) {
+	if ( originalAntialias != r_multiSamples.GetInteger() && r_openGL.GetBool() ) {
 		return true;
 	}
 	if ( originalFramerate != com_engineHz.GetInteger() ) {
@@ -450,9 +450,9 @@ void idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::AdjustFi
 			break;
 		}
 		case SYSTEM_FIELD_ANTIALIASING: {
-			static const int numValues = 5;
-			static const int values[numValues] = { 0, 2, 4, 8, 16 };
-			r_multiSamples.SetInteger( AdjustOption( r_multiSamples.GetInteger(), values, numValues, adjustAmount ) );
+			idList<int> aaOptions;
+			tr->PopulateAAOptions(aaOptions);
+			r_multiSamples.SetInteger(AdjustOption(r_multiSamples.GetInteger(), aaOptions.Ptr(), aaOptions.Num(), adjustAmount));
 			break;
 		}
 		case SYSTEM_FIELD_MOTIONBLUR: {

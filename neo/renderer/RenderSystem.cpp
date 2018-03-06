@@ -1031,3 +1031,12 @@ bool idRenderSystemLocal::UploadImage( const char *imageName, const byte *data, 
 	image->UploadScratch( data, width, height );
 	return true;
 }
+
+void idRenderSystemLocal::PopulateAAOptions(idList<int>& aaOptions)
+{
+	aaOptions.Append(0);
+	aaOptions.Append(2);
+	aaOptions.Append(4);
+	aaOptions.Append(8);
+	aaOptions.Append(16);
+}

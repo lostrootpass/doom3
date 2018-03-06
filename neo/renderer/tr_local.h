@@ -748,6 +748,8 @@ public:
 	virtual void			UnCrop();
 	virtual bool			UploadImage( const char *imageName, const byte *data, int width, int height );
 
+	virtual void PopulateAAOptions(idList<int>& aaOptions);
+
 	//GraphicsAPIWrapper functions
 	virtual void SetCull(int cullType) override;
 	virtual void SetScissor(int x/*left*/, int y/*bottom*/, int w, int h) override;
@@ -1123,6 +1125,8 @@ void Vk_ClearAttachments(uint32_t mask, byte stencilValue = 0);
 VkImage Vk_ActiveColorBuffer();
 VkImage Vk_ActiveDepthBuffer();
 void Vk_QueueDestroyDescriptorSet(VkDescriptorSet set);
+VkSampleCountFlagBits Vk_MaxSupportedSampleCount();
+VkSampleCountFlagBits Vk_SampleCount();
 #endif
 
 /*

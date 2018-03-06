@@ -141,7 +141,7 @@ const emptyCommand_t * idRenderSystemVk::SwapCommandBuffers_FinishCommandBuffers
 
 
 void idRenderSystemVk::CaptureRenderToImage( const char *imageName, bool clearColorAfterCopy ) {
-
+	idRenderSystemLocal::CaptureRenderToImage(imageName, clearColorAfterCopy);
 }
 
 
@@ -235,6 +235,31 @@ float idRenderSystemVk::GetPhysicalScreenWidthInCentimeters() const {
 void idRenderSystemVk::QueueImagePurge(idImage* image)
 {
 	purgeQueue.Append(image);
+}
+
+void idRenderSystemVk::PopulateAAOptions(idList<int>& aaOptions)
+{
+	const VkSampleCountFlagBits msaa = Vk_MaxSupportedSampleCount();
+
+	aaOptions.Append(0);
+
+	if(msaa >= VK_SAMPLE_COUNT_2_BIT)
+		aaOptions.Append(2);
+
+	if(msaa >= VK_SAMPLE_COUNT_4_BIT)
+		aaOptions.Append(4);
+
+	if(msaa >= VK_SAMPLE_COUNT_8_BIT)
+		aaOptions.Append(8);
+
+	if (msaa >= VK_SAMPLE_COUNT_16_BIT)
+		aaOptions.Append(16);
+
+	if (msaa >= VK_SAMPLE_COUNT_32_BIT)
+		aaOptions.Append(32);
+
+	if (msaa >= VK_SAMPLE_COUNT_64_BIT)
+		aaOptions.Append(64);
 }
 
 #endif

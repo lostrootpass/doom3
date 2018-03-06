@@ -53,6 +53,7 @@ struct RenderPass
 {
 	RenderImage color;
 	RenderImage depth;
+	RenderImage resolve;
 	Framebuffer fb;
 
 	VkCommandBuffer cmd;
@@ -137,7 +138,7 @@ static void Vk_CreateInstance()
 		createInfo.enabledLayerCount = 0;
 	}
 	
-	bool res = vkCreateInstance(&createInfo, nullptr, &vkInstance);
+	vkCreateInstance(&createInfo, nullptr, &vkInstance);
 }
 
 bool R_IsVulkanAvailable()
@@ -322,6 +323,67 @@ uint32_t Vk_GetMemoryTypeIndex(uint32_t bits, VkMemoryPropertyFlags flags)
 	return -1;
 }
 
+static void Vk_CreateResolveImage(RenderImage* renderImage)
+{
+	if (renderImage->view != VK_NULL_HANDLE)
+		vkDestroyImageView(vkDevice, renderImage->view, nullptr);
+
+	if (renderImage->image != VK_NULL_HANDLE)
+		vkDestroyImage(vkDevice, renderImage->image, nullptr);
+
+	if (renderImage->memory != VK_NULL_HANDLE)
+		vkFreeMemory(vkDevice, renderImage->memory, nullptr);
+
+	VkImageCreateInfo info = {};
+	info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+		VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+	info.tiling = VK_IMAGE_TILING_OPTIMAL;
+	info.extent.width = surfaceCaps.currentExtent.width;
+	info.extent.height = surfaceCaps.currentExtent.height;
+	info.extent.depth = 1;
+	info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	info.samples = Vk_SampleCount();
+	info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	info.mipLevels = 1;
+	info.arrayLayers = 1;
+	info.format = VK_FORMAT_B8G8R8A8_UNORM;
+	info.imageType = VK_IMAGE_TYPE_2D;
+
+	VkCheck(vkCreateImage(vkDevice, &info, nullptr, &renderImage->image));
+
+	VkMemoryRequirements memReq;
+	vkGetImageMemoryRequirements(vkDevice, renderImage->image, &memReq);
+
+	VkMemoryAllocateInfo alloc = {};
+	alloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	alloc.allocationSize = memReq.size;
+	alloc.memoryTypeIndex = Vk_GetMemoryTypeIndex(memReq.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+	VkCheck(vkAllocateMemory(vkDevice, &alloc, nullptr, &renderImage->memory));
+	VkCheck(vkBindImageMemory(vkDevice, renderImage->image, renderImage->memory, 0));
+
+	VkImageViewCreateInfo view = {};
+	view.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	view.format = VK_FORMAT_B8G8R8A8_UNORM;
+	view.viewType = VK_IMAGE_VIEW_TYPE_2D;
+	view.image = renderImage->image;
+	view.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	view.subresourceRange.baseMipLevel = 0;
+	view.subresourceRange.baseArrayLayer = 0;
+	view.subresourceRange.layerCount = 1;
+	view.subresourceRange.levelCount = 1;
+
+	VkCheck(vkCreateImageView(vkDevice, &view, nullptr, &renderImage->view));
+
+	VkImageSubresourceRange range = {};
+	range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	range.layerCount = 1;
+	range.levelCount = 1;
+	Vk_SetImageLayout(renderImage->image,
+		VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_LAYOUT_UNDEFINED,
+		VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, range);
+}
+
 static void Vk_CreateDepthBuffer(RenderImage* renderImage)
 {
 	if (renderImage->view != VK_NULL_HANDLE)
@@ -341,7 +403,7 @@ static void Vk_CreateDepthBuffer(RenderImage* renderImage)
 	info.extent.height = surfaceCaps.currentExtent.height;
 	info.extent.depth = 1;
 	info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	info.samples = VK_SAMPLE_COUNT_1_BIT;
+	info.samples = Vk_SampleCount();
 	info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	info.mipLevels = 1;
 	info.arrayLayers = 1;
@@ -567,21 +629,37 @@ static void Vk_CreateOffscreenRenderPass()
 
 static void Vk_CreateRenderPass()
 {
+	const bool msaa = (Vk_SampleCount() > VK_SAMPLE_COUNT_1_BIT);
+
 	//Color
 	VkAttachmentDescription attachDesc = {};
 	attachDesc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 	attachDesc.finalLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
 	attachDesc.format = VK_FORMAT_B8G8R8A8_UNORM;
 	attachDesc.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
-	attachDesc.samples = VK_SAMPLE_COUNT_1_BIT;
+	attachDesc.samples = Vk_SampleCount();
 	attachDesc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 	attachDesc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 	attachDesc.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+
+	VkAttachmentDescription resolveAttachDesc = {};
+	resolveAttachDesc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	resolveAttachDesc.finalLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+	resolveAttachDesc.format = VK_FORMAT_B8G8R8A8_UNORM;
+	resolveAttachDesc.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	resolveAttachDesc.samples = VK_SAMPLE_COUNT_1_BIT;
+	resolveAttachDesc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	resolveAttachDesc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	resolveAttachDesc.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 
 	//Color
 	VkAttachmentReference attachRef = {};
 	attachRef.attachment = 0;
 	attachRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+	VkAttachmentReference colorResolveRef = {};
+	colorResolveRef.attachment = 2;
+	colorResolveRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
 	//Depth
 	VkAttachmentReference depthAttach = {};
@@ -594,13 +672,16 @@ static void Vk_CreateRenderPass()
 	subpass[0].pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 	subpass[0].pDepthStencilAttachment = &depthAttach;
 
+	if(msaa)
+		subpass[0].pResolveAttachments = &colorResolveRef;
+
 	subpass[1].colorAttachmentCount = 1;
 	subpass[1].pColorAttachments = &attachRef;
 	subpass[1].pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 	subpass[1].pDepthStencilAttachment = &depthAttach;
 
 	VkAttachmentDescription depthDesc = {};
-	depthDesc.samples = VK_SAMPLE_COUNT_1_BIT;
+	depthDesc.samples = Vk_SampleCount();
 	depthDesc.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
 	depthDesc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
 	depthDesc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -635,10 +716,10 @@ static void Vk_CreateRenderPass()
 	dependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
 	dependencies[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
 
-	VkAttachmentDescription attachments[] = { attachDesc, depthDesc };
+	VkAttachmentDescription attachments[] = { attachDesc, depthDesc, resolveAttachDesc };
 	VkRenderPassCreateInfo info = {};
 	info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-	info.attachmentCount = 2;
+	info.attachmentCount = msaa ? 3 : 2;
 	info.pAttachments = attachments;
 	info.subpassCount = 1;
 	info.pSubpasses = subpass;
@@ -652,6 +733,8 @@ static void Vk_CreateRenderPass()
 static void Vk_CreateSwapChain()
 {
 	Vk_PopulateSwapChainInfo();
+	
+	const bool msaa = (Vk_SampleCount() > VK_SAMPLE_COUNT_1_BIT);
 
 	VkSurfaceCapabilitiesKHR caps = surfaceCaps;
 	uint32_t imageCount;
@@ -734,6 +817,9 @@ static void Vk_CreateSwapChain()
 
 	//Create the depth buffer
 	Vk_CreateDepthBuffer(&screenRenderPass.depth);
+	
+
+	Vk_CreateResolveImage(&screenRenderPass.resolve);
 
 
 	//Create framebuffers
@@ -745,15 +831,22 @@ static void Vk_CreateSwapChain()
 		info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
 		info.width = extent.width;
 		info.height = extent.height;
-		info.attachmentCount = 2;
+		info.attachmentCount = msaa ? 3 : 2;
 		info.layers = 1;
 		info.renderPass = screenRenderPass.handle;
 
+		VkImageView attachments[3];
+		attachments[1] = screenRenderPass.depth.view;
+
+		if (msaa)
+			attachments[0] = screenRenderPass.resolve.view;
+
 		for (Framebuffer& fb : framebuffers)
 		{
-			const VkImageView attachments[] = {
-				fb.view, screenRenderPass.depth.view
-			};
+			if(msaa)
+				attachments[2] = fb.view;
+			else
+				attachments[0] = fb.view;
 
 			info.pAttachments = attachments;
 			VkCheck(vkCreateFramebuffer(vkDevice, &info, nullptr, &(fb.framebuffer)));
@@ -778,15 +871,15 @@ static void Vk_RecordCommandBuffer(VkFramebuffer framebuffer, VkCommandBuffer cm
 	VkClearValue colorClear, depthClear;
 	colorClear.color = { 0.0f, 0.0f, 0.0f, 1.0f };
 	depthClear.depthStencil = { 1.0f, STENCIL_SHADOW_TEST_VALUE };
-	VkClearValue clearValues[] = {
-		colorClear, depthClear
+	VkClearValue clearValues[3] = {
+		colorClear, depthClear, colorClear
 	};
 
 	VkExtent2D extent = surfaceCaps.currentExtent;
 
 	VkRenderPassBeginInfo info = {};
 	info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-	info.clearValueCount = 2;
+	info.clearValueCount = (Vk_SampleCount() > VK_SAMPLE_COUNT_1_BIT) ? 3 : 2;
 	info.pClearValues = clearValues;
 	info.renderPass = pass;
 	info.renderArea.offset = { 0, 0 };
@@ -867,7 +960,7 @@ void Vk_EndFrame()
 		barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 		barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
 		barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-		barrier.image = framebuffers[activeCommandBufferIdx].image;
+		barrier.image = Vk_ActiveColorBuffer();
 		barrier.subresourceRange = range;
 		barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 		barrier.dstAccessMask = 0;
@@ -877,6 +970,14 @@ void Vk_EndFrame()
 			VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
 			0, 0, nullptr, 0, nullptr, 1, &barrier);
 
+		if(Vk_SampleCount() > VK_SAMPLE_COUNT_1_BIT)
+		{
+			barrier.image = screenRenderPass.resolve.image;
+			vkCmdPipelineBarrier(commandBuffers[activeCommandBufferIdx],
+				VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+				VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+				0, 0, nullptr, 0, nullptr, 1, &barrier);
+		}
 
 		range.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
 		barrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
@@ -1420,6 +1521,20 @@ void Vk_FlipPresent()
 	{
 		VkCheck(res);
 	}
+
+	static int msaaCount = r_multiSamples.GetInteger();
+	if (msaaCount != r_multiSamples.GetInteger())
+	{
+		vkDeviceWaitIdle(vkDevice);
+
+		msaaCount = r_multiSamples.GetInteger();
+		if(renderProgManager)
+			((idRenderProgManagerVk*)(renderProgManager))->DestroyPipelines();
+
+		vkDestroyRenderPass(vkDevice, screenRenderPass.handle, nullptr);
+		Vk_CreateRenderPass();
+		Vk_CreateSwapChain();
+	}
 }
 
 VkBuffer Vk_CreateAndBindBuffer(const VkBufferCreateInfo& info, VkMemoryPropertyFlags flags, VkDeviceMemory& memory)
@@ -1823,6 +1938,50 @@ VkImage Vk_ActiveDepthBuffer()
 void Vk_QueueDestroyDescriptorSet(VkDescriptorSet set)
 {
 	destructionQueue.push_back(set);
+}
+
+VkSampleCountFlagBits Vk_MaxSupportedSampleCount()
+{
+	VkSampleCountFlags colorLimit =
+		vkPhysicalDeviceProperties.limits.framebufferColorSampleCounts;
+	VkSampleCountFlags depthLimit =
+		vkPhysicalDeviceProperties.limits.framebufferDepthSampleCounts;
+
+	VkSampleCountFlags limit = Min(colorLimit, depthLimit);
+
+	if (limit & VK_SAMPLE_COUNT_64_BIT) return VK_SAMPLE_COUNT_64_BIT;
+	if (limit & VK_SAMPLE_COUNT_32_BIT) return VK_SAMPLE_COUNT_32_BIT;
+	if (limit & VK_SAMPLE_COUNT_16_BIT) return VK_SAMPLE_COUNT_16_BIT;
+	if (limit & VK_SAMPLE_COUNT_8_BIT) return VK_SAMPLE_COUNT_8_BIT;
+	if (limit & VK_SAMPLE_COUNT_4_BIT) return VK_SAMPLE_COUNT_4_BIT;
+	if (limit & VK_SAMPLE_COUNT_2_BIT) return VK_SAMPLE_COUNT_2_BIT;
+
+	return VK_SAMPLE_COUNT_1_BIT;
+}
+
+VkSampleCountFlagBits Vk_SampleCount()
+{
+	VkSampleCountFlagBits maxSamples = Vk_MaxSupportedSampleCount();
+	const int msaa = r_multiSamples.GetInteger();
+
+	//Fall through on each case until we get a supported sample count.
+	switch (msaa)
+	{
+	case 64:
+		if (maxSamples >= VK_SAMPLE_COUNT_64_BIT) return VK_SAMPLE_COUNT_64_BIT;
+	case 32:
+		if (maxSamples >= VK_SAMPLE_COUNT_32_BIT) return VK_SAMPLE_COUNT_32_BIT;
+	case 16:
+		if (maxSamples >= VK_SAMPLE_COUNT_16_BIT) return VK_SAMPLE_COUNT_16_BIT;
+	case 8:
+		if (maxSamples >= VK_SAMPLE_COUNT_8_BIT) return VK_SAMPLE_COUNT_8_BIT;
+	case 4:
+		if (maxSamples >= VK_SAMPLE_COUNT_4_BIT) return VK_SAMPLE_COUNT_4_BIT;
+	case 2:
+		if (maxSamples >= VK_SAMPLE_COUNT_2_BIT) return VK_SAMPLE_COUNT_2_BIT;
+	}
+
+	return VK_SAMPLE_COUNT_1_BIT;
 }
 
 #endif

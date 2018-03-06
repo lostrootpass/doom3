@@ -9,7 +9,7 @@
 				Vulkan
 **********************************************/
 
-const int UNIFORM_BUFFER_SIZE = 65536 * 16;
+const int UNIFORM_BUFFER_SIZE = 65536 * 32;
 
 extern idCVar r_skipStripDeadCode;
 extern idCVar r_useUniformArrays;
@@ -627,7 +627,7 @@ VkPipeline idRenderProgManagerVk::GetPipelineForState(uint64 stateBits)
 
 	VkPipelineMultisampleStateCreateInfo mss = {};
 	mss.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-	mss.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+	mss.rasterizationSamples = Vk_SampleCount();
 
 	VkCullModeFlags cullType = VK_CULL_MODE_NONE;
 	if (backEnd.glState.faceCulling == CT_TWO_SIDED)

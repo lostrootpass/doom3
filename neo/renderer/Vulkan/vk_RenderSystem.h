@@ -44,6 +44,8 @@ public:
 
 	virtual void QueueImagePurge(idImage* image);
 
+	virtual void PopulateAAOptions(idList<int>& aaOptions) override;
+
 	virtual void SetCull(int cullType) override;
 	virtual void SetScissor(int x/*left*/, int y/*bottom*/, int w, int h) override;
 	virtual void SetViewport(int x/*left*/, int y/*bottom*/, int w, int h) override;
