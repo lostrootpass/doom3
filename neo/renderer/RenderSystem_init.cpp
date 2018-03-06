@@ -2083,6 +2083,10 @@ void idRenderSystemLocal::Clear() {
 	}
 
 	frontEndJobList = NULL;
+
+	memset(&unitSquareSurface_, 0, sizeof(drawSurf_t));
+	memset(&zeroOneCubeSurface_, 0, sizeof(drawSurf_t));
+	memset(&testImageSurface_, 0, sizeof(drawSurf_t));
 }
 /*
 =============
