@@ -56,7 +56,21 @@ void idRenderBackendVk::BindVariableStageImage(const textureStage_t *texture, co
 
 void idRenderBackendVk::CopyRender(const void* data)
 {
+	const copyRenderCommand_t * cmd = (const copyRenderCommand_t *)data;
 
+	if ( r_skipCopyTexture.GetBool() ) {
+		return;
+	}
+
+	RENDERLOG_PRINTF( "***************** RB_CopyRender *****************\n" );
+
+	if ( cmd->image ) {
+		cmd->image->CopyFramebuffer( cmd->x, cmd->y, cmd->imageWidth, cmd->imageHeight );
+	}
+
+	if ( cmd->clearColorAfterCopy ) {
+		renderSystem->Clear( true, false, false, STENCIL_SHADOW_TEST_VALUE, 0, 0, 0, 0 );
+	}
 }
 
 void idRenderBackendVk::DrawElementsWithCounters(const drawSurf_t* drawSurf)
@@ -999,9 +1013,38 @@ void idRenderBackendVk::FogAllLights()
 	renderLog.CloseMainBlock();
 }
 
+extern idCVar rs_enable;
 void idRenderBackendVk::PostProcess(const void* data)
 {
+	// only do the post process step if resolution scaling is enabled. Prevents the unnecessary copying of the framebuffer and
+	// corresponding full screen quad pass.
+	if ( rs_enable.GetInteger() == 0 ) { 
+		return;
+	}
 
+	// resolve the scaled rendering to a temporary texture
+	postProcessCommand_t * cmd = (postProcessCommand_t *)data;
+	const idScreenRect & viewport = cmd->viewDef->viewport;
+	globalImages->currentRenderImage->CopyFramebuffer( viewport.x1, viewport.y1, viewport.GetWidth(), viewport.GetHeight() );
+
+	renderSystem->SetState( GLS_SRCBLEND_ONE | GLS_DSTBLEND_ZERO | GLS_DEPTHMASK | GLS_DEPTHFUNC_ALWAYS );
+	renderSystem->SetCull( CT_TWO_SIDED );
+
+	int screenWidth = renderSystem->GetWidth();
+	int screenHeight = renderSystem->GetHeight();
+
+	// set the window clipping
+	renderSystem->SetViewport( 0, 0, screenWidth, screenHeight );
+	renderSystem->SetScissor( 0, 0, screenWidth, screenHeight );
+
+	GL_SelectTexture( 0 );
+	globalImages->currentRenderImage->Bind();
+	renderProgManager->BindShader_PostProcess();
+
+	// Draw
+	DrawElementsWithCounters( &backEnd.unitSquareSurface );
+
+	renderLog.CloseBlock();
 }
 
 void idRenderBackendVk::PrepareStageTexturing(const shaderStage_t * pStage, const drawSurf_t * surf)
