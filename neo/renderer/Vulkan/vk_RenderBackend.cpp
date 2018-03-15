@@ -772,11 +772,6 @@ void idRenderBackendVk::DrawViewInternal(const viewDef_t* viewDef, const int ste
 		// Set Projection Matrix
 		float projMatrixTranspose[16];
 		R_MatrixTranspose( backEnd.viewDef->projectionMatrix, projMatrixTranspose );
-		//Most shaders uses MVPMATRIX rather than PROJMATRIX - but for the shaders
-		//that do, we should still Vulkanize this matrix (inv Y, half Z)
-		projMatrixTranspose[5] *= -1.0f;
-		projMatrixTranspose[10] *= 0.5f;
-		projMatrixTranspose[11] *= 0.5f;
 		SetVertexParms( RENDERPARM_PROJMATRIX_X, projMatrixTranspose, 4 );
 	}
 

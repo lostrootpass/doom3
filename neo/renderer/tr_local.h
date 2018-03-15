@@ -1130,6 +1130,8 @@ VkSampleCountFlagBits Vk_SampleCount();
 void Vk_StartFrameTimeCounter();
 void Vk_EndFrameTimeCounter();
 uint64_t Vk_GetFrameTimeCounter();
+VkCommandBuffer Vk_CurrentBackendCommandBuffer();
+VkCommandBuffer Vk_CurrentUniformCommandBuffer();
 #endif
 
 /*

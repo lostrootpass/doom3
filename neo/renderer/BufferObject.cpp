@@ -1044,6 +1044,15 @@ void idBufferObjectVk::Sync()
 	Vk_SubmitOneShotCommandBuffer(cmd);
 }
 
+void idBufferObjectVk::Sync(VkCommandBuffer cmd)
+{
+	VkBufferCopy copy = {};
+	copy.size = GetAllocedSize();
+	copy.dstOffset = copy.srcOffset = 0;
+
+	vkCmdCopyBuffer(cmd, stagingBuffer, buffer, 1, &copy);	
+}
+
 void idBufferObjectVk::ClearWithoutFreeing()
 {
 	buffer = stagingBuffer = VK_NULL_HANDLE;

@@ -99,13 +99,19 @@ void idRenderSystemVk::SwapCommandBuffers_FinishRendering(
 												uint64 * backEndMicroSec,
 												uint64 * shadowMicroSec,
 												uint64 * gpuMicroSec )  {
-	vertexCache->frameData[vertexCache->listNum].vertexBuffer->Sync();
-	vertexCache->frameData[vertexCache->listNum].indexBuffer->Sync();
-	vertexCache->frameData[vertexCache->listNum].jointBuffer->Sync();
-	vertexCache->staticData.vertexBuffer->Sync();
-	vertexCache->staticData.indexBuffer->Sync();
-	//TODO: There is no static joint cache but we allocate one anyway???
-	//vertexCache->staticData.jointBuffer->Sync();
+	VkCommandBuffer cmd = Vk_CurrentBackendCommandBuffer();
+	if (cmd != VK_NULL_HANDLE)
+	{
+		geoBufferSet_t gbs = vertexCache->frameData[vertexCache->listNum];
+		static_cast<idBufferObjectVk*>(gbs.vertexBuffer)->Sync(cmd);
+		static_cast<idBufferObjectVk*>(gbs.indexBuffer)->Sync(cmd);
+		static_cast<idBufferObjectVk*>(gbs.jointBuffer)->Sync(cmd);
+
+		gbs = vertexCache->staticData;
+		static_cast<idBufferObjectVk*>(gbs.vertexBuffer)->Sync(cmd);
+		static_cast<idBufferObjectVk*>(gbs.indexBuffer)->Sync(cmd);
+	}
+
 	Vk_EndRenderPass();
 	Vk_EndFrame();
 
@@ -124,13 +130,15 @@ void idRenderSystemVk::SwapCommandBuffers_FinishRendering(
 }
 
 const emptyCommand_t * idRenderSystemVk::SwapCommandBuffers_FinishCommandBuffers() {
+	const emptyCommand_t* cmd = idRenderSystemLocal::SwapCommandBuffers_FinishCommandBuffers();
+
 	Vk_StartFrame();
 	Vk_StartRenderPass();
 	Vk_ClearAttachments(VK_IMAGE_ASPECT_COLOR_BIT);
 
 	renderProgManager->BeginFrame();
 
-	return idRenderSystemLocal::SwapCommandBuffers_FinishCommandBuffers();
+	return cmd;
 }
 
 

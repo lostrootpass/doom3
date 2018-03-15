@@ -387,14 +387,23 @@ private:
 
 	VkBuffer uniformStagingBuffer;
 	VkBuffer uniformBuffer;
-
-	int totalUniformCount;
-
-	size_t currentVertOffset;
-	size_t currentFragOffset;
-	size_t nextVertOffset;
-
+	
 	void* uniformPtr;
+
+	struct UniformBuffer
+	{
+		explicit UniformBuffer(size_t offset) : baseOffset(offset),
+			currentVertOffset(offset), currentFragOffset(0),
+			nextVertOffset(0) {};
+
+		size_t baseOffset;
+
+		size_t currentVertOffset;
+		size_t currentFragOffset;
+		size_t nextVertOffset;
+
+	};
+	std::vector<UniformBuffer> uniformBuffers;
 };
 #endif
 

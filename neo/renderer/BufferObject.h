@@ -124,6 +124,7 @@ public:
 	virtual void				UnmapBuffer() const override;
 
 	virtual void				Sync() override;
+	void Sync(VkCommandBuffer cmd);
 
 	VkBuffer GetBuffer() const { return buffer; }
 

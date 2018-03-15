@@ -67,11 +67,16 @@ RenderPass* activeRenderPass = nullptr;
 
 std::vector<Framebuffer> framebuffers;
 std::vector<VkCommandBuffer> commandBuffers;
+std::vector<VkCommandBuffer> backEndCommandBuffers;
+std::vector<VkCommandBuffer> uniformCommandBuffers;
+std::vector<VkFence> fences;
 
 VkSurfaceCapabilitiesKHR surfaceCaps;
 
 VkSemaphore imageAvailableSemaphore = VK_NULL_HANDLE;
 VkSemaphore renderingFinishedSemaphore = VK_NULL_HANDLE;
+VkSemaphore backEndFinishedSemaphore = VK_NULL_HANDLE;
+VkSemaphore uniformSyncFinishedSemaphore = VK_NULL_HANDLE;
 
 uint32_t activeCommandBufferIdx = -1;
 
@@ -875,6 +880,12 @@ static void Vk_CreateSwapChain()
 
 		if(renderingFinishedSemaphore == VK_NULL_HANDLE)
 			VkCheck(vkCreateSemaphore(vkDevice, &info, nullptr, &renderingFinishedSemaphore));
+
+		if (backEndFinishedSemaphore == VK_NULL_HANDLE)
+			VkCheck(vkCreateSemaphore(vkDevice, &info, nullptr, &backEndFinishedSemaphore));
+
+		if (uniformSyncFinishedSemaphore == VK_NULL_HANDLE)
+			VkCheck(vkCreateSemaphore(vkDevice, &info, nullptr, &uniformSyncFinishedSemaphore));
 	}
 }
 
@@ -909,8 +920,10 @@ static void Vk_RecordCommandBuffer(VkFramebuffer framebuffer, VkCommandBuffer cm
 
 VkCommandBuffer Vk_StartFrame()
 {
+	const uint64_t uint64max = std::numeric_limits<uint64_t>::max();
+
 	VkCheck(vkAcquireNextImageKHR(vkDevice, vkSwapchain, 
-		std::numeric_limits<uint64_t>::max(), imageAvailableSemaphore,
+		uint64max, imageAvailableSemaphore,
 		VK_NULL_HANDLE, &activeCommandBufferIdx));
 
 	VkCommandBuffer cmd = commandBuffers[activeCommandBufferIdx];
@@ -918,7 +931,18 @@ VkCommandBuffer Vk_StartFrame()
 	VkCommandBufferBeginInfo beginInfo = {};
 	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
+
+	if (activeCommandBufferIdx != -1)
+	{
+		//Wait for the fence *here* because it's not until after we've retrieved
+		//the idx that we know what fence we're supposed to be waiting for.
+		vkWaitForFences(vkDevice, 1, &fences[activeCommandBufferIdx], 
+			VK_TRUE, uint64max);
+		vkResetFences(vkDevice, 1, &fences[activeCommandBufferIdx]);
+	}
+
 	VkCheck(vkBeginCommandBuffer(cmd, &beginInfo));
+	VkCheck(vkBeginCommandBuffer(backEndCommandBuffers[activeCommandBufferIdx], &beginInfo));
 
 	vkCmdResetQueryPool(Vk_ActiveCommandBuffer(), queryPool, 0, 2);
 
@@ -1006,6 +1030,8 @@ void Vk_EndFrame()
 	renderProgManager->EndFrame();
 	VkCheck(vkEndCommandBuffer(cmd));
 
+	VkCheck(vkEndCommandBuffer(backEndCommandBuffers[activeCommandBufferIdx]));
+
 	for (VkDescriptorSet set : destructionQueue)
 	{
 		Vk_FreeDescriptorSet(set);
@@ -1053,6 +1079,14 @@ static void Vk_AllocateAllCommandBuffers()
 	info.commandPool = vkCommandPool;
 
 	VkCheck(vkAllocateCommandBuffers(vkDevice, &info, commandBuffers.data()));
+
+	backEndCommandBuffers.resize(framebuffers.size());
+
+	VkCheck(vkAllocateCommandBuffers(vkDevice, &info, backEndCommandBuffers.data()));
+
+	uniformCommandBuffers.resize(framebuffers.size());
+
+	VkCheck(vkAllocateCommandBuffers(vkDevice, &info, uniformCommandBuffers.data()));
 }
 
 static void Vk_CreatePipelineLayout()
@@ -1296,6 +1330,14 @@ static bool Vk_InitDriver(VkImpParams_t params)
 	Vk_CreateSwapChain();
 	Vk_AllocateAllCommandBuffers();
 
+	VkFenceCreateInfo fenceCreateInfo = {};
+	fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+	fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+	fences.resize(framebuffers.size());
+
+	for(size_t i = 0; i < fences.size(); ++i)
+		vkCreateFence(vkDevice, &fenceCreateInfo, nullptr, &fences[i]);
+
 	Vk_RegisterDebugger();
 
 	Vk_CreateQueryPool();
@@ -1464,6 +1506,18 @@ void VkImp_Shutdown()
 	vkFreeCommandBuffers(vkDevice, vkCommandPool, commandBuffers.size(), commandBuffers.data());
 	commandBuffers.clear();
 
+	vkFreeCommandBuffers(vkDevice, vkCommandPool, backEndCommandBuffers.size(), backEndCommandBuffers.data());
+	backEndCommandBuffers.clear();
+
+	vkFreeCommandBuffers(vkDevice, vkCommandPool, uniformCommandBuffers.size(), uniformCommandBuffers.data());
+	uniformCommandBuffers.clear();
+
+	for (size_t i = 0; i < fences.size(); ++i)
+	{
+		vkDestroyFence(vkDevice, fences[i], nullptr);
+	}
+	fences.clear();
+
 	//Offscreen pass not currently used.
 	//Vk_FreeRenderImage(offscreenRenderPass.color);
 	//Vk_FreeRenderImage(offscreenRenderPass.depth);
@@ -1482,6 +1536,8 @@ void VkImp_Shutdown()
 	vkDestroyDescriptorPool(vkDevice, descriptorPool, nullptr);
 	vkDestroySemaphore(vkDevice, imageAvailableSemaphore, nullptr);
 	vkDestroySemaphore(vkDevice, renderingFinishedSemaphore, nullptr);
+	vkDestroySemaphore(vkDevice, backEndFinishedSemaphore, nullptr);
+	vkDestroySemaphore(vkDevice, uniformSyncFinishedSemaphore, nullptr);
 	vkDestroySwapchainKHR(vkDevice, vkSwapchain, nullptr);
 	vkDestroyPipelineLayout(vkDevice, vkPipelineLayout, nullptr);
 	vkDestroyCommandPool(vkDevice, vkCommandPool, nullptr);
@@ -1501,30 +1557,59 @@ void Vk_FlipPresent()
 	if (activeCommandBufferIdx == -1)
 		return;
 
-	VkSemaphore semaphores[] = { imageAvailableSemaphore };
+	//Flipping works by submitting three command queues:
+	//* First, the uniforms used for this frame have to finish syncing
+	//* After that, rendering for this frame is allowed to begin
+	//* During all this, vertex/index/join data for next frame is synced
+
+	VkSubmitInfo uniformInfo = {};
+	uniformInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	uniformInfo.signalSemaphoreCount = 1;
+	uniformInfo.pSignalSemaphores = &uniformSyncFinishedSemaphore;
+	uniformInfo.commandBufferCount = 1;
+	uniformInfo.pCommandBuffers = &uniformCommandBuffers[activeCommandBufferIdx];
+
+	VkSemaphore backendSignals[] = { backEndFinishedSemaphore };
+	VkCommandBuffer backendBuffers[] = { backEndCommandBuffers[activeCommandBufferIdx] };
+	VkSubmitInfo backendSubmitInfo = {};
+	backendSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	backendSubmitInfo.signalSemaphoreCount = 1;
+	backendSubmitInfo.pSignalSemaphores = backendSignals;
+	backendSubmitInfo.commandBufferCount = 1;
+	backendSubmitInfo.pCommandBuffers = backendBuffers;
+
+	VkSemaphore semaphores[] = {
+		backEndFinishedSemaphore,
+		uniformSyncFinishedSemaphore,
+		imageAvailableSemaphore
+	};
 	VkSemaphore signals[] = { renderingFinishedSemaphore };
-	VkPipelineStageFlags stages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+	VkPipelineStageFlags stages[] = {
+		VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+		VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
+	};
 	VkCommandBuffer buffers[] = { commandBuffers[(size_t)activeCommandBufferIdx] };
-	VkSwapchainKHR swapChains[] = { vkSwapchain };
 
 	VkSubmitInfo submitInfo = {};
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-	submitInfo.waitSemaphoreCount = 1;
-	submitInfo.pWaitSemaphores = semaphores;
+	submitInfo.waitSemaphoreCount = 3;
+	submitInfo.pWaitSemaphores = &semaphores[0];
+	submitInfo.pWaitDstStageMask = &stages[0];
 	submitInfo.signalSemaphoreCount = 1;
 	submitInfo.pSignalSemaphores = signals;
-	submitInfo.pWaitDstStageMask = stages;
 	submitInfo.commandBufferCount = 1;
 	submitInfo.pCommandBuffers = buffers;
 
-	VkCheck(vkQueueSubmit(vkGraphicsQueue.vkQueue, 1, &submitInfo, VK_NULL_HANDLE));
+	VkSubmitInfo submits[3] = { uniformInfo, backendSubmitInfo, submitInfo };
+	VkCheck(vkQueueSubmit(vkGraphicsQueue.vkQueue, 3, submits, fences[activeCommandBufferIdx]));
 
 	VkPresentInfoKHR presentInfo = {};
 	presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 	presentInfo.waitSemaphoreCount = 1;
 	presentInfo.pWaitSemaphores = signals;
 	presentInfo.swapchainCount = 1;
-	presentInfo.pSwapchains = swapChains;
+	presentInfo.pSwapchains = &vkSwapchain;
 	presentInfo.pImageIndices = &activeCommandBufferIdx;
 
 	VkResult res = vkQueuePresentKHR(vkPresentQueue.vkQueue, &presentInfo);
@@ -2029,6 +2114,22 @@ uint64_t Vk_GetFrameTimeCounter()
 	time /= 1000 / vkPhysicalDeviceProperties.limits.timestampPeriod;
 
 	return time;
+}
+
+VkCommandBuffer Vk_CurrentBackendCommandBuffer()
+{
+	if (activeCommandBufferIdx == -1)
+		return VK_NULL_HANDLE;
+
+	return backEndCommandBuffers[activeCommandBufferIdx];
+}
+
+VkCommandBuffer Vk_CurrentUniformCommandBuffer()
+{
+	if (activeCommandBufferIdx == -1)
+		return VK_NULL_HANDLE;
+
+	return uniformCommandBuffers[activeCommandBufferIdx];
 }
 
 #endif

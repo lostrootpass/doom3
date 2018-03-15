@@ -43,7 +43,8 @@ idRenderProgManagerVk::idRenderProgManagerVk
 ================================================================================================
 */
 idRenderProgManagerVk::idRenderProgManagerVk() : idRenderProgManager(),
-currentVertOffset(0), currentFragOffset(0), nextVertOffset(0), uniformPtr(nullptr) {
+	uniformPtr(nullptr)
+{
 
 }
 
@@ -94,7 +95,9 @@ void idRenderProgManagerVk::SetUniformValue(const renderParm_t rp, const float *
 void idRenderProgManagerVk::CommitUniforms() {
 	ALIGNTYPE16 idVec4 localVectors[RENDERPARM_USER + MAX_GLSL_USER_PARMS];
 	
-	currentVertOffset = nextVertOffset;
+	UniformBuffer& buf = uniformBuffers[vertexCache->listNum];
+
+	buf.currentVertOffset = buf.nextVertOffset;
 	
 	const glslProgram_t & prog = glslPrograms[currentRenderProgram];
 	
@@ -115,7 +118,7 @@ void idRenderProgManagerVk::CommitUniforms() {
 		uniformPtr = (char*)uniformPtr + thisUniform;
 	}
 
-	currentFragOffset = currentVertOffset + thisUniform;
+	buf.currentFragOffset = buf.currentVertOffset + thisUniform;
 	thisUniform = 0;
 
 	//We're always guaranteed to have a vertex shader, but shadow passes don't use fragshaders
@@ -138,9 +141,9 @@ void idRenderProgManagerVk::CommitUniforms() {
 		}
 	}
 	
-	nextVertOffset = currentFragOffset + thisUniform;
+	buf.nextVertOffset = buf.currentFragOffset + thisUniform;
 
-	assert(nextVertOffset < UNIFORM_BUFFER_SIZE);
+	assert(buf.nextVertOffset < UNIFORM_BUFFER_SIZE);
 }
 
 int idRenderProgManagerVk::FindProgram(const char* name, int vIndex, int fIndex) {
@@ -380,14 +383,12 @@ void idRenderProgManagerVk::Init()
 {
 	idRenderProgManager::Init();
 
-	totalUniformCount = 0;
 	size_t bufferSize = 0;
 	size_t vertexSize = 0;
 	for (int i = 0; i < vertexShaders.Num(); ++i)
 	{
 		if(vertexShaders[i].uniforms.Num())
 		{
-			totalUniformCount += vertexShaders[i].uniforms.Num();
 			bufferSize += ((vertexShaders[i].uniforms.Num() * sizeof(idVec4)) + 0x100) & -0x100;
 		}
 	}
@@ -398,13 +399,17 @@ void idRenderProgManagerVk::Init()
 	{
 		if(fragmentShaders[i].uniforms.Num())
 		{
-			totalUniformCount += fragmentShaders[i].uniforms.Num();
 			bufferSize += ((fragmentShaders[i].uniforms.Num() * sizeof(idVec4)) + 0x100) & -0x100;
 		}
 	}
 
 	Vk_CreateUniformBuffer(uniformStagingMemory, uniformStagingBuffer, 
-		uniformMemory, uniformBuffer, UNIFORM_BUFFER_SIZE);
+		uniformMemory, uniformBuffer, UNIFORM_BUFFER_SIZE * VERTCACHE_NUM_FRAMES);
+
+	for (int i = 0; i < VERTCACHE_NUM_FRAMES; ++i)
+	{
+		uniformBuffers.emplace_back((size_t)(UNIFORM_BUFFER_SIZE * i));
+	}
 
 	VkDescriptorBufferInfo bufferInfo[2];
 	bufferInfo[0] = {};
@@ -881,33 +886,49 @@ void idRenderProgManagerVk::DestroyPipelines()
 
 size_t idRenderProgManagerVk::GetCurrentVertUniformOffset() const
 {
-	return currentVertOffset;
+	const UniformBuffer& b = uniformBuffers[vertexCache->listNum];
+	return b.baseOffset + uniformBuffers[vertexCache->listNum].currentVertOffset;
 }
 
 size_t idRenderProgManagerVk::GetCurrentFragUniformOffset() const
 {
-	return currentFragOffset;
+	const UniformBuffer& b = uniformBuffers[vertexCache->listNum];
+	return b.baseOffset + uniformBuffers[vertexCache->listNum].currentFragOffset;
 }
 
 void idRenderProgManagerVk::BeginFrame()
 {
-	uniformPtr = Vk_MapMemory(uniformStagingMemory, 0, UNIFORM_BUFFER_SIZE, 0);
-	currentFragOffset = currentVertOffset = nextVertOffset = 0;
+	UniformBuffer& b = uniformBuffers[vertexCache->listNum];
+	if (uniformPtr == nullptr)
+	{
+		uniformPtr = Vk_MapMemory(uniformStagingMemory, b.baseOffset,
+			UNIFORM_BUFFER_SIZE, 0);
+	}
+	b.currentFragOffset = b.currentVertOffset = b.nextVertOffset = 0;
 }
 
 void idRenderProgManagerVk::EndFrame()
 {
+	UniformBuffer& buf = uniformBuffers[vertexCache->listNum];
 	if (uniformPtr != nullptr)
 	{
 		Vk_UnmapMemory(uniformStagingMemory);
 		uniformPtr = nullptr;
 
 		VkBufferCopy copy = {};
-		copy.size = UNIFORM_BUFFER_SIZE;
-		VkCommandBuffer b = Vk_StartOneShotCommandBuffer();
-		vkCmdCopyBuffer(b, uniformStagingBuffer, uniformBuffer, 1, &copy);
-		//vkCmdCopyBuffer(Vk_ActiveCommandBuffer(), uniformStagingBuffer, uniformBuffer, 1, &copy);
-		Vk_SubmitOneShotCommandBuffer(b);
+		copy.size = buf.nextVertOffset;
+		copy.srcOffset = buf.baseOffset;
+		copy.dstOffset = buf.baseOffset;
+		VkCommandBuffer cmd = Vk_CurrentUniformCommandBuffer();
+		if (cmd != VK_NULL_HANDLE)
+		{
+			VkCommandBufferBeginInfo info = {};
+			info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+			info.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
+			vkBeginCommandBuffer(cmd, &info);
+			vkCmdCopyBuffer(cmd, uniformStagingBuffer, uniformBuffer, 1, &copy);
+			vkEndCommandBuffer(cmd);
+		}
 	}
 }
 
