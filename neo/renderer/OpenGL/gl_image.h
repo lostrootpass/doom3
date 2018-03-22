@@ -15,7 +15,7 @@ public:
 	virtual void SetTexParameters() override;
 	virtual void AllocImage() override;
 	virtual void PurgeImage() override;
-	virtual void ActuallyPurgeImage() override;
+	virtual void ActuallyPurgeImage(bool force = false) override;
 	virtual void Resize(int width, int height) override;
 	virtual void SetSamplerState(textureFilter_t tf, 
 		textureRepeat_t tr) override;

@@ -130,7 +130,7 @@ public:
 
 	//"Purge Image" will only queue the image to be purged by the render system,
 	//Actually Purge Image will do the associated freeing of resources
-	virtual void		ActuallyPurgeImage()=0;
+	virtual void		ActuallyPurgeImage(bool force = false)=0;
 
 	// z is 0 for 2D textures, 0 - 5 for cube maps, and 0 - uploadDepth for 3D textures. Only 
 	// one plane at a time of 3D textures can be uploaded. The data is assumed to be correct for 

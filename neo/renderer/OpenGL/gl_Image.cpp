@@ -472,7 +472,7 @@ void idImageGL::PurgeImage() {
 	}
 }
 
-void idImageGL::ActuallyPurgeImage() {
+void idImageGL::ActuallyPurgeImage(bool force) {
 	//Do nothing on OpenGL
 }
 

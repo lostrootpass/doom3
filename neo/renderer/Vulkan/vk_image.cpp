@@ -403,8 +403,9 @@ void idImageVk::PurgeImage()
 		renderSystem->QueueImagePurge(this);
 }
 
-void idImageVk::ActuallyPurgeImage() {
-	if (texnum != TEXTURE_NOT_LOADED) {
+void idImageVk::ActuallyPurgeImage(bool force) {
+	if (texnum != TEXTURE_NOT_LOADED &&
+		(force || cmdBuffer == Vk_ActiveCommandBuffer())) {
 		Vk_DestroyBuffer(stagingBuffer);
 		Vk_FreeMemory(stagingMemory);
 		stagingMemory = stagingBuffer = VK_NULL_HANDLE;
@@ -492,7 +493,8 @@ void idImageVk::Bind() {
 			tmu->currentCubeMap = texnum;
 	}
 
-	vkCmdBindDescriptorSets(Vk_ActiveCommandBuffer(), 
+	cmdBuffer = Vk_ActiveCommandBuffer();
+	vkCmdBindDescriptorSets(cmdBuffer, 
 		VK_PIPELINE_BIND_POINT_GRAPHICS, Vk_GetPipelineLayout(),
 		texUnit + VK_IMAGE_SET_OFFSET, 1, &descriptorSet, 0, nullptr);
 }

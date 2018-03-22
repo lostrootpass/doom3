@@ -317,6 +317,7 @@
     <ClInclude Include="renderer\tr_local.h" />
     <ClInclude Include="renderer\VertexCache.h" />
     <ClInclude Include="renderer\Vulkan\vk_image.h" />
+    <ClInclude Include="renderer\Vulkan\vk_MemPool.h" />
     <ClInclude Include="renderer\Vulkan\vk_RenderBackend.h" />
     <ClInclude Include="renderer\Vulkan\vk_RenderSystem.h" />
     <ClInclude Include="sound\snd_local.h" />
@@ -545,6 +546,7 @@
     <ClCompile Include="renderer\VertexCache.cpp" />
     <ClCompile Include="renderer\Vulkan\vk_GraphicsAPIWrapper.cpp" />
     <ClCompile Include="renderer\Vulkan\vk_image.cpp" />
+    <ClCompile Include="renderer\Vulkan\vk_MemPool.cpp" />
     <ClCompile Include="renderer\Vulkan\vk_RenderBackend.cpp" />
     <ClCompile Include="renderer\Vulkan\vk_RenderProgs.cpp" />
     <ClCompile Include="renderer\Vulkan\vk_RenderSystem.cpp" />

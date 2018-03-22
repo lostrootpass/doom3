@@ -18,7 +18,7 @@ public:
 	virtual void SetTexParameters() override;
 	virtual void AllocImage() override;
 	virtual void PurgeImage() override;
-	virtual void ActuallyPurgeImage() override;
+	virtual void ActuallyPurgeImage(bool force = false) override;
 	virtual void Resize(int width, int height) override;
 	virtual void SetSamplerState(textureFilter_t tf, 
 		textureRepeat_t tr) override;
@@ -45,6 +45,7 @@ private:
 	VkFormat format;
 	VkSampler sampler = VK_NULL_HANDLE;
 	VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
+	VkCommandBuffer cmdBuffer = VK_NULL_HANDLE;
 };
 
 #endif

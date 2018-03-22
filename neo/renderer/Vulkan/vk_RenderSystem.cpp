@@ -118,12 +118,6 @@ void idRenderSystemVk::SwapCommandBuffers_FinishRendering(
 	if (gpuMicroSec)
 		*gpuMicroSec = Vk_GetFrameTimeCounter();
 
-	//Need to do this here to avoid invalidating the command buffers
-	for (int i = 0; i < purgeQueue.Num(); ++i)
-	{
-		purgeQueue[i]->ActuallyPurgeImage();
-	}
-
 	purgeQueue.Clear();
 
 	Vk_FlipPresent();
@@ -133,6 +127,14 @@ const emptyCommand_t * idRenderSystemVk::SwapCommandBuffers_FinishCommandBuffers
 	const emptyCommand_t* cmd = idRenderSystemLocal::SwapCommandBuffers_FinishCommandBuffers();
 
 	Vk_StartFrame();
+
+	//Need to do this here to avoid invalidating the command buffers
+	for (int i = 0; i < purgeQueue.Num(); ++i)
+	{
+		purgeQueue[i]->ActuallyPurgeImage();
+	}
+
+
 	Vk_StartRenderPass();
 	Vk_ClearAttachments(VK_IMAGE_ASPECT_COLOR_BIT);
 
@@ -168,7 +170,7 @@ void idRenderSystemVk::Shutdown() {
 
 	for (int i = 0; i < purgeQueue.Num(); ++i)
 	{
-		purgeQueue[i]->ActuallyPurgeImage();
+		purgeQueue[i]->ActuallyPurgeImage(true);
 	}
 
 	purgeQueue.Clear();
