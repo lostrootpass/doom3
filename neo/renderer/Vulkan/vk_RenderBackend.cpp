@@ -1882,15 +1882,20 @@ void idRenderBackendVk::MotionBlur()
 	renderSystem->SetState( GLS_DEPTHFUNC_ALWAYS );
 	renderSystem->SetCull( CT_TWO_SIDED );
 
+	const uint32_t msaa = (uint32_t)Vk_SampleCount();
+
 	renderProgManager->BindShader_MotionBlur();
 
 	// let the fragment program know how many samples we are going to use
 	idVec4 samples( (float)( 1 << r_motionBlur.GetInteger() ) );
 	SetFragmentParm( RENDERPARM_OVERBRIGHT, samples.ToFloatPtr() );
 
+	vkCmdPushConstants(Vk_ActiveCommandBuffer(), Vk_GetPipelineLayout(),
+		VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(uint32_t), &msaa);
+
 	GL_SelectTexture( 0 );
 	globalImages->currentRenderImage->Bind();
-	GL_SelectTexture( 1 );
+	GL_SelectTexture( msaa > 1 ? 1 : 2 );
 	globalImages->currentDepthImage->Bind();
 
 	DrawElementsWithCounters( &backEnd.unitSquareSurface );

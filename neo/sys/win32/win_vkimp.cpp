@@ -332,7 +332,9 @@ uint32_t Vk_GetMemoryTypeIndex(uint32_t bits, VkMemoryPropertyFlags flags)
 	return -1;
 }
 
-static void Vk_CreateResolveImage(RenderImage* renderImage)
+static void Vk_CreateResolveImage(RenderImage* renderImage, 
+	VkImageUsageFlagBits usage, VkFormat format, VkImageAspectFlags aspectMask,
+	VkImageLayout dstLayout)
 {
 	if (renderImage->view != VK_NULL_HANDLE)
 		vkDestroyImageView(vkDevice, renderImage->view, nullptr);
@@ -345,8 +347,7 @@ static void Vk_CreateResolveImage(RenderImage* renderImage)
 
 	VkImageCreateInfo info = {};
 	info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-	info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
-		VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+	info.usage = usage | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 	info.tiling = VK_IMAGE_TILING_OPTIMAL;
 	info.extent.width = surfaceCaps.currentExtent.width;
 	info.extent.height = surfaceCaps.currentExtent.height;
@@ -356,7 +357,7 @@ static void Vk_CreateResolveImage(RenderImage* renderImage)
 	info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	info.mipLevels = 1;
 	info.arrayLayers = 1;
-	info.format = VK_FORMAT_B8G8R8A8_UNORM;
+	info.format = format;
 	info.imageType = VK_IMAGE_TYPE_2D;
 
 	VkCheck(vkCreateImage(vkDevice, &info, nullptr, &renderImage->image));
@@ -367,16 +368,17 @@ static void Vk_CreateResolveImage(RenderImage* renderImage)
 	VkMemoryAllocateInfo alloc = {};
 	alloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	alloc.allocationSize = memReq.size;
-	alloc.memoryTypeIndex = Vk_GetMemoryTypeIndex(memReq.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+	alloc.memoryTypeIndex = Vk_GetMemoryTypeIndex(memReq.memoryTypeBits, 
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 	VkCheck(vkAllocateMemory(vkDevice, &alloc, nullptr, &renderImage->memory));
 	VkCheck(vkBindImageMemory(vkDevice, renderImage->image, renderImage->memory, 0));
 
 	VkImageViewCreateInfo view = {};
 	view.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-	view.format = VK_FORMAT_B8G8R8A8_UNORM;
+	view.format = format;
 	view.viewType = VK_IMAGE_VIEW_TYPE_2D;
 	view.image = renderImage->image;
-	view.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	view.subresourceRange.aspectMask = aspectMask;
 	view.subresourceRange.baseMipLevel = 0;
 	view.subresourceRange.baseArrayLayer = 0;
 	view.subresourceRange.layerCount = 1;
@@ -385,12 +387,11 @@ static void Vk_CreateResolveImage(RenderImage* renderImage)
 	VkCheck(vkCreateImageView(vkDevice, &view, nullptr, &renderImage->view));
 
 	VkImageSubresourceRange range = {};
-	range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	range.aspectMask = aspectMask;
 	range.layerCount = 1;
 	range.levelCount = 1;
-	Vk_SetImageLayout(renderImage->image,
-		VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_LAYOUT_UNDEFINED,
-		VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, range);
+	Vk_SetImageLayout(renderImage->image, format, VK_IMAGE_LAYOUT_UNDEFINED, 
+		dstLayout, range);
 }
 
 static void Vk_CreateDepthBuffer(RenderImage* renderImage)
@@ -828,8 +829,9 @@ static void Vk_CreateSwapChain()
 	Vk_CreateDepthBuffer(&screenRenderPass.depth);
 	
 
-	Vk_CreateResolveImage(&screenRenderPass.resolve);
-
+	Vk_CreateResolveImage(&screenRenderPass.resolve,
+		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_FORMAT_B8G8R8A8_UNORM,
+		VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
 	//Create framebuffers
 	{
@@ -1169,10 +1171,17 @@ static void Vk_CreatePipelineLayout()
 		imageSetLayout
 	};
 
+	VkPushConstantRange pushConstant = {};
+	pushConstant.offset = 0;
+	pushConstant.size = sizeof(uint32_t);
+	pushConstant.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
 	VkPipelineLayoutCreateInfo layoutCreateInfo = {};
 	layoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	layoutCreateInfo.pSetLayouts = layouts;
 	layoutCreateInfo.setLayoutCount = SET_COUNT;
+	layoutCreateInfo.pushConstantRangeCount = 1;
+	layoutCreateInfo.pPushConstantRanges = &pushConstant;
 
 	VkCheck(vkCreatePipelineLayout(vkDevice, &layoutCreateInfo, nullptr, &vkPipelineLayout));
 }

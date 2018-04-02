@@ -34,12 +34,33 @@ vec4 tex2Dlod( sampler2D samp, vec4 texcoord ) { return textureLod( samp, texcoo
 vec4 tex3Dlod( sampler3D samp, vec4 texcoord ) { return textureLod( samp, texcoord.xyz, texcoord.w ); }
 vec4 texCUBElod( samplerCube samp, vec4 texcoord ) { return textureLod( samp, texcoord.xyz, texcoord.w ); }
 
+layout(push_constant) uniform SampleCountInfo {
+	uint sampleCount;
+};
+
+vec4 tex2DMS(sampler2DMS samp, vec2 texCoord)
+{
+	vec4 value = vec4(0.0);
+
+	vec2 texSize = floor(textureSize(samp) * texCoord);
+	ivec2 sampCoord = ivec2(int(texSize.s), int(texSize.t));
+	for(int i = 0; i < sampleCount; ++i)
+	{
+		value += texelFetch(samp, sampCoord, i);
+	}
+
+	value /= sampleCount;
+
+	return value;
+}
+
 layout(set = 0, binding = 1) uniform UBO {
 	vec4 _fa_[6];
 };
 
 layout(set = 2, binding = 0) uniform sampler2D samp0;
-layout(set = 3, binding = 0) uniform sampler2D samp1;
+layout(set = 3, binding = 0) uniform sampler2DMS samp1;
+layout(set = 4, binding = 0) uniform sampler2D samp2;
 
 layout(location = 0) in vec2 vofi_TexCoord0;
 
@@ -49,7 +70,13 @@ void main() {
 	if ( tex2D ( samp0 , vofi_TexCoord0 ). w == 0.0 ) {
 		discard ;
 	}
-	float windowZ = 1.0- tex2D ( samp1 , vofi_TexCoord0 ). x ;
+
+	float windowZ;
+	if(sampleCount > 1)
+		windowZ = 1.0 - tex2DMS(samp1, vofi_TexCoord0).x;
+	else
+		windowZ = 1.0 - tex2D(samp2, vofi_TexCoord0).x;
+
 	vec3 ndc = vec3 ( vofi_TexCoord0 * 2.0 - 1.0 , windowZ * 2.0 - 1.0 ) ;
 	float clipW = - _fa_[4 /* rpProjectionMatrixZ */] . w / ( - _fa_[4 /* rpProjectionMatrixZ */] . z - ndc. z ) ;
 	vec4 clip = vec4 ( ndc * clipW , clipW ) ;

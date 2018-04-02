@@ -113,15 +113,22 @@ void idImageVk::FinaliseImageUpload()
 			offset += PadAlign(ByteSize(mipWidth, mipHeight, opts));
 		}
 	}
+	
+	VkImageSubresourceRange range = {};
+	range.layerCount = layerCount;
+	range.levelCount = opts.numLevels;
+	range.aspectMask = Aspect();
+
+	if (range.aspectMask & VK_IMAGE_ASPECT_DEPTH_BIT)
+		range.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+
+	Vk_SetImageLayout(image, format, VK_IMAGE_LAYOUT_UNDEFINED,
+		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, range);
 
 	VkCommandBuffer cmd = Vk_StartOneShotCommandBuffer();
 	vkCmdCopyBufferToImage(cmd, stagingBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, (uint32_t)copies.size(), copies.data());
 	Vk_SubmitOneShotCommandBuffer(cmd);
 
-	VkImageSubresourceRange range = {};
-	range.layerCount = layerCount;
-	range.levelCount = opts.numLevels;
-	range.aspectMask = Aspect();
 	Vk_SetImageLayout(image, format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, range);
 
@@ -147,7 +154,7 @@ void idImageVk::FinaliseImageUpload()
 		a = VK_COMPONENT_SWIZZLE_A;
 	}
 
-	VkFilter minFilter, magFilter;
+	VkFilter minFilter = VK_FILTER_LINEAR, magFilter = VK_FILTER_LINEAR;
 	switch( filter ) {
 		case TF_DEFAULT:
 			if ( r_useTrilinearFiltering.GetBool() ) {
@@ -193,7 +200,8 @@ void idImageVk::FinaliseImageUpload()
 	}
 
 	// set the wrap/clamp modes
-	VkSamplerAddressMode u, v;
+	VkSamplerAddressMode u = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	VkSamplerAddressMode v = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 	VkBorderColor borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK;
 	switch( repeat ) {
 		case TR_REPEAT:
@@ -385,6 +393,9 @@ void idImageVk::AllocImage() {
 	range.levelCount = opts.numLevels;
 	range.aspectMask = Aspect();
 
+	if (Aspect() & VK_IMAGE_ASPECT_DEPTH_BIT)
+		range.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+
 	Vk_SetImageLayout(image, format, VK_IMAGE_LAYOUT_UNDEFINED,
 		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, range);
 
@@ -436,9 +447,6 @@ idImageVk::Resize
 ========================
 */
 void idImageVk::Resize( int width, int height ) {
-	if ( opts.width == width && opts.height == height ) {
-		return;
-	}
 	opts.width = width;
 	opts.height = height;
 
@@ -453,8 +461,6 @@ void idImageVk::Resize( int width, int height ) {
 	imageView = newView;
 
 	UpdateDescriptorSet();
-
-	//vkDeviceWaitIdle(Vk_GetDevice());
 }
 
 /*
@@ -586,7 +592,7 @@ bool idImageVk::AllocImageInternal(VkImage& newImage, VkImageView& newView)
 			break;
 		default:
 			idLib::FatalError( "%s: bad texture type %d", GetName(), opts.textureType );
-			return false;
+			break;
 	}
 
 	VkComponentSwizzle r, g, b, a;
@@ -627,6 +633,9 @@ bool idImageVk::AllocImageInternal(VkImage& newImage, VkImageView& newView)
 	info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	info.samples = VK_SAMPLE_COUNT_1_BIT;
 	
+	if (Aspect() & VK_IMAGE_ASPECT_DEPTH_BIT)
+		info.samples = Vk_SampleCount();
+
 	if (opts.textureType == TT_CUBIC)
 		info.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
 
@@ -682,6 +691,14 @@ void idImageVk::CopyImageInternal(int imageWidth, int imageHeight, VkImage img, 
 	if (!(opts.width == imageWidth && opts.height == imageHeight))
 	{
 		Resize(imageWidth, imageHeight);
+	}
+
+	//Account for MSAA values changing during gameplay for motion blur
+	static VkSampleCountFlagBits msaa = Vk_SampleCount();
+	if ((msaa != Vk_SampleCount()) && (Aspect() & VK_IMAGE_ASPECT_DEPTH_BIT))
+	{
+		Resize(imageWidth, imageHeight);
+		msaa = Vk_SampleCount();
 	}
 
 	VkImageSubresourceRange range = {};
