@@ -84,3 +84,27 @@ char *Mem_CopyString( const char *in ) {
 	return out;
 }
 
+void *operator new(size_t s) {
+	return Mem_Alloc( s, TAG_NEW );
+}
+void operator delete( void *p ) {
+	Mem_Free( p );
+}
+void *operator new[]( size_t s ) {
+	return Mem_Alloc( s, TAG_NEW );
+}
+void operator delete[]( void *p ) {
+	Mem_Free( p );
+}
+void *operator new( size_t s, memTag_t tag ) {
+	return Mem_Alloc( s, tag );
+}
+void operator delete( void *p, memTag_t tag ) {
+	Mem_Free( p );
+}
+void *operator new[]( size_t s, memTag_t tag ) {
+	return Mem_Alloc( s, tag );
+}
+void operator delete[]( void *p, memTag_t tag ) {
+	Mem_Free( p );
+}

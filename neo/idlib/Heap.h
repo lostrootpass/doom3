@@ -58,30 +58,14 @@ ID_INLINE void		Mem_Free( void *ptr ) { Mem_Free16( ptr ); }
 void *		Mem_ClearedAlloc( const int size, const memTag_t tag );
 char *		Mem_CopyString( const char *in );
 
-ID_INLINE void *operator new( size_t s ) {
-	return Mem_Alloc( s, TAG_NEW );
-}
-ID_INLINE void operator delete( void *p ) {
-	Mem_Free( p );
-}
-ID_INLINE void *operator new[]( size_t s ) {
-	return Mem_Alloc( s, TAG_NEW );
-}
-ID_INLINE void operator delete[]( void *p ) {
-	Mem_Free( p );
-}
-ID_INLINE void *operator new( size_t s, memTag_t tag ) {
-	return Mem_Alloc( s, tag );
-}
-ID_INLINE void operator delete( void *p, memTag_t tag ) {
-	Mem_Free( p );
-}
-ID_INLINE void *operator new[]( size_t s, memTag_t tag ) {
-	return Mem_Alloc( s, tag );
-}
-ID_INLINE void operator delete[]( void *p, memTag_t tag ) {
-	Mem_Free( p );
-}
+void *operator new(size_t s);
+void operator delete( void *p );
+void *operator new[]( size_t s ); 
+void operator delete[]( void *p );
+void *operator new( size_t s, memTag_t tag );
+void operator delete( void *p, memTag_t tag );
+void *operator new[]( size_t s, memTag_t tag ); 
+void operator delete[]( void *p, memTag_t tag ); 
 
 // Define replacements for the PS3 library's aligned new operator.
 // Without these, allocations of objects with 32 byte or greater alignment
