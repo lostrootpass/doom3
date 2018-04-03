@@ -640,7 +640,7 @@ bool idImageVk::AllocImageInternal(VkImage& newImage, VkImageView& newView)
 		info.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
 
 
-	newImage = Vk_AllocAndCreateImage(info, deviceMemory);
+	newImage = Vk_AllocAndCreateImage(info);
 
 	VkImageSubresourceRange range = {};
 	range.layerCount = layerCount;

@@ -316,6 +316,7 @@
     <ClInclude Include="renderer\simplex.h" />
     <ClInclude Include="renderer\tr_local.h" />
     <ClInclude Include="renderer\VertexCache.h" />
+    <ClInclude Include="renderer\Vulkan\vk_API.h" />
     <ClInclude Include="renderer\Vulkan\vk_image.h" />
     <ClInclude Include="renderer\Vulkan\vk_MemPool.h" />
     <ClInclude Include="renderer\Vulkan\vk_RenderBackend.h" />

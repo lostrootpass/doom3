@@ -38,10 +38,6 @@ If you have questions concerning this license or the applicable additional terms
 #include "RenderTexture.h"
 #include "Font.h"
 
-#ifdef DOOM3_VULKAN
-#include <vulkan/vulkan.h>
-#endif
-
 // everything that is needed by the backend needs
 // to be double buffered to allow it to run in
 // parallel on a dual cpu machine
@@ -1080,60 +1076,6 @@ void		GLimp_DeactivateContext();
 
 void		GLimp_EnableLogging( bool enable );
 
-
-/* Vulkan-specific functions */
-//TODO: move these
-#ifdef DOOM3_VULKAN
-typedef glimpParms_t VkImpParams_t;
-bool		VkImp_Init( VkImpParams_t params );
-void VkImp_Shutdown();
-void Vk_FlipPresent();
-bool R_IsVulkanAvailable();
-VkBuffer Vk_CreateAndBindBuffer(const VkBufferCreateInfo& info, VkMemoryPropertyFlags flags, VkDeviceMemory& memory);
-VkImage Vk_AllocAndCreateImage(const VkImageCreateInfo& info, VkDeviceMemory& memory);
-VkImageView Vk_CreateImageView(const VkImageViewCreateInfo& info);
-VkCommandBuffer Vk_StartOneShotCommandBuffer();
-void Vk_SubmitOneShotCommandBuffer(VkCommandBuffer cmd);
-void Vk_SetImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout,
-	VkImageLayout newLayout, VkImageSubresourceRange& range);
-void Vk_DestroyImageAndView(VkImage image, VkImageView imageView);
-void Vk_DestroyBuffer(VkBuffer buffer);
-void Vk_FreeMemory(VkDeviceMemory memory);
-VkCommandBuffer Vk_ActiveCommandBuffer();
-VkCommandBuffer Vk_StartFrame();
-VkCommandBuffer Vk_StartOffscrenRenderPass();
-VkCommandBuffer Vk_StartRenderPass();
-void Vk_EndFrame();
-void Vk_EndRenderPass();
-uint32_t Vk_GetMemoryTypeIndex(uint32_t bits, VkMemoryPropertyFlags flags);
-VkPipeline Vk_CreatePipeline(VkGraphicsPipelineCreateInfo& info);
-VkShaderModule Vk_CreateShaderModule(const char* bytes, size_t length);
-void Vk_UsePipeline(VkPipeline p);
-void* Vk_MapMemory(VkDeviceMemory memory, VkDeviceSize offset, VkDeviceSize size, VkFlags flags);
-void Vk_UnmapMemory(VkDeviceMemory memory);
-void Vk_CreateUniformBuffer(VkDeviceMemory& stagingMemory, VkBuffer& stagingBuffer,
-	VkDeviceMemory& memory, VkBuffer& buffer, VkDeviceSize size);
-void Vk_UpdateDescriptorSet(VkWriteDescriptorSet& write);
-VkDevice Vk_GetDevice();
-VkDescriptorSet Vk_AllocDescriptorSetForImage();
-VkPipelineLayout Vk_GetPipelineLayout();
-VkDescriptorSet Vk_UniformDescriptorSet();
-VkDescriptorSet Vk_AllocateJointBufferSetForFrame(int idx, geoBufferSet_t& gbs);
-VkDescriptorSet Vk_JointBufferSetForFrame(int idx);
-void Vk_FreeDescriptorSet(const VkDescriptorSet set);
-void Vk_ClearAttachments(uint32_t mask, byte stencilValue = 0);
-VkImage Vk_ActiveColorBuffer();
-VkImage Vk_ActiveDepthBuffer();
-void Vk_QueueDestroyDescriptorSet(VkDescriptorSet set);
-VkSampleCountFlagBits Vk_MaxSupportedSampleCount();
-VkSampleCountFlagBits Vk_SampleCount();
-void Vk_StartFrameTimeCounter();
-void Vk_EndFrameTimeCounter();
-uint64_t Vk_GetFrameTimeCounter();
-VkCommandBuffer Vk_CurrentBackendCommandBuffer();
-VkCommandBuffer Vk_CurrentUniformCommandBuffer();
-#endif
-
 /*
 ============================================================
 
@@ -1430,6 +1372,7 @@ void RB_ShutdownDebugTools();
 #include "RenderBackend.h"
 
 #ifdef DOOM3_VULKAN
+#include "Vulkan/vk_API.h"
 #include "Vulkan/vk_RenderSystem.h"
 #endif
 
