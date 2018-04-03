@@ -172,7 +172,7 @@ void idBinaryImage::Load2DFromMemory( int width, int height, const byte * pic_co
 			if (textureFormat == FMT_BGRA8)
 				fileData.format = FMT_BGRA8;
 			else if (textureFormat == FMT_DEPTH)
-				fileData.format == FMT_DEPTH;
+				fileData.format = FMT_DEPTH;
 			else
 				fileData.format = textureFormat = FMT_RGBA8;
 			img.Alloc( scaledWidth * scaledHeight * 4 );
@@ -404,12 +404,12 @@ bool idBinaryImage::LoadFromGeneratedFile( idFile * bFile, ID_TIME_T sourceFileT
 		if ( bFile->Read( &img, sizeof( bimageImage_t ) ) <= 0 ) {
 			return false;
 		}
-		idSwapClass<bimageImage_t> swap;
-		swap.Big( img.level );
-		swap.Big( img.destZ );
-		swap.Big( img.width );
-		swap.Big( img.height );
-		swap.Big( img.dataSize );
+		idSwapClass<bimageImage_t> imgSwap;
+		imgSwap.Big( img.level );
+		imgSwap.Big( img.destZ );
+		imgSwap.Big( img.width );
+		imgSwap.Big( img.height );
+		imgSwap.Big( img.dataSize );
 		assert( img.level >= 0 && img.level < fileData.numLevels );
 		assert( img.destZ == 0 || fileData.textureType == TT_CUBIC );
 		assert( img.dataSize > 0 );

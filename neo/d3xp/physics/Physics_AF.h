@@ -124,7 +124,7 @@ protected:
 							// simulation variables set by Evaluate
 	idMatX					J1, J2;						// matrix with left hand side of constraint equations
 	idVecX					c1, c2;						// right hand side of constraint equations
-	idVecX					lo, hi, e;					// low and high bounds and lcp epsilon
+	idVecX					lo, hi, eps;					// low and high bounds and lcp epsilon
 	idAFConstraint *		boxConstraint;				// constraint the boxIndex refers to
 	int						boxIndex[6];				// indexes for special box constrained variables
 

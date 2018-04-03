@@ -446,15 +446,15 @@ ID_INLINE void idDrawVert::LerpAll( const idDrawVert &a, const idDrawVert &b, co
 	xyz = ::Lerp( a.xyz, b.xyz, f );
 	SetTexCoord( ::Lerp( a.GetTexCoord(), b.GetTexCoord(), f ) );
 
-	idVec3 normal = ::Lerp( a.GetNormal(), b.GetNormal(), f );
-	idVec3 tangent = ::Lerp( a.GetTangent(), b.GetTangent(), f );
-	idVec3 bitangent = ::Lerp( a.GetBiTangent(), b.GetBiTangent(), f );
-	normal.Normalize();
-	tangent.Normalize();
-	bitangent.Normalize();
-	SetNormal( normal );
-	SetTangent( tangent );
-	SetBiTangent( bitangent );
+	idVec3 newNormal = ::Lerp( a.GetNormal(), b.GetNormal(), f );
+	idVec3 newTangent = ::Lerp( a.GetTangent(), b.GetTangent(), f );
+	idVec3 newBitangent = ::Lerp( a.GetBiTangent(), b.GetBiTangent(), f );
+	newNormal.Normalize();
+	newTangent.Normalize();
+	newBitangent.Normalize();
+	SetNormal( newNormal );
+	SetTangent( newTangent );
+	SetBiTangent( newBitangent );
 
 	color[0] = (byte)( a.color[0] + f * ( b.color[0] - a.color[0] ) );
 	color[1] = (byte)( a.color[1] + f * ( b.color[1] - a.color[1] ) );
@@ -472,8 +472,8 @@ ID_INLINE void idDrawVert::LerpAll( const idDrawVert &a, const idDrawVert &b, co
 idDrawVert::SetNativeOrderColor
 ========================
 */
-ID_INLINE void idDrawVert::SetNativeOrderColor( dword color ) {
-	*reinterpret_cast<dword *>(this->color) = color;
+ID_INLINE void idDrawVert::SetNativeOrderColor( dword c ) {
+	*reinterpret_cast<dword *>(this->color) = c;
 }
 
 /*
@@ -481,8 +481,8 @@ ID_INLINE void idDrawVert::SetNativeOrderColor( dword color ) {
 idDrawVert::SetColor
 ========================
 */
-ID_INLINE void idDrawVert::SetColor( dword color ) {
-	*reinterpret_cast<dword *>(this->color) = color;
+ID_INLINE void idDrawVert::SetColor( dword c ) {
+	*reinterpret_cast<dword *>(this->color) = c;
 }
 
 /*

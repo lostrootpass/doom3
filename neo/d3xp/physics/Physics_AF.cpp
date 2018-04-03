@@ -86,8 +86,8 @@ idAFConstraint::idAFConstraint() {
 	lo.SubVec6(0)		= -vec6_infinity;
 	hi.Zero( 6 );
 	hi.SubVec6(0)		= vec6_infinity;
-	e.SetSize( 6 );
-	e.SubVec6(0)		= vec6_lcp_epsilon;
+	eps.SetSize( 6 );
+	eps.SubVec6(0)		= vec6_lcp_epsilon;
 
 	boxConstraint		= NULL;
 	boxIndex[0]			= -1;
@@ -3031,7 +3031,7 @@ void idAFConstraint_Contact::Setup( idAFBody *b1, idAFBody *b2, contactInfo_t &c
 		c1[0] = 0.0f;
 	}
 
-	e[0] = CONTACT_LCP_EPSILON;
+	eps[0] = CONTACT_LCP_EPSILON;
 	lo[0] = 0.0f;
 	hi[0] = idMath::INFINITY;
 	boxConstraint = NULL;
@@ -3486,7 +3486,7 @@ bool idAFConstraint_ConeLimit::Add( idPhysics_AF *phys, float invTimeStep ) {
 	}
 
 	lo[0] = 0.0f;
-	e[0] = LIMIT_LCP_EPSILON;
+	eps[0] = LIMIT_LCP_EPSILON;
 
 	physics->AddFrameConstraint( this );
 
@@ -3755,7 +3755,7 @@ bool idAFConstraint_PyramidLimit::Add( idPhysics_AF *phys, float invTimeStep ) {
 	}
 
 	lo[0] = 0.0f;
-	e[0] = LIMIT_LCP_EPSILON;
+	eps[0] = LIMIT_LCP_EPSILON;
 
 	physics->AddFrameConstraint( this );
 
@@ -4014,7 +4014,7 @@ void idAFConstraint_Suspension::Evaluate( float invTimeStep ) {
 
 	c1[0] = -compression;		// + 0.5f * -velocity;
 
-	e[0] = 1e-4f;
+	eps[0] = 1e-4f;
 	lo[0] = 0.0f;
 	hi[0] = springForce;
 	boxConstraint = NULL;
@@ -5218,7 +5218,7 @@ void idPhysics_AF::AuxiliaryForces( float timeStep ) {
 			else {
 				boxIndex[k] = -1;
 			}
-			jmk[k][k] += constraint->e[j] * invStep;
+			jmk[k][k] += constraint->eps[j] * invStep;
 		}
 	}
 
