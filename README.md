@@ -2,7 +2,7 @@
 
 Installing
 ===
-Unzip [doom3vk.zip](releases/download/v1.0/doom3vk1.0.zip) into your Doom 3 BFG Edition install folder (by default it will be `C:\Program Files (x86)\Steam\steamapps\common\DOOM 3 BFG Edition`). Run `doom3vk.exe` and enjoy; the original doom3 executable installed by Steam is left as-is if you want to do side-by-side comparisons.
+Unzip [doom3vk.zip](https://github.com/lostrootpass/doom3/releases/download/v1.0/doom3vk.zip) into your Doom 3 BFG Edition install folder (by default it will be `C:\Program Files (x86)\Steam\steamapps\common\DOOM 3 BFG Edition`). Run `doom3vk.exe` and enjoy; the original doom3 executable installed by Steam is left as-is if you want to do side-by-side comparisons.
 
 Video
 ===
